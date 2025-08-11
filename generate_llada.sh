@@ -1,0 +1,22 @@
+uv run generate_llada.py \
+  --mlp_ratio 4 \
+  --d_model 512 \
+  --n_heads 16 \
+  --residual_dropout 0.1 \
+  --attention_dropout 0.1 \
+  --rope_theta 10000.0 \
+  --max_sequence_length 1024 \
+  --vocab_size 50304 \
+  --embedding_dropout 0.1 \
+  --n_layers 4 \
+  --device "cuda" \
+  --ckpt_path ./runs/2025-08-10_23-02-31_isgighbq/3000.ckpt \
+  --vocab_path ./data/gpt2_vocab.json \
+  --merges_path ./data/gpt2_merges.txt \
+  --special_tokens "<|endoftext|>" \
+  --prompt "Oh wow, it's Judy!" \
+  --mask_id 50257 \
+  --steps 256 \
+  --gen_length 256 \
+  --block_length 128 \
+  --temperature 0.0

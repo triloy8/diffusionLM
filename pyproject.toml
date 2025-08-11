@@ -7,8 +7,11 @@ requires-python = ">=3.11,<3.13"
 dependencies = [
     "numpy",
     "torch",
+    "jaxtyping>=0.3.0",
     "regex>=2024.11.6",
+    "wandb>=0.19.7",
     "tqdm>=4.67.1",
+    "einops>=0.8.1",
 ]
 
 [tool.uv]

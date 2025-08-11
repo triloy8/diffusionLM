@@ -1,3 +1,5 @@
+# adapted from https://huggingface.co/GSAI-ML/LLaDA-8B-Base/blob/main/modeling_llada.py
+
 from typing import (
     Optional,
     Tuple,
