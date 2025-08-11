@@ -1,10 +1,10 @@
-from modeling_llada import LLaDAModel
-from pretrain_llada_utils import (AdamW,
-                                  get_batch,
-                                  cross_entropy,
-                                  save_checkpoint,
-                                  lr_cosine_schedule,
-                                  gradient_clipping,)
+from diffusionlm.model.modeling_llada import LLaDAModel
+from diffusionlm.train.pretrain_llada_utils import (AdamW,
+                                                    get_batch,
+                                                    cross_entropy,
+                                                    save_checkpoint,
+                                                    lr_cosine_schedule,
+                                                    gradient_clipping,)
 
 from pathlib import Path
 import numpy as np

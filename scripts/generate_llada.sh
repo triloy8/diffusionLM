@@ -1,4 +1,4 @@
-uv run generate_llada.py \
+uv run -m diffusionlm.infer.generate_llada \
   --mlp_ratio 4 \
   --d_model 512 \
   --n_heads 16 \

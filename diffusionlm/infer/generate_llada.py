@@ -1,6 +1,6 @@
 # adapted from https://github.com/ML-GSAI/LLaDA/blob/main/generate.py
-from tokenizer import Tokenizer
-from modeling_llada import LLaDAModel
+from diffusionlm.model.tokenizer import Tokenizer
+from diffusionlm.model.modeling_llada import LLaDAModel
 
 import torch
 import numpy as np

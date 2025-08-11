@@ -1,4 +1,4 @@
-from tokenizer_utils import gpt2_bytes_to_unicode
+from diffusionlm.model.tokenizer_utils import gpt2_bytes_to_unicode
 from typing import Iterable, Iterator
 import json
 import regex as re

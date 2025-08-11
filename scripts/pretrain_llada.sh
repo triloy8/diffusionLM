@@ -1,4 +1,4 @@
-uv run pretrain_llada.py \
+uv run -m diffusionlm.train.pretrain_llada \
   --runs_path ./runs \
   --np_dat_train_path ./data/TinyStoriesV2-GPT4-train.dat \
   --total_train_tokens 547994686 \
