@@ -1,30 +1,27 @@
 import torch
-import pytest
-
 from diffusionlm.models import MultiheadSelfAttentionRoPE, scaled_dot_product_attention
 from diffusionlm.models import RotaryPositionalEmbedding
 from diffusionlm.inference import softmax
 
 
-def test_causal_mask_invariance(device):
-    # Test invariance using the core scaled_dot_product_attention function
+def test_full_attention_responds_to_future_tokens(device):
+    # With bidirectional attention, perturbing later tokens should affect earlier outputs.
     B, T, d_k = 1, 4, 6
     Q = torch.randn(B, T, d_k, device=device)
     K = torch.randn(B, T, d_k, device=device)
     V = torch.randn(B, T, d_k, device=device)
-    mask = torch.tril(torch.ones(T, T, dtype=torch.bool, device=device))
 
-    out1 = scaled_dot_product_attention(Q, K, V, mask)
+    out1 = scaled_dot_product_attention(Q, K, V)
 
-    # Modify future tokens (> i) and confirm outputs up to i unchanged
+    # Modify future tokens (> i) and confirm outputs up to i change as well
     i = 1
     Q2, K2, V2 = Q.clone(), K.clone(), V.clone()
     Q2[:, i + 1 :, :] += 1.0
     K2[:, i + 1 :, :] += 1.0
     V2[:, i + 1 :, :] += 1.0
-    out2 = scaled_dot_product_attention(Q2, K2, V2, mask)
+    out2 = scaled_dot_product_attention(Q2, K2, V2)
 
-    assert torch.allclose(out1[:, : i + 1, :], out2[:, : i + 1, :], atol=1e-6, rtol=1e-5)
+    assert not torch.allclose(out1[:, : i + 1, :], out2[:, : i + 1, :], atol=1e-6, rtol=1e-5)
 
 
 def test_softmax_matches_torch(device):
@@ -58,7 +55,7 @@ def test_rope_shapes_and_norm_preservation(device):
     assert torch.allclose(x_norms, y_norms, atol=1e-5, rtol=1e-4)
 
 
-def test_end_to_end_causal_invariance_with_mhsa_rope(device):
+def test_end_to_end_full_attention_with_mhsa_rope(device):
     d_model = 8
     num_heads = 2  # ensures per-head dim is even
     max_seq_len = 8
@@ -80,7 +77,7 @@ def test_end_to_end_causal_invariance_with_mhsa_rope(device):
     x2[:, i + 1 :, :] += 1.0
     out2 = attn(x2, tok_pos)
 
-    assert torch.allclose(out1[:, : i + 1, :], out2[:, : i + 1, :], atol=1e-6, rtol=1e-5)
+    assert not torch.allclose(out1[:, : i + 1, :], out2[:, : i + 1, :], atol=1e-6, rtol=1e-5)
 
 
 def test_head_split_merge_preserves_feature_dimension(device):

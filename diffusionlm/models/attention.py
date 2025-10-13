@@ -54,22 +54,19 @@ class RotaryPositionalEmbedding(torch.nn.Module):
             return x_rotated.flatten(-2)
 
 
-def scaled_dot_product_attention(Q: torch.Tensor, K: torch.Tensor, V: torch.Tensor, mask: torch.Tensor):
+def scaled_dot_product_attention(Q: torch.Tensor, K: torch.Tensor, V: torch.Tensor):
     if nvtx.enabled("fine"):
         with nvtx.range("sdpa/qk"):
             qk_score = einsum(Q, K, "batch_size ... n d_k, batch_size ... m d_k -> batch_size ... n m") / torch.sqrt(torch.tensor(Q.shape[-1]))
-        with nvtx.range("sdpa/mask"):
-            masked_qk_score = qk_score.masked_fill(~mask, float('-inf'))
         with nvtx.range("sdpa/softmax"):
-            softmax_masked_qk_score = softmax(masked_qk_score, dim=-1)
+            softmax_qk_score = softmax(qk_score, dim=-1)
         with nvtx.range("sdpa/attnV"):
-            attn = einsum(softmax_masked_qk_score, V, "batch_size ... n m, batch_size ... m d_k -> batch_size ... n d_k")
+            attn = einsum(softmax_qk_score, V, "batch_size ... n m, batch_size ... m d_k -> batch_size ... n d_k")
         return attn
     else:
         qk_score = einsum(Q, K, "batch_size ... n d_k, batch_size ... m d_k -> batch_size ... n m") / torch.sqrt(torch.tensor(Q.shape[-1]))
-        masked_qk_score = qk_score.masked_fill(~mask, float('-inf'))
-        softmax_masked_qk_score = softmax(masked_qk_score, dim=-1)
-        attn = einsum(softmax_masked_qk_score, V, "batch_size ... n m, batch_size ... m d_k -> batch_size ... n d_k")
+        softmax_qk_score = softmax(qk_score, dim=-1)
+        attn = einsum(softmax_qk_score, V, "batch_size ... n m, batch_size ... m d_k -> batch_size ... n d_k")
         return attn
 
 
@@ -89,8 +86,6 @@ class MultiheadSelfAttentionRoPE(nn.Module):
         self.output_proj = Linear(self.d_model, self.d_model, device=device, dtype=dtype)
 
         self.rope = RotaryPositionalEmbedding(self.theta, self.d_k, self.max_seq_len, device)
-        self.register_buffer("mask", torch.tril(torch.ones(max_seq_len, max_seq_len, device=device, dtype=torch.bool)))
-
     def forward(self, x: torch.Tensor, token_positions: torch.Tensor) -> torch.Tensor:
         with nvtx.range("attn/q_proj"):
             wqx = self.q_proj(x)
@@ -124,7 +119,7 @@ class MultiheadSelfAttentionRoPE(nn.Module):
 
         seq_len = token_positions.shape[-1]
         with nvtx.range("attn/sdpa"):
-            attn = scaled_dot_product_attention(wqx_rearr_rope, wkx_rearr_rope, wvx_rearr, self.mask[:seq_len, :seq_len])
+            attn = scaled_dot_product_attention(wqx_rearr_rope, wkx_rearr_rope, wvx_rearr)
         if nvtx.enabled("fine"):
             with nvtx.range("attn/merge_heads"):
                 attn_rearr = rearrange(attn, "... num_heads seq_len d_v -> ... seq_len (num_heads d_v)", num_heads=self.num_heads, d_v=self.d_v)

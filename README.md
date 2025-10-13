@@ -82,8 +82,9 @@ uv run diffusionlm-train --config config/resources/train.toml --print-config
 ## Modules
 
 - diffusionlm.models
-  - Purpose: Core Transformer components and the decoder‑only LM.
+  - Purpose: Core Transformer components with bidirectional self-attention for diffusion-style language modelling.
   - Key files: `diffusionlm/models/transformer.py`, `diffusionlm/models/attention.py`, `diffusionlm/models/layers.py`.
+    (Attention is unmasked/bidirectional by default.)
   - Notes: dtype helpers under `diffusionlm/utils/dtypes.py`.
 
 - diffusionlm.training
