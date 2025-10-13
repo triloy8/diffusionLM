@@ -34,13 +34,18 @@ def main():
         rope_theta=cfg_dc.model.rope_theta,
         device=cfg_dc.model.device,
         dtype=cfg_dc.model.dtype,
+        mask_token_id=cfg_dc.model.mask_token_id,
+        noise_epsilon=cfg_dc.model.noise_epsilon,
+        random_trunc_prob=cfg_dc.model.random_trunc_prob,
         # checkpoint
         ckpt_path=str(cfg_dc.checkpoint.ckpt_path),
         # inference
-        text_list=list(cfg_dc.inference.text_list),
+        prompt=cfg_dc.inference.prompt,
+        steps=cfg_dc.inference.steps,
+        gen_length=cfg_dc.inference.gen_length,
+        block_length=cfg_dc.inference.block_length,
         temperature=cfg_dc.inference.temperature,
-        p=cfg_dc.inference.p,
-        eos_token_id=cfg_dc.inference.eos_token_id,
+        mask_id=cfg_dc.inference.mask_id,
     )
     logger = ConsoleLogger()
     _ = infer_transformer(ns, logger=logger)

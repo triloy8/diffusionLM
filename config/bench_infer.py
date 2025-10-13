@@ -42,8 +42,9 @@ def load_bench_infer_config(path: Path | str) -> BenchInferConfig:
         vocab_path=_as_path(tok["vocab_path"]),
         special_tokens=list(tok.get("special_tokens", [])),
     )
+    vocab_size = int(m["vocab_size"])
     model = ModelConfig(
-        vocab_size=int(m["vocab_size"]),
+        vocab_size=vocab_size,
         context_length=int(m["context_length"]),
         d_model=int(m["d_model"]),
         num_layers=int(m["num_layers"]),
@@ -52,13 +53,18 @@ def load_bench_infer_config(path: Path | str) -> BenchInferConfig:
         rope_theta=float(m["rope_theta"]),
         device=str(m["device"]),
         dtype=str(m["dtype"]),
+        mask_token_id=int(m.get("mask_token_id", vocab_size - 1)),
+        noise_epsilon=float(m.get("noise_epsilon", 1e-3)),
+        random_trunc_prob=float(m.get("random_trunc_prob", 0.01)),
     )
     checkpoint = CheckpointConfig(ckpt_path=_as_path(c["ckpt_path"]))
     inference = InferenceConfig(
-        text_list=list(i["text_list"]),
-        temperature=float(i["temperature"]),
-        p=float(i["p"]),
-        eos_token_id=int(i["eos_token_id"]),
+        prompt=str(i["prompt"]),
+        steps=int(i["steps"]),
+        gen_length=int(i["gen_length"]),
+        block_length=int(i["block_length"]),
+        temperature=float(i.get("temperature", 1.0)),
+        mask_id=int(i.get("mask_id", model.mask_token_id)),
     )
     benchmark = BenchParams(
         warmup=int(b.get("warmup", 2)),

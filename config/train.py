@@ -36,8 +36,9 @@ def load_train_config(path: Path | str) -> TrainConfig:
     ddp: Dict[str, Any] = cfg.get("ddp", {})
     lg: Dict[str, Any] = cfg.get("logging", {})
 
+    vocab_size = int(m["vocab_size"])
     model = ModelConfig(
-        vocab_size=int(m["vocab_size"]),
+        vocab_size=vocab_size,
         context_length=int(m["context_length"]),
         d_model=int(m["d_model"]),
         num_layers=int(m["num_layers"]),
@@ -46,6 +47,9 @@ def load_train_config(path: Path | str) -> TrainConfig:
         rope_theta=float(m["rope_theta"]),
         device=str(m["device"]),
         dtype=str(m["dtype"]),
+        mask_token_id=int(m.get("mask_token_id", vocab_size - 1)),
+        noise_epsilon=float(m.get("noise_epsilon", 1e-3)),
+        random_trunc_prob=float(m.get("random_trunc_prob", 0.01)),
     )
     betas = o.get("betas", [0.9, 0.95])
     initial_lr = float(o.get("initial_learning_rate", o["max_learning_rate"]))

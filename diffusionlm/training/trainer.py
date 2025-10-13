@@ -105,6 +105,10 @@ def train_transformer(args, *, logger: Logger, run_name: str):
     noise_epsilon = getattr(cfg, "noise_epsilon", 1e-3)
     random_trunc_prob = getattr(cfg, "random_trunc_prob", 0.01)
 
+    setattr(cfg, "mask_token_id", mask_token_id)
+    setattr(cfg, "noise_epsilon", noise_epsilon)
+    setattr(cfg, "random_trunc_prob", random_trunc_prob)
+
     batch_getter = partial(
         get_batch,
         mask_token_id=mask_token_id,
@@ -210,6 +214,10 @@ def train_transformer_ddp(rank, args, cfg_dc):
     noise_epsilon = getattr(cfg, "noise_epsilon", 1e-3)
     random_trunc_prob = getattr(cfg, "random_trunc_prob", 0.01)
 
+    setattr(cfg, "mask_token_id", mask_token_id)
+    setattr(cfg, "noise_epsilon", noise_epsilon)
+    setattr(cfg, "random_trunc_prob", random_trunc_prob)
+
     batch_getter = partial(
         get_batch,
         mask_token_id=mask_token_id,
@@ -290,6 +298,9 @@ def build_run_config(cfg, cfg_dc):
         "num_heads": cfg.num_heads,
         "d_ff": cfg.d_ff,
         "rope_theta": cfg.rope_theta,
+        "mask_token_id": cfg.mask_token_id,
+        "noise_epsilon": getattr(cfg, "noise_epsilon", None),
+        "random_trunc_prob": getattr(cfg, "random_trunc_prob", None),
         "betas": cfg.betas,
         "eps": cfg.eps,
         "weight_decay": cfg.weight_decay,

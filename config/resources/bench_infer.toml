@@ -13,18 +13,20 @@ d_ff = 1344
 rope_theta = 10000.0
 device = "cuda"
 dtype = "float16"
+mask_token_id = 50256
+noise_epsilon = 0.001
+random_trunc_prob = 0.01
 
 [checkpoint]
 ckpt_path = "./runs/2025-10-12_18-51-44/5000.ckpt"
 
 [inference]
-text_list = [
-  "Once upon a time,",
-  "In a distant galaxy,",
-]
+prompt = "Once upon a time,"
+steps = 256
+gen_length = 256
+block_length = 128
 temperature = 1.0
-p = 0.9
-eos_token_id = 1
+mask_id = 50256
 
 [data]
 np_dat_valid_path = "./data/TinyStoriesV2-GPT4-valid.dat"

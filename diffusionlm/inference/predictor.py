@@ -12,7 +12,8 @@ def infer_transformer(args, *, logger: Optional[Logger] = None, artifact_path: O
     tokenizer = Tokenizer.from_files(
         vocab_filepath=args.vocab_path, merges_filepath=args.merges_path, special_tokens=args.special_tokens
     )
-    ids = [tokenizer.encode(text) for text in args.text_list]
+    prompts = [args.prompt]
+    ids = [tokenizer.encode(args.prompt)]
 
     model = TransformerLM(
         vocab_size=args.vocab_size,
@@ -37,10 +38,11 @@ def infer_transformer(args, *, logger: Optional[Logger] = None, artifact_path: O
             {
                 "phase": "infer",
                 "params.temperature": float(args.temperature),
-                "params.p": float(args.p),
-                "params.eos_token_id": int(args.eos_token_id),
-                "params.context_length": int(args.context_length),
-                "metrics.num_prompts": int(len(ids)),
+                "params.steps": int(args.steps),
+                "params.gen_length": int(args.gen_length),
+                "params.block_length": int(args.block_length),
+                "params.mask_id": int(args.mask_id),
+                "metrics.num_prompts": int(len(prompts)),
             }
         )
 
@@ -48,27 +50,26 @@ def infer_transformer(args, *, logger: Optional[Logger] = None, artifact_path: O
     out_indices = generate(
         model,
         in_indices=in_indices,
-        steps=args.context_length,
+        steps=args.gen_length,
         temperature=args.temperature,
-        p=args.p,
-        eos_token_id=args.eos_token_id,
+        p=0.0,
+        eos_token_id=None,
         context_length=args.context_length,
     )
     elapsed = time.time() - t0
 
     output_strings = []
-    for i, out_indices_ in enumerate(out_indices):
+    for prompt_text, out_indices_ in zip(prompts, out_indices):
         out_indices_list = out_indices_.tolist()
         output_string = tokenizer.decode(out_indices_list)
         output_strings.append(output_string)
         if logger is not None:
-            prompt_text = args.text_list[i]
             logger.log(
                 {
                     "phase": "infer",
                     "text.prompt": (prompt_text[:200] + ("…" if len(prompt_text) > 200 else "")),
                     "text.output": (output_string[:200] + ("…" if len(output_string) > 200 else "")),
-                    "metrics.prompt_len": int(len(ids[i])),
+                    "metrics.prompt_len": int(len(ids[0])),
                     "metrics.output_len": int(len(out_indices_list)),
                     "metrics.latency_ms": float(elapsed * 1000.0),
                 }
@@ -79,13 +80,12 @@ def infer_transformer(args, *, logger: Optional[Logger] = None, artifact_path: O
         try:
             import json
             with open(artifact_path, "w", encoding="utf-8") as f:
-                for i, s in enumerate(output_strings):
+                for prompt_text, s in zip(prompts, output_strings):
                     rec = {
-                        "prompt": args.text_list[i],
+                        "prompt": prompt_text,
                         "output": s,
                         "temperature": args.temperature,
-                        "p": args.p,
-                        "eos_token_id": args.eos_token_id,
+                        "steps": args.steps,
                     }
                     f.write(json.dumps(rec, ensure_ascii=False) + "\n")
             logger.log_artifact(artifact_path, name=artifact_path, type_="inference_outputs")

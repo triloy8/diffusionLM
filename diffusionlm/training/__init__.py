@@ -4,7 +4,7 @@ from .schedule import lr_cosine_schedule
 from .checkpoint import save_checkpoint, load_checkpoint
 from .grad import gradient_clipping
 from .loss import cross_entropy, diffusion_cross_entropy
-from .data import get_batch
+from .data import get_batch, DiffusionBatch
 
 __all__ = [
     "train_loop",
@@ -16,4 +16,5 @@ __all__ = [
     "cross_entropy",
     "diffusion_cross_entropy",
     "get_batch",
+    "DiffusionBatch",
 ]

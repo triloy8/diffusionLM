@@ -35,6 +35,9 @@ def test_train_config_happy_and_validation(tmp_path: Path):
     rope_theta = 10000.0
     device = "cpu"
     dtype = "float32"
+    mask_token_id = 31
+    noise_epsilon = 0.01
+    random_trunc_prob = 0.0
 
     [optimizer]
     betas = [0.9, 0.95]
@@ -109,17 +112,19 @@ def test_infer_config_happy_and_errors(tmp_path: Path):
     ckpt_path = "{ckpt.as_posix()}"
 
     [inference]
-    text_list = ["hello"]
+    prompt = "hello"
+    steps = 32
+    gen_length = 32
+    block_length = 8
     temperature = 1.0
-    p = 0.9
-    eos_token_id = 0
+    mask_id = 31
     """)
     cfg = load_infer_config(cfg_path)
     assert cfg.checkpoint.ckpt_path.exists()
 
-    # Invalid p
+    # Invalid block_length (does not divide gen_length)
     bad = tmp_path / "infer_bad.toml"
-    write(bad, cfg_path.read_text().replace("p = 0.9", "p = 1.5"))
+    write(bad, cfg_path.read_text().replace("block_length = 8", "block_length = 5"))
     with pytest.raises(ValueError):
         load_infer_config(bad)
 

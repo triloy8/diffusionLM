@@ -51,7 +51,7 @@ def toy_training_bundle(device) -> TrainingBundle:
     dataset = build_toy_language_modeling_dataset(device=device, context_length=2)
 
     model_cfg = ModelConfig(
-        vocab_size=dataset.vocab_size,
+        vocab_size=dataset.vocab_size + 1,
         context_length=dataset.context_length,
         d_model=16,
         num_layers=2,
@@ -60,6 +60,9 @@ def toy_training_bundle(device) -> TrainingBundle:
         rope_theta=10000.0,
         device=str(device),
         dtype="float32",
+        mask_token_id=dataset.vocab_size,
+        noise_epsilon=1e-3,
+        random_trunc_prob=0.0,
     )
 
     optimizer_cfg = OptimizerConfig(

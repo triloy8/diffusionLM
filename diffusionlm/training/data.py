@@ -44,6 +44,9 @@ def get_batch(
     device_obj = torch.device(device)
     rng_device = generator.device if generator is not None and hasattr(generator, "device") else torch.device("cpu")
 
+    if dataset_len <= context_length:
+        raise ValueError("dataset must be longer than context_length")
+
     sampled_sequence_stack = []
     for _ in range(batch_size):
         if generator is not None:

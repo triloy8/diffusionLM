@@ -86,7 +86,8 @@ def main():
             merges_filepath=str(cfg.tokenizer.merges_path),
             special_tokens=cfg.tokenizer.special_tokens,
         )
-        ids: List[List[int]] = [tokenizer.encode(text) for text in cfg.inference.text_list]
+        prompts: List[str] = [cfg.inference.prompt]
+        ids: List[List[int]] = [tokenizer.encode(prompt) for prompt in prompts]
     prompt_lens = [len(x) for x in ids]
     batch_size = len(ids)
 
@@ -134,8 +135,9 @@ def main():
         "rope_theta": cfg.model.rope_theta,
         # sampling
         "temperature": cfg.inference.temperature,
-        "p": cfg.inference.p,
-        "eos_token_id": cfg.inference.eos_token_id,
+        "steps": cfg.inference.steps,
+        "gen_length": cfg.inference.gen_length,
+        "block_length": cfg.inference.block_length,
         # bench
         "warmup": cfg.benchmark.warmup,
         "repeats": cfg.benchmark.repeats,

@@ -30,6 +30,12 @@ def _validate_model(m: ModelConfig) -> None:
             raise ValueError(f"{k} must be > 0")
     if m.rope_theta <= 0:
         raise ValueError("rope_theta must be > 0")
+    if not (0 <= m.mask_token_id < m.vocab_size):
+        raise ValueError("mask_token_id must be in [0, vocab_size)")
+    if not (0.0 < m.noise_epsilon <= 1.0):
+        raise ValueError("noise_epsilon must be in (0, 1]")
+    if not (0.0 <= m.random_trunc_prob <= 1.0):
+        raise ValueError("random_trunc_prob must be in [0, 1]")
 
 
 def _validate_optimizer(o: OptimizerConfig) -> None:
@@ -68,14 +74,18 @@ def _validate_data(d: DataConfig) -> None:
 
 
 def _validate_inference(i: InferenceConfig) -> None:
+    if not i.prompt:
+        raise ValueError("prompt must not be empty")
+    if i.steps <= 0:
+        raise ValueError("steps must be > 0")
+    if i.gen_length <= 0:
+        raise ValueError("gen_length must be > 0")
+    if i.block_length <= 0 or i.gen_length % i.block_length != 0:
+        raise ValueError("block_length must be > 0 and divide gen_length")
     if i.temperature <= 0:
         raise ValueError("temperature must be > 0")
-    if not (0 <= i.p <= 1):
-        raise ValueError("p must be in [0, 1]")
-    if i.eos_token_id < 0:
-        raise ValueError("eos_token_id must be >= 0")
-    if not i.text_list:
-        raise ValueError("text_list must not be empty")
+    if i.mask_id < 0:
+        raise ValueError("mask_id must be >= 0")
 
 
 def _validate_tokenizer(tok: TokenizerConfig) -> None:

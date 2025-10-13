@@ -9,7 +9,7 @@ A minimal, from‑scratch Transformer language model implementation with a small
 - From‑scratch model: decoder‑only Transformer LM (RMSNorm, SwiGLU, RoPE, SDPA/MHA), implemented directly with PyTorch modules.
 - From‑scratch training: AdamW optimizer, cosine LR schedule, gradient clipping, checkpointing.
 - From‑scratch tokenizer: byte‑level BPE training and IO, producing `vocab.json` and `merges.txt`.
-- From‑scratch inference: temperature and top‑p sampling with optional EOS handling.
+- Diffusion inference: bidirectional decoding with configurable mask scheduling (steps, block length, temperature).
 - Databuilder: memmap pipeline for large corpora (token counting and ID writing).
 - CLI + TOML configs: consistent, simple entry points.
 - Logging: console JSON or Weights & Biases.
@@ -90,10 +90,12 @@ uv run diffusionlm-train --config config/resources/train.toml --print-config
 - diffusionlm.training
   - Purpose: Training loop, loss, optimizer, schedule, checkpointing, and batching over memmap data.
   - Key files: `diffusionlm/training/trainer.py`, `diffusionlm/training/loop.py`, `diffusionlm/training/optim.py`, `diffusionlm/training/schedule.py`, `diffusionlm/training/checkpoint.py`, `diffusionlm/training/data.py`.
+  - Notes: `[model]` config now includes `mask_token_id`, `noise_epsilon`, and `random_trunc_prob` for diffusion-aware batching.
 
 - diffusionlm.inference
   - Purpose: Sampling utilities and simple generation helpers.
   - Key files: `diffusionlm/inference/generate.py`, `diffusionlm/inference/sampling.py`, `diffusionlm/inference/predictor.py`.
+  - Notes: Inference configs provide `prompt`, `steps`, `gen_length`, `block_length`, `temperature`, and `mask_id` for diffusion decoding.
 
 - diffusionlm.tokenizer
   - Purpose: From‑scratch byte‑level BPE trainer and tokenizer IO.

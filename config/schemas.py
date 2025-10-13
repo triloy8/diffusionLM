@@ -18,6 +18,9 @@ class ModelConfig:
     rope_theta: float
     device: str
     dtype: str
+    mask_token_id: int
+    noise_epsilon: float = 1e-3
+    random_trunc_prob: float = 0.01
 
 
 @dataclass
@@ -103,10 +106,16 @@ class CheckpointConfig:
 
 @dataclass
 class InferenceConfig:
-    text_list: List[str]
+    prompt: str
+    steps: int
+    gen_length: int
+    block_length: int
     temperature: float
-    p: float
-    eos_token_id: int
+    mask_id: int
+    gen_length: int
+    block_length: int
+    temperature: float
+    mask_id: int
 
 
 @dataclass

@@ -13,12 +13,17 @@ d_ff = 1344
 rope_theta = 10000.0
 device = "cuda"
 dtype = "float16"
+mask_token_id = 50256
+noise_epsilon = 0.001
+random_trunc_prob = 0.01
 
 [checkpoint]
 ckpt_path = "./runs/2025-08-04_00-16-58_28jyumc2/2000.ckpt"
 
 [inference]
-text_list = ["I love Lily", "I love John", "I love Judy"]
+prompt = "I love Lily"
+steps = 256
+gen_length = 256
+block_length = 128
 temperature = 0.9
-p = 0.3
-eos_token_id = 50256
+mask_id = 50256
