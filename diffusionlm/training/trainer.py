@@ -3,8 +3,8 @@ from diffusionlm.models import (
     Linear,
 )
 from diffusionlm.training.optim import AdamW
-from diffusionlm.training.data import get_batch
-from diffusionlm.training.loss import cross_entropy
+from diffusionlm.training.data import get_batch, DiffusionBatch
+from diffusionlm.training.loss import diffusion_cross_entropy
 from diffusionlm.training.checkpoint import save_checkpoint
 from diffusionlm.training.schedule import lr_cosine_schedule
 from diffusionlm.training.grad import gradient_clipping
@@ -16,6 +16,7 @@ import os
 import random
 import torch
 import torch.distributed as dist
+from functools import partial
 
 from diffusionlm.utils.dtypes import DTYPES
 from logger import Logger
@@ -100,6 +101,20 @@ def train_transformer(args, *, logger: Logger, run_name: str):
         if isinstance(module, Linear):
             module.register_forward_hook(get_activation_norm_hook(name))
 
+    mask_token_id = getattr(cfg, "mask_token_id", cfg.vocab_size - 1)
+    noise_epsilon = getattr(cfg, "noise_epsilon", 1e-3)
+    random_trunc_prob = getattr(cfg, "random_trunc_prob", 0.01)
+
+    batch_getter = partial(
+        get_batch,
+        mask_token_id=mask_token_id,
+        noise_epsilon=noise_epsilon,
+        random_trunc_prob=random_trunc_prob,
+    )
+
+    def _compute_loss(logits: torch.Tensor, batch) -> torch.Tensor:
+        return diffusion_cross_entropy(logits, batch.clean_targets, batch.mask, batch.p_mask)
+
     train_loop(
         model,
         optimizer,
@@ -118,11 +133,11 @@ def train_transformer(args, *, logger: Logger, run_name: str):
         grad_clip_max_l2_norm=cfg.grad_clip_max_l2_norm,
         ckpting_save_iter=cfg.ckpting_save_iter,
         ckpting_save_folder=ckpting_save_folder,
-        get_batch=get_batch,
-        cross_entropy=cross_entropy,
+        get_batch=batch_getter,
         lr_cosine_schedule=lr_cosine_schedule,
         gradient_clipping=gradient_clipping,
         save_checkpoint=save_checkpoint,
+        compute_loss=_compute_loss,
         batch_generator=torch_generator,
         logger=logger,
         activation_norms=activation_norms,
@@ -191,8 +206,34 @@ def train_transformer_ddp(rank, args, cfg_dc):
     # broadcast model params/buffers from rank 0 via DDP helper
     ddp_model.broadcast_parameters(src=0)
 
-    def _shard(seq: torch.Tensor, ids: torch.Tensor, ws: int, rk: int):
-        return torch.chunk(seq, ws, dim=0)[rk], torch.chunk(ids, ws, dim=0)[rk]
+    mask_token_id = getattr(cfg, "mask_token_id", cfg.vocab_size - 1)
+    noise_epsilon = getattr(cfg, "noise_epsilon", 1e-3)
+    random_trunc_prob = getattr(cfg, "random_trunc_prob", 0.01)
+
+    batch_getter = partial(
+        get_batch,
+        mask_token_id=mask_token_id,
+        noise_epsilon=noise_epsilon,
+        random_trunc_prob=random_trunc_prob,
+    )
+
+    def _compute_loss(logits: torch.Tensor, batch) -> torch.Tensor:
+        return diffusion_cross_entropy(logits, batch.clean_targets, batch.mask, batch.p_mask)
+
+    def _shard_batch(batch_obj, ws: int, rk: int):
+        if isinstance(batch_obj, DiffusionBatch):
+            def _chunk(t: torch.Tensor) -> torch.Tensor:
+                return torch.chunk(t, ws, dim=0)[rk]
+
+            metadata = dict(batch_obj.metadata) if isinstance(batch_obj.metadata, dict) else {}
+            return DiffusionBatch(
+                noisy_inputs=_chunk(batch_obj.noisy_inputs),
+                clean_targets=_chunk(batch_obj.clean_targets),
+                mask=_chunk(batch_obj.mask),
+                p_mask=_chunk(batch_obj.p_mask),
+                metadata=metadata,
+            )
+        raise ValueError("DDP expects DiffusionBatch instances for sharding.")
 
     def _sync():
         ddp_model.finish_gradient_synchronization()
@@ -215,17 +256,17 @@ def train_transformer_ddp(rank, args, cfg_dc):
         grad_clip_max_l2_norm=cfg.grad_clip_max_l2_norm,
         ckpting_save_iter=cfg.ckpting_save_iter,
         ckpting_save_folder=ckpting_save_folder,
-        get_batch=get_batch,
-        cross_entropy=cross_entropy,
+        get_batch=batch_getter,
         lr_cosine_schedule=lr_cosine_schedule,
         gradient_clipping=gradient_clipping,
         save_checkpoint=save_checkpoint,
+        compute_loss=_compute_loss,
         batch_generator=torch_generator,
         logger=logger,
         activation_norms=activation_norms,
         log_activation_norms=True,
         log_weight_norms=True,
-        shard_batch=_shard,
+        shard_batch=_shard_batch,
         sync_gradients=_sync,
         reduce_metric=allreduce_mean,
         world_size=cfg.world_size,

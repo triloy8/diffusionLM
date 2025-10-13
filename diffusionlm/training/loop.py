@@ -3,8 +3,9 @@ from pathlib import Path
 import torch
 from torch._utils import _flatten_dense_tensors, _unflatten_dense_tensors
 import numpy as np
-from typing import Optional, Callable, Tuple
+from typing import Optional, Callable
 from logger import Logger
+from diffusionlm.training.data import DiffusionBatch
 
 
 def train_loop(
@@ -34,10 +35,12 @@ def train_loop(
     ckpting_save_folder: Path | str | None,
     # helpers
     get_batch,
-    cross_entropy,
     lr_cosine_schedule,
     gradient_clipping,
     save_checkpoint,
+    compute_loss,
+    prepare_batch: Optional[Callable[[object], object]] = None,
+    extract_model_inputs: Optional[Callable[[object], torch.Tensor]] = None,
     batch_generator: torch.Generator | None = None,
     # logging
     logger: Optional[Logger] = None,
@@ -46,7 +49,7 @@ def train_loop(
     log_activation_norms: bool = False,
     log_weight_norms: bool = False,
     # DDP/unified-loop hooks (optional)
-    shard_batch: Optional[Callable[[torch.Tensor, torch.Tensor, int, int], Tuple[torch.Tensor, torch.Tensor]]] = None,
+    shard_batch: Optional[Callable[[object, int, int], object]] = None,
     sync_gradients: Optional[Callable[[], None]] = None,
     reduce_metric: Optional[Callable[[float], float]] = None,
     world_size: int = 1,
@@ -58,15 +61,28 @@ def train_loop(
 ):
     """A minimal training loop extracted into a reusable function.
 
-    The caller supplies batching, loss, schedule, clipping, and checkpoint helpers.
-    If `log` is provided, it is called as `log(dict, step=iteration)`.
+    `compute_loss` consumes model logits and the prepared batch object.
     """
+    if compute_loss is None:
+        raise ValueError("compute_loss must be provided.")
+
+    prepare = prepare_batch or (lambda batch: batch)
+
+    def _inputs(batch_obj: object) -> torch.Tensor:
+        if extract_model_inputs is not None:
+            return extract_model_inputs(batch_obj)
+        if hasattr(batch_obj, "noisy_inputs"):
+            return getattr(batch_obj, "noisy_inputs")
+        if isinstance(batch_obj, dict) and "noisy_inputs" in batch_obj:
+            return batch_obj["noisy_inputs"]
+        raise ValueError("Prepared batch must expose `noisy_inputs` for model input.")
+
     train_iteration = start_iteration
     while True:
         model.train()
         # If sharding is requested, draw a larger batch so each rank gets a slice
         eff_batch_size = batch_size * world_size if shard_batch is not None else batch_size
-        train_batch_sampled_sequence, train_batch_sampled_ids = get_batch(
+        raw_train_batch = get_batch(
             dataset=np_arr_train_data,
             batch_size=eff_batch_size,
             context_length=context_length,
@@ -76,19 +92,40 @@ def train_loop(
 
         # Optional rank sharding for DDP
         if shard_batch is not None:
-            train_batch_sampled_sequence, train_batch_sampled_ids = shard_batch(
-                train_batch_sampled_sequence, train_batch_sampled_ids, world_size, local_rank
-            )
+            raw_train_batch = shard_batch(raw_train_batch, world_size, local_rank)
+
+        train_batch = prepare(raw_train_batch)
+        train_inputs = _inputs(train_batch)
 
         # forward
-        train_logits = model(train_batch_sampled_sequence)
-        train_loss = cross_entropy(train_logits, train_batch_sampled_ids).mean()
+        train_logits = model(train_inputs)
+        train_loss = compute_loss(train_logits, train_batch)
         # Optionally reduce metrics across ranks before logging
         tloss_val = float(train_loss.item())
         if reduce_metric is not None:
             tloss_val = float(reduce_metric(tloss_val))
         if logger is not None:
             logger.log({"phase": "train", "metrics.train_loss": tloss_val}, step=train_iteration)
+            batch_metadata = getattr(train_batch, "metadata", None)
+            if isinstance(batch_metadata, dict):
+                if "mask_ratio" in batch_metadata:
+                    logger.log(
+                        {
+                            "phase": "train",
+                            "metrics.mask_ratio": float(batch_metadata["mask_ratio"]),
+                        },
+                        step=train_iteration,
+                    )
+                if "random_truncation_applied" in batch_metadata:
+                    logger.log(
+                        {
+                            "phase": "train",
+                            "metrics.random_truncation_applied": float(
+                                batch_metadata["random_truncation_applied"]
+                            ),
+                        },
+                        step=train_iteration,
+                    )
 
         # activation norms (if hooks populate activation_norms)
         if logger is not None and log_activation_norms and activation_norms is not None and len(activation_norms) > 0:
@@ -147,15 +184,17 @@ def train_loop(
             running_val_loss = 0.0
             while True:
                 with torch.no_grad():
-                    val_batch_sampled_sequence, val_batch_sampled_ids = get_batch(
+                    raw_val_batch = get_batch(
                         dataset=np_arr_valid_data,
                         batch_size=batch_size,
                         context_length=context_length,
                         device=device,
                         generator=batch_generator,
                     )
-                    val_logits = model(val_batch_sampled_sequence)
-                    val_loss = cross_entropy(val_logits, val_batch_sampled_ids).mean()
+                    val_batch = prepare(raw_val_batch)
+                    val_inputs = _inputs(val_batch)
+                    val_logits = model(val_inputs)
+                    val_loss = compute_loss(val_logits, val_batch)
                     running_val_loss += float(val_loss.item())
                 val_iteration += 1
                 if max_val_iteration is not None and val_iteration >= max_val_iteration:
@@ -213,10 +252,12 @@ def train_loop_ddp(
     ckpting_save_iter: int,
     ckpting_save_folder: Path | str | None,
     get_batch,
-    cross_entropy,
     lr_cosine_schedule,
     gradient_clipping,
     save_checkpoint,
+    compute_loss,
+    prepare_batch: Optional[Callable[[object], object]] = None,
+    extract_model_inputs: Optional[Callable[[object], torch.Tensor]] = None,
     logger: Optional[Logger] = None,
     activation_norms: dict | None = None,
     log_activation_norms: bool = False,
@@ -228,8 +269,20 @@ def train_loop_ddp(
 ):
     """Thin wrapper calling unified train_loop with DDP hooks."""
 
-    def _shard(seq: torch.Tensor, ids: torch.Tensor, ws: int, rk: int):
-        return torch.chunk(seq, ws, dim=0)[rk], torch.chunk(ids, ws, dim=0)[rk]
+    def _shard(batch_obj: object, ws: int, rk: int):
+        if isinstance(batch_obj, DiffusionBatch):
+            def _chunk(t: torch.Tensor) -> torch.Tensor:
+                return torch.chunk(t, ws, dim=0)[rk]
+
+            metadata = dict(batch_obj.metadata) if isinstance(batch_obj.metadata, dict) else {}
+            return DiffusionBatch(
+                noisy_inputs=_chunk(batch_obj.noisy_inputs),
+                clean_targets=_chunk(batch_obj.clean_targets),
+                mask=_chunk(batch_obj.mask),
+                p_mask=_chunk(batch_obj.p_mask),
+                metadata=metadata,
+            )
+        raise ValueError("DDP shard_batch expects DiffusionBatch instances.")
 
     def _sync():
         ddp_model.finish_gradient_synchronization()
@@ -256,10 +309,12 @@ def train_loop_ddp(
         ckpting_save_iter=ckpting_save_iter,
         ckpting_save_folder=ckpting_save_folder,
         get_batch=get_batch,
-        cross_entropy=cross_entropy,
         lr_cosine_schedule=lr_cosine_schedule,
         gradient_clipping=gradient_clipping,
         save_checkpoint=save_checkpoint,
+        compute_loss=compute_loss,
+        prepare_batch=prepare_batch,
+        extract_model_inputs=extract_model_inputs,
         logger=logger,
         activation_norms=activation_norms,
         log_activation_norms=log_activation_norms,

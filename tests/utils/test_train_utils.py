@@ -79,11 +79,24 @@ def test_get_batch_shapes_and_targets(tmp_path, device):
     random.seed(0)
     arr = np.arange(50, dtype=np.int32)
     B, T = 2, 4
-    x, y = get_batch(arr, batch_size=B, context_length=T, device=str(device))
-    assert x.shape == (B, T)
-    assert y.shape == (B, T)
-    # For monotonic arr, targets equal inputs + 1
-    assert torch.all(y == x + 1)
+    generator = torch.Generator(device="cpu").manual_seed(123)
+    batch = get_batch(
+        arr,
+        batch_size=B,
+        context_length=T,
+        device=str(device),
+        mask_token_id=999,
+        noise_epsilon=1e-3,
+        random_trunc_prob=0.0,
+        generator=generator,
+    )
+    assert batch.clean_targets.shape == (B, T)
+    assert batch.noisy_inputs.shape == (B, T)
+    assert batch.mask.shape == (B, T)
+    assert batch.p_mask.shape == (B, T)
+    # With monotonic data and zero truncation prob, clean targets retain the original slices
+    diffs = batch.clean_targets[:, 1:] - batch.clean_targets[:, :-1]
+    assert torch.all(diffs == 1)
 
 
 def test_get_batch_raises_on_too_small_dataset(device):
@@ -91,7 +104,13 @@ def test_get_batch_raises_on_too_small_dataset(device):
     random.seed(0)
     arr = np.arange(3, dtype=np.int32)  # too small for T=4
     with pytest.raises(ValueError):
-        _ = get_batch(arr, batch_size=1, context_length=4, device=str(device))
+        _ = get_batch(
+            arr,
+            batch_size=1,
+            context_length=4,
+            device=str(device),
+            mask_token_id=0,
+        )
 
 
 def test_checkpointing_roundtrip(tmp_path, device):

@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Tuple
+from functools import partial
 import tempfile
 
 import numpy as np
@@ -11,9 +12,9 @@ import torch
 import torch.distributed as dist
 
 from diffusionlm.training.loop import train_loop
-from diffusionlm.training.data import get_batch
+from diffusionlm.training.data import get_batch, DiffusionBatch
 from diffusionlm.training.grad import gradient_clipping
-from diffusionlm.training.loss import cross_entropy
+from diffusionlm.training.loss import diffusion_cross_entropy
 from diffusionlm.training.schedule import lr_cosine_schedule
 from diffusionlm.training.optim import AdamW
 from diffusionlm.training.checkpoint import save_checkpoint, load_checkpoint
@@ -68,6 +69,20 @@ def _set_all_seeds(seed: int, device: torch.device) -> torch.Generator:
     generator = torch.Generator(device="cpu")
     generator.manual_seed(seed)
     return generator
+
+
+def _shard_diffusion_batch(batch: DiffusionBatch, world_size: int, rank: int) -> DiffusionBatch:
+    def _chunk(t: torch.Tensor) -> torch.Tensor:
+        return torch.chunk(t, world_size, dim=0)[rank]
+
+    metadata = dict(batch.metadata) if isinstance(batch.metadata, dict) else {}
+    return DiffusionBatch(
+        noisy_inputs=_chunk(batch.noisy_inputs),
+        clean_targets=_chunk(batch.clean_targets),
+        mask=_chunk(batch.mask),
+        p_mask=_chunk(batch.p_mask),
+        metadata=metadata,
+    )
 
 
 def _prepare_data_arrays(bundle: TrainingBundle) -> Tuple[np.ndarray, np.ndarray]:
@@ -129,7 +144,7 @@ def _run_loop(
     base_iteration: int,
     snapshots: List[TrainingStepSnapshot],
     hook: Optional[Callable[[int, torch.nn.Module, torch.optim.Optimizer], None]] = None,
-    shard_batch: Optional[Callable[[torch.Tensor, torch.Tensor, int, int], Tuple[torch.Tensor, torch.Tensor]]] = None,
+    shard_batch: Optional[Callable[[object, int, int], object]] = None,
     sync_gradients: Optional[Callable[[], None]] = None,
     reduce_metric: Optional[Callable[[float], float]] = None,
     world_size: int = 1,
@@ -144,6 +159,22 @@ def _run_loop(
     training_cfg = bundle.train_config.training
 
     step_callback = _make_step_callback(snapshots, hook)
+
+    mask_token_id = getattr(model_cfg, "mask_token_id", model_cfg.vocab_size - 1)
+    noise_epsilon = getattr(training_cfg, "noise_epsilon", 1e-3)
+    random_trunc_prob = getattr(training_cfg, "random_trunc_prob", 0.01)
+
+    batch_getter = partial(
+        get_batch,
+        mask_token_id=mask_token_id,
+        noise_epsilon=noise_epsilon,
+        random_trunc_prob=random_trunc_prob,
+    )
+
+    def _compute_loss(logits: torch.Tensor, batch) -> torch.Tensor:
+        if isinstance(batch, DiffusionBatch):
+            return diffusion_cross_entropy(logits, batch.clean_targets, batch.mask, batch.p_mask)
+        raise ValueError("Expected DiffusionBatch in training runner.")
 
     train_loop(
         module,
@@ -163,11 +194,11 @@ def _run_loop(
         grad_clip_max_l2_norm=optimizer_cfg.grad_clip_max_l2_norm,
         ckpting_save_iter=training_cfg.ckpting_save_iter,
         ckpting_save_folder=None,
-        get_batch=get_batch,
-        cross_entropy=cross_entropy,
+        get_batch=batch_getter,
         lr_cosine_schedule=lr_cosine_schedule,
         gradient_clipping=gradient_clipping,
         save_checkpoint=lambda *_, **__: None,
+        compute_loss=_compute_loss,
         batch_generator=generator,
         logger=None,
         activation_norms=None,
@@ -254,8 +285,10 @@ def run_training_steps_ddp(bundle: TrainingBundle, *, num_steps: int, seed: int 
         train_tokens_np, valid_tokens_np = _prepare_data_arrays(bundle)
         snapshots: List[TrainingStepSnapshot] = []
 
-        def _shard(seq: torch.Tensor, ids: torch.Tensor, ws: int, rk: int):
-            return torch.chunk(seq, ws, dim=0)[rk], torch.chunk(ids, ws, dim=0)[rk]
+        def _shard(batch_obj: object, ws: int, rk: int):
+            if isinstance(batch_obj, DiffusionBatch):
+                return _shard_diffusion_batch(batch_obj, ws, rk)
+            raise ValueError("Expected DiffusionBatch for sharding in tests.")
 
         def _sync():
             ddp_model.finish_gradient_synchronization()
@@ -417,8 +450,10 @@ def run_training_with_checkpoint_ddp(
         train_tokens_np, valid_tokens_np = _prepare_data_arrays(bundle)
         snapshots_resumed: List[TrainingStepSnapshot] = []
 
-        def _shard(seq: torch.Tensor, ids: torch.Tensor, ws: int, rk: int):
-            return torch.chunk(seq, ws, dim=0)[rk], torch.chunk(ids, ws, dim=0)[rk]
+        def _shard(batch_obj: object, ws: int, rk: int):
+            if isinstance(batch_obj, DiffusionBatch):
+                return _shard_diffusion_batch(batch_obj, ws, rk)
+            raise ValueError("Expected DiffusionBatch for sharding in tests.")
 
         def _sync():
             ddp_model.finish_gradient_synchronization()
@@ -486,8 +521,10 @@ def run_training_with_checkpoint_ddp(
                 np.random.set_state(state_holder["numpy_state"])
                 torch.random.set_rng_state(state_holder["torch_state"])
 
-                def _shard_resume(seq: torch.Tensor, ids: torch.Tensor, ws: int, rk: int):
-                    return torch.chunk(seq, ws, dim=0)[rk], torch.chunk(ids, ws, dim=0)[rk]
+                def _shard_resume(batch_obj: object, ws: int, rk: int):
+                    if isinstance(batch_obj, DiffusionBatch):
+                        return _shard_diffusion_batch(batch_obj, ws, rk)
+                    raise ValueError("Expected DiffusionBatch for sharding in resume tests.")
 
                 def _sync_resume():
                     ddp_model_resume.finish_gradient_synchronization()
