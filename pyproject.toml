@@ -1,17 +1,18 @@
 [project]
-name = "diffusionLM"
+name = "transformerlm"
 version = "1.0.0"
-description = "Exploring Diffusion Language Models"
+description = "A from scratch implementation of a Transformer Language Model"
 readme = "README.md"
 requires-python = ">=3.11,<3.13"
 dependencies = [
     "numpy",
-    "torch",
+    "pytest>=8.3.4",
     "jaxtyping>=0.3.0",
-    "regex>=2024.11.6",
-    "wandb>=0.19.7",
+    "torch",
     "tqdm>=4.67.1",
+    "wandb>=0.19.7",
     "einops>=0.8.1",
+    "regex>=2024.11.6",
 ]
 
 [tool.uv]
@@ -24,4 +25,48 @@ line-length = 120
 extend-select = ["UP"]
 ignore = [
     "F722"
+]
+
+[project.scripts]
+transformerlm-train = "cli.train:main"
+transformerlm-train-ddp = "cli.train_ddp:main"
+transformerlm-infer = "cli.infer:main"
+transformerlm-make-data = "cli.make_data:main"
+transformerlm-train-tokenizer = "cli.train_tokenizer:main"
+transformerlm-bench-infer = "benchmarking.bench_infer_latency:main"
+transformerlm-bench-tokenizer = "benchmarking.bench_tokenizer:main"
+
+[build-system]
+requires = ["setuptools>=69", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+package-dir = {"" = "."}
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["transformerlm*", "benchmarking*", "logger*", "cli*", "config*", "profiling*", "databuilder*", "ddp*"]
+
+[tool.setuptools.package-data]
+"config" = [
+  "resources/**",
+]
+exclude = [
+  "tests*",
+  "runs*",
+  "todo*",
+  "wandb*",
+  "configs*",
+  "scripts*",
+  "data*",
+  ".venv*",
+  ".*",
+]
+
+[tool.pytest.ini_options]
+addopts = ["-q"]
+markers = [
+  "slow: marks tests as slow (deselect with '-m \"not slow\"')",
+  "gpu: requires CUDA/GPU",
+  "cpu: requires only CPU resources",
 ]

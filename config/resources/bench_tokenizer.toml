@@ -1,0 +1,14 @@
+[tokenizer]
+merges_path = "path/to/merges.txt"
+vocab_path = "path/to/vocab.json"
+special_tokens = ["<|pad|>", "<|eos|>"]
+
+[input]
+text_list = [
+  "The quick brown fox jumps over the lazy dog.",
+  "To be, or not to be, that is the question.",
+  "Hello, world!",
+]
+
+[benchmark]
+repeats = 5

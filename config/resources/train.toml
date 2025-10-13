@@ -1,0 +1,45 @@
+[model]
+vocab_size = 50257
+context_length = 256
+d_model = 512
+num_layers = 4
+num_heads = 16
+d_ff = 1344
+rope_theta = 10000.0
+device = "cuda"
+dtype = "float32"
+
+[optimizer]
+betas = [0.9, 0.95]
+eps = 1e-8
+weight_decay = 0.001
+initial_learning_rate = 0.001
+max_learning_rate = 0.001
+min_learning_rate = 0.0001
+warmup_iters = 50
+cosine_cycle_iters = 4500
+grad_clip_max_l2_norm = 1.0
+
+[training]
+batch_size = 8
+max_train_iteration = 5000
+max_val_iteration = 10
+val_freq_iteration = 125
+ckpting_save_iter = 1000
+seed = 3407
+
+[data]
+runs_path = "./runs"
+np_dat_train_path = "./data/TinyStoriesV2-GPT4-train.dat"
+total_train_tokens = 547994686
+np_dat_valid_path = "./data/TinyStoriesV2-GPT4-valid.dat"
+total_val_tokens = 5535291
+
+[logging]
+backend = "wandb"
+architecture = "TransformerLM"
+dataset = "TinyStoriesV2-GPT4"
+
+[wandb]
+entity = "yiltro8-org"
+project = "transformer_lm"

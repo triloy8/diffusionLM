@@ -1,0 +1,14 @@
+[input]
+input_filename = "./data/TinyStoriesV2-GPT4-valid.txt"
+total_tokens = 5535291
+# input_filename = "./data/TinyStoriesV2-GPT4-train.txt"
+# total_tokens = 547994686
+
+[output]
+output_filename = "./data/TinyStoriesV2-GPT4-valid.dat"
+# output_filename = "./data/TinyStoriesV2-GPT4-train.dat"
+
+[tokenizer]
+vocab_path = "./data/gpt2_vocab.json"
+merges_path = "./data/gpt2_merges.txt"
+special_tokens = ["<|endoftext|>"]

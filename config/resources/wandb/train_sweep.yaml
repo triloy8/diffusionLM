@@ -1,0 +1,68 @@
+program: train_transformer.py
+method: bayes
+metric:
+  goal: minimize
+  name: val_loss
+parameters:
+  architecture:
+    value: Transformer LM
+  batch_size:
+    value: 4
+  ckpting_save_iter:
+    value: 125
+  context_length:
+    value: 256
+  d_ff:
+    value: 1344
+  d_model:
+    value: 512
+  dataset:
+    value: TinyStoriesV2-GPT4
+  device:
+    value: cuda
+  dtype:
+    value: float32
+  eps:
+    value: 1e-8
+  grad_clip_max_l2_norm:
+    value: 1.0
+  max_train_iteration:
+    value: 5000
+  max_val_iteration:
+    value: 10
+  num_heads:
+    value: 16
+  num_layers:
+    value: 4
+  rope_theta:
+    value: 10000
+  vocab_size:
+    value: 50257
+  cosine_cycle_iters:
+    distribution: int_uniform
+    max: 4500
+    min: 3000
+  initial_learning_rate:
+    distribution: uniform
+    max: 0.002
+    min: 0.00015
+  learning_rate:
+    distribution: uniform
+    max: 0.002
+    min: 0.0005
+  max_learning_rate:
+    distribution: uniform
+    max: 0.002
+    min: 0.00015
+  warmup_iters:
+    distribution: int_uniform
+    max: 200
+    min: 5
+  weight_decay:
+    distribution: uniform
+    max: 0.2
+    min: 0.005
+  min_learning_rate:
+    distribution: uniform
+    max: 0.0002
+    min: 1.5e-05

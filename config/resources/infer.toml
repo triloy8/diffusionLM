@@ -1,0 +1,24 @@
+[tokenizer]
+merges_path = "./data/gpt2_merges.txt"
+vocab_path = "./data/gpt2_vocab.json"
+special_tokens = ["<|endoftext|>"]
+
+[model]
+vocab_size = 50257
+context_length = 256
+d_model = 512
+num_layers = 4
+num_heads = 16
+d_ff = 1344
+rope_theta = 10000.0
+device = "cuda"
+dtype = "float16"
+
+[checkpoint]
+ckpt_path = "./runs/2025-08-04_00-16-58_28jyumc2/2000.ckpt"
+
+[inference]
+text_list = ["I love Lily", "I love John", "I love Judy"]
+temperature = 0.9
+p = 0.3
+eos_token_id = 50256
