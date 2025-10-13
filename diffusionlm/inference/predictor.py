@@ -1,9 +1,9 @@
-from transformerlm.tokenizer.tokenizer import Tokenizer
-from transformerlm.models import TransformerLM
-from transformerlm.inference.generate import generate
+from diffusionlm.tokenizer.tokenizer import Tokenizer
+from diffusionlm.models import TransformerLM
+from diffusionlm.inference.generate import generate
 import torch
 import time
-from transformerlm.utils.dtypes import DTYPES
+from diffusionlm.utils.dtypes import DTYPES
 from typing import Optional
 from logger import Logger
 

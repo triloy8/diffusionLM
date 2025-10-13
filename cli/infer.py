@@ -1,7 +1,7 @@
 import argparse
 
 from config import load_infer_config
-from transformerlm.inference.predictor import infer_transformer
+from diffusionlm.inference.predictor import infer_transformer
 from cli.utils import add_config_args, load_config_or_print
 from logger import ConsoleLogger
 

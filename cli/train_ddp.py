@@ -2,7 +2,7 @@ import argparse
 from pathlib import Path
 
 from config import load_train_config
-from transformerlm.training.trainer import train_transformer_ddp
+from diffusionlm.training.trainer import train_transformer_ddp
 from cli.utils import add_config_args, load_config_or_print
 
 import torch.multiprocessing as mp

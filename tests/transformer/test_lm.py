@@ -1,7 +1,7 @@
 import torch
 
-from transformerlm.models import TransformerLM
-from transformerlm.inference import top_p_filter, generate
+from diffusionlm.models import TransformerLM
+from diffusionlm.inference import top_p_filter, generate
 
 
 def make_tiny_model(device):

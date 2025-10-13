@@ -2,8 +2,8 @@ import torch
 import torch.nn as nn
 from profiling import nvtx
 
-from transformerlm.models.layers import Embedding, RMSNorm, SwiGLU, Linear
-from transformerlm.models.attention import MultiheadSelfAttentionRoPE
+from diffusionlm.models.layers import Embedding, RMSNorm, SwiGLU, Linear
+from diffusionlm.models.attention import MultiheadSelfAttentionRoPE
 
 
 class TransformerBlock(nn.Module):
@@ -60,4 +60,4 @@ class TransformerLM(nn.Module):
                 logits = self.lm_head(normed_output_seq)
             return logits
 
-    # Note: Decoding is done via `transformerlm.inference.generate.generate`.
+    # Note: Decoding is done via `diffusionlm.inference.generate.generate`.

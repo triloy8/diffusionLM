@@ -3,8 +3,8 @@ import torch
 import torch.nn as nn
 from profiling import nvtx
 
-from transformerlm.models.layers import Linear
-from transformerlm.inference.sampling import softmax
+from diffusionlm.models.layers import Linear
+from diffusionlm.inference.sampling import softmax
 
 
 class RotaryPositionalEmbedding(torch.nn.Module):

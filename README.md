@@ -25,7 +25,7 @@ Requires Python 3.11–3.12 and PyTorch. Using [`uv`](https://github.com/astral-
 
 ```bash
 # Print an example resolved config
-uv run transformerlm-train --config config/resources/train.toml --print-config
+uv run diffusionlm-train --config config/resources/train.toml --print-config
 ```
 
 - Or install the package locally (editable):
@@ -41,19 +41,19 @@ Entry points live in `cli/` and are driven by TOML configs in `config/resources/
 - Train the tokenizer (BPE):
 
 ```bash
-uv run transformerlm-train-tokenizer --config config/resources/train_tokenizer.toml
+uv run diffusionlm-train-tokenizer --config config/resources/train_tokenizer.toml
 ```
 
 - Start model training:
 
 ```bash
-uv run transformerlm-train --config config/resources/train.toml
+uv run diffusionlm-train --config config/resources/train.toml
 ```
 
 - Train with DDP:
 
 ```bash
-uv run transformerlm-train-ddp --config config/resources/train_ddp.toml
+uv run diffusionlm-train-ddp --config config/resources/train_ddp.toml
 ```
 
 Notes:
@@ -64,45 +64,45 @@ Notes:
 - Generate text:
 
 ```bash
-uv run transformerlm-infer --config config/resources/infer.toml
+uv run diffusionlm-infer --config config/resources/infer.toml
 ```
 
 - Build memmap datasets from raw text:
 
 ```bash
-uv run transformerlm-make-data --config config/resources/make_data.toml
+uv run diffusionlm-make-data --config config/resources/make_data.toml
 ```
 
 - Inspect effective configuration without running:
 
 ```bash
-uv run transformerlm-train --config config/resources/train.toml --print-config
+uv run diffusionlm-train --config config/resources/train.toml --print-config
 ```
 
 ## Modules
 
-- transformerlm.models
+- diffusionlm.models
   - Purpose: Core Transformer components and the decoder‑only LM.
-  - Key files: `transformerlm/models/transformer.py`, `transformerlm/models/attention.py`, `transformerlm/models/layers.py`.
-  - Notes: dtype helpers under `transformerlm/utils/dtypes.py`.
+  - Key files: `diffusionlm/models/transformer.py`, `diffusionlm/models/attention.py`, `diffusionlm/models/layers.py`.
+  - Notes: dtype helpers under `diffusionlm/utils/dtypes.py`.
 
-- transformerlm.training
+- diffusionlm.training
   - Purpose: Training loop, loss, optimizer, schedule, checkpointing, and batching over memmap data.
-  - Key files: `transformerlm/training/trainer.py`, `transformerlm/training/loop.py`, `transformerlm/training/optim.py`, `transformerlm/training/schedule.py`, `transformerlm/training/checkpoint.py`, `transformerlm/training/data.py`.
+  - Key files: `diffusionlm/training/trainer.py`, `diffusionlm/training/loop.py`, `diffusionlm/training/optim.py`, `diffusionlm/training/schedule.py`, `diffusionlm/training/checkpoint.py`, `diffusionlm/training/data.py`.
 
-- transformerlm.inference
+- diffusionlm.inference
   - Purpose: Sampling utilities and simple generation helpers.
-  - Key files: `transformerlm/inference/generate.py`, `transformerlm/inference/sampling.py`, `transformerlm/inference/predictor.py`.
+  - Key files: `diffusionlm/inference/generate.py`, `diffusionlm/inference/sampling.py`, `diffusionlm/inference/predictor.py`.
 
-- transformerlm.tokenizer
+- diffusionlm.tokenizer
   - Purpose: From‑scratch byte‑level BPE trainer and tokenizer IO.
-  - Key files: `transformerlm/tokenizer/bpe_trainer.py`, `transformerlm/tokenizer/tokenizer.py`, `transformerlm/tokenizer/pretokenize.py`, `transformerlm/tokenizer/io.py`.
+  - Key files: `diffusionlm/tokenizer/bpe_trainer.py`, `diffusionlm/tokenizer/tokenizer.py`, `diffusionlm/tokenizer/pretokenize.py`, `diffusionlm/tokenizer/io.py`.
   - Artifacts: `vocab.json`, `merges.txt` (with optional special tokens).
 
 - databuilder
   - Purpose: Dataset building helpers for large corpora (memmap writer, token counting).
   - Key files: `databuilder/dataset_builder.py`.
-  - Usage: driven via `transformerlm-make-data` and `config/resources/make_data.toml`.
+  - Usage: driven via `diffusionlm-make-data` and `config/resources/make_data.toml`.
 
 - cli
   - Purpose: Command‑line entry points wrapping configs and orchestration.
@@ -133,7 +133,7 @@ uv run transformerlm-train --config config/resources/train.toml --print-config
 
 - utils
   - Purpose: Small shared helpers.
-  - Key files: `transformerlm/utils/dtypes.py`.
+  - Key files: `diffusionlm/utils/dtypes.py`.
 
 ## Benchmarking
 
@@ -183,7 +183,7 @@ project = "your-project"
 - Inference logs include sampling params and truncated text:
   - Keys: `params.temperature`, `params.p`, `params.eos_token_id`, `text.prompt`, `text.output`, `metrics.latency_ms`.
 - Tip (console backend): Pipe to `jq` for readability:
-  - `uv run transformerlm-train --config config/resources/train.toml | jq -r "."`
+  - `uv run diffusionlm-train --config config/resources/train.toml | jq -r "."`
 
 ### DDP Policy
 - Rank-zero logging: only rank 0 constructs a real logger and emits logs; other ranks are no-ops via `RankZeroLogger`.
@@ -207,7 +207,7 @@ project = "your-project"
 ```bash
 TRANSFORMERLM_NVTX=1 TRANSFORMERLM_NVTX_LEVEL=fine \
   nsys profile -o result \
-  uv run transformerlm-train --config config/resources/train.toml
+  uv run diffusionlm-train --config config/resources/train.toml
 ```
 
 - Memory helpers (Python):

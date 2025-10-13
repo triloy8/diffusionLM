@@ -1,14 +1,14 @@
-from transformerlm.models import (
+from diffusionlm.models import (
     TransformerLM,
     Linear,
 )
-from transformerlm.training.optim import AdamW
-from transformerlm.training.data import get_batch
-from transformerlm.training.loss import cross_entropy
-from transformerlm.training.checkpoint import save_checkpoint
-from transformerlm.training.schedule import lr_cosine_schedule
-from transformerlm.training.grad import gradient_clipping
-from transformerlm.training.loop import train_loop
+from diffusionlm.training.optim import AdamW
+from diffusionlm.training.data import get_batch
+from diffusionlm.training.loss import cross_entropy
+from diffusionlm.training.checkpoint import save_checkpoint
+from diffusionlm.training.schedule import lr_cosine_schedule
+from diffusionlm.training.grad import gradient_clipping
+from diffusionlm.training.loop import train_loop
 
 from datetime import datetime
 import numpy as np
@@ -17,7 +17,7 @@ import random
 import torch
 import torch.distributed as dist
 
-from transformerlm.utils.dtypes import DTYPES
+from diffusionlm.utils.dtypes import DTYPES
 from logger import Logger
 from logger import ConsoleLogger, WandbLogger, RankZeroLogger
 from ddp import DDP, OptimizerStateSharding

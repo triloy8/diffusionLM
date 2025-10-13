@@ -692,7 +692,7 @@ wheels = [
 ]
 
 [[package]]
-name = "transformerlm"
+name = "diffusionlm"
 version = "1.0.0"
 source = { editable = "." }
 dependencies = [

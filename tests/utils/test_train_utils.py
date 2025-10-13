@@ -3,8 +3,8 @@ import numpy as np
 import torch
 import pytest
 
-from transformerlm.models import TransformerLM
-from transformerlm.training import (
+from diffusionlm.models import TransformerLM
+from diffusionlm.training import (
     cross_entropy,
     AdamW,
     lr_cosine_schedule,

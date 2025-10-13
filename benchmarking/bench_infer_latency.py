@@ -10,12 +10,12 @@ import torch
 
 from cli.utils import add_config_args, load_config_or_print
 from config import load_bench_infer_config
-from transformerlm.tokenizer.tokenizer import Tokenizer
-from transformerlm.models import TransformerLM
-from transformerlm.utils.dtypes import DTYPES
-from transformerlm.training.loss import cross_entropy
-from transformerlm.training.optim import AdamW
-from transformerlm.training.grad import gradient_clipping
+from diffusionlm.tokenizer.tokenizer import Tokenizer
+from diffusionlm.models import TransformerLM
+from diffusionlm.utils.dtypes import DTYPES
+from diffusionlm.training.loss import cross_entropy
+from diffusionlm.training.optim import AdamW
+from diffusionlm.training.grad import gradient_clipping
 from logger import ConsoleLogger
 from profiling import nvtx
 

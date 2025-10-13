@@ -1,6 +1,6 @@
 """Inference config loader (to be populated in Step 2)."""
 
-# Placeholder module; content will be moved from transformerlm/config.py
+# Placeholder module; content will be moved from diffusionlm/config.py
 from __future__ import annotations
 
 from pathlib import Path
@@ -66,4 +66,3 @@ def load_infer_config(path: Path | str) -> InferConfig:
             dataset=lg.get("dataset"),
         )
     return InferConfig(tokenizer=tokenizer, model=model, checkpoint=checkpoint, inference=inference, logging=logging)
-

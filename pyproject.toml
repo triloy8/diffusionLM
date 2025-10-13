@@ -1,5 +1,5 @@
 [project]
-name = "transformerlm"
+name = "diffusionlm"
 version = "1.0.0"
 description = "A from scratch implementation of a Transformer Language Model"
 readme = "README.md"
@@ -28,13 +28,13 @@ ignore = [
 ]
 
 [project.scripts]
-transformerlm-train = "cli.train:main"
-transformerlm-train-ddp = "cli.train_ddp:main"
-transformerlm-infer = "cli.infer:main"
-transformerlm-make-data = "cli.make_data:main"
-transformerlm-train-tokenizer = "cli.train_tokenizer:main"
-transformerlm-bench-infer = "benchmarking.bench_infer_latency:main"
-transformerlm-bench-tokenizer = "benchmarking.bench_tokenizer:main"
+diffusionlm-train = "cli.train:main"
+diffusionlm-train-ddp = "cli.train_ddp:main"
+diffusionlm-infer = "cli.infer:main"
+diffusionlm-make-data = "cli.make_data:main"
+diffusionlm-train-tokenizer = "cli.train_tokenizer:main"
+diffusionlm-bench-infer = "benchmarking.bench_infer_latency:main"
+diffusionlm-bench-tokenizer = "benchmarking.bench_tokenizer:main"
 
 [build-system]
 requires = ["setuptools>=69", "wheel"]
@@ -45,7 +45,7 @@ package-dir = {"" = "."}
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["transformerlm*", "benchmarking*", "logger*", "cli*", "config*", "profiling*", "databuilder*", "ddp*"]
+include = ["diffusionlm*", "benchmarking*", "logger*", "cli*", "config*", "profiling*", "databuilder*", "ddp*"]
 
 [tool.setuptools.package-data]
 "config" = [

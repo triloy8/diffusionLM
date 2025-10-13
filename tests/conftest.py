@@ -6,9 +6,9 @@ import pytest
 import numpy as np
 import torch
 
-from transformerlm.models import TransformerLM
-from transformerlm.training.optim import AdamW
-from transformerlm.utils.dtypes import DTYPES
+from diffusionlm.models import TransformerLM
+from diffusionlm.training.optim import AdamW
+from diffusionlm.utils.dtypes import DTYPES
 
 from tests.fixtures import TrainingBundle, build_toy_language_modeling_dataset
 

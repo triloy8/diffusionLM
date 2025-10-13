@@ -1,5 +1,5 @@
 import torch
-from transformerlm.inference.sampling import softmax, top_p_filter
+from diffusionlm.inference.sampling import softmax, top_p_filter
 
 
 @torch.no_grad()
@@ -49,4 +49,3 @@ def generate(
             if finished.all():
                 break
     return in_indices
-

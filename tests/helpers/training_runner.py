@@ -10,13 +10,13 @@ import random
 import torch
 import torch.distributed as dist
 
-from transformerlm.training.loop import train_loop
-from transformerlm.training.data import get_batch
-from transformerlm.training.grad import gradient_clipping
-from transformerlm.training.loss import cross_entropy
-from transformerlm.training.schedule import lr_cosine_schedule
-from transformerlm.training.optim import AdamW
-from transformerlm.training.checkpoint import save_checkpoint, load_checkpoint
+from diffusionlm.training.loop import train_loop
+from diffusionlm.training.data import get_batch
+from diffusionlm.training.grad import gradient_clipping
+from diffusionlm.training.loss import cross_entropy
+from diffusionlm.training.schedule import lr_cosine_schedule
+from diffusionlm.training.optim import AdamW
+from diffusionlm.training.checkpoint import save_checkpoint, load_checkpoint
 
 from ddp import DDP, OptimizerStateSharding
 from ddp.utils import setup_process_group, cleanup_process_group, allreduce_mean
