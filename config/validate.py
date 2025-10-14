@@ -78,10 +78,10 @@ def _validate_inference(i: InferenceConfig) -> None:
         raise ValueError("prompt must not be empty")
     if i.steps <= 0:
         raise ValueError("steps must be > 0")
-    if i.gen_length <= 0:
-        raise ValueError("gen_length must be > 0")
-    if i.block_length <= 0 or i.gen_length % i.block_length != 0:
-        raise ValueError("block_length must be > 0 and divide gen_length")
+    if i.total_length <= 0:
+        raise ValueError("total_length must be > 0")
+    if i.block_length <= 0:
+        raise ValueError("block_length must be > 0")
     if i.temperature <= 0:
         raise ValueError("temperature must be > 0")
     if i.mask_id < 0:

@@ -42,7 +42,7 @@ def main():
         # inference
         prompt=cfg_dc.inference.prompt,
         steps=cfg_dc.inference.steps,
-        gen_length=cfg_dc.inference.gen_length,
+        total_length=cfg_dc.inference.total_length,
         block_length=cfg_dc.inference.block_length,
         temperature=cfg_dc.inference.temperature,
         mask_id=cfg_dc.inference.mask_id,

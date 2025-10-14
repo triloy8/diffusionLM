@@ -27,7 +27,7 @@ def test_train_config_happy_and_validation(tmp_path: Path):
     write(cfg_path, f"""
     [model]
     vocab_size = 32
-    context_length = 8
+    context_length = 128
     d_model = 8
     num_layers = 1
     num_heads = 2
@@ -99,7 +99,7 @@ def test_infer_config_happy_and_errors(tmp_path: Path):
 
     [model]
     vocab_size = 32
-    context_length = 8
+    context_length = 128
     d_model = 8
     num_layers = 1
     num_heads = 2
@@ -114,17 +114,18 @@ def test_infer_config_happy_and_errors(tmp_path: Path):
     [inference]
     prompt = "hello"
     steps = 32
-    gen_length = 32
+    total_length = 64
     block_length = 8
     temperature = 1.0
     mask_id = 31
     """)
     cfg = load_infer_config(cfg_path)
     assert cfg.checkpoint.ckpt_path.exists()
+    assert cfg.inference.total_length == 64
 
-    # Invalid block_length (does not divide gen_length)
+    # Invalid block_length (must be > 0)
     bad = tmp_path / "infer_bad.toml"
-    write(bad, cfg_path.read_text().replace("block_length = 8", "block_length = 5"))
+    write(bad, cfg_path.read_text().replace("block_length = 8", "block_length = 0"))
     with pytest.raises(ValueError):
         load_infer_config(bad)
 

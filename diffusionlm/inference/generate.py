@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import math
+
 import torch
 from diffusionlm.inference.sampling import add_gumbel_noise, compute_transfer_schedule
 
@@ -20,19 +22,19 @@ def diffusion_generate(
 
     if prompt_indices.dim() != 2:
         raise ValueError("prompt_indices must be 2D (batch, seq)")
-    if gen_length <= 0:
-        raise ValueError("gen_length must be > 0")
     if block_length <= 0:
         raise ValueError("block_length must be > 0")
     if steps <= 0:
         raise ValueError("steps must be > 0")
-    if gen_length % block_length != 0:
-        raise ValueError("gen_length must be divisible by block_length")
 
-    blocks = gen_length // block_length
-    if steps % blocks != 0:
-        raise ValueError("steps must be divisible by the number of blocks")
-    steps_per_block = steps // blocks
+    if gen_length <= 0:
+        return prompt_indices
+
+    blocks = max(1, math.ceil(gen_length / block_length))
+    if steps < blocks:
+        raise ValueError("steps must be >= number of blocks")
+    base_steps = steps // blocks
+    extra_steps = steps % blocks
 
     device = prompt_indices.device
     batch_size, prompt_len = prompt_indices.shape
@@ -52,11 +54,14 @@ def diffusion_generate(
 
     for block_idx in range(blocks):
         block_start = prompt_len + block_idx * block_length
-        block_end = block_start + block_length
+        block_end = min(block_start + block_length, total_len)
+        block_steps = base_steps + (1 if block_idx < extra_steps else 0)
+        if block_steps <= 0:
+            block_steps = 1
         block_mask = (x[:, block_start:block_end] == mask_id)
-        transfer_counts = compute_transfer_schedule(block_mask, steps_per_block)
+        transfer_counts = compute_transfer_schedule(block_mask, block_steps)
 
-        for step_idx in range(steps_per_block):
+        for step_idx in range(block_steps):
             mask_index = (x == mask_id)
             logits = model(x)
             logits = add_gumbel_noise(logits, temperature, generator=generator)
@@ -77,12 +82,12 @@ def diffusion_generate(
                 k = int(transfer_counts[b, step_idx].item())
                 if k <= 0:
                     continue
-                # Guard in case of numerical issues when fewer masked tokens remain
                 available = confidence[b] > float("-inf")
-                if available.sum() < k:
-                    k = int(available.sum().item())
-                if k <= 0:
+                available_count = int(available.sum().item())
+                if available_count == 0:
                     continue
+                if available_count < k:
+                    k = available_count
                 topk_indices = torch.topk(confidence[b], k=k, dim=-1).indices
                 transfer_mask[b, topk_indices] = True
 

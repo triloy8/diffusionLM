@@ -92,6 +92,10 @@ def main():
         ids: List[List[int]] = [tokenizer.encode(prompt) for prompt in prompts]
     prompt_lens = [len(x) for x in ids]
     batch_size = len(ids)
+    total_length = int(cfg.inference.total_length)
+    if total_length > cfg.model.context_length:
+        raise ValueError("inference.total_length must be <= model.context_length")
+    gen_length = max(total_length - prompt_lens[0], 0)
 
     # Model
     with nvtx.range("bench/setup/model_load"):
@@ -138,7 +142,8 @@ def main():
         # sampling
         "temperature": cfg.inference.temperature,
         "steps": cfg.inference.steps,
-        "gen_length": cfg.inference.gen_length,
+        "total_length": total_length,
+        "gen_length": gen_length,
         "block_length": cfg.inference.block_length,
         "mask_id": cfg.inference.mask_id,
         # bench
@@ -210,7 +215,7 @@ def main():
                                 in_indices,
                                 mask_id=int(cfg.inference.mask_id),
                                 steps=int(cfg.inference.steps),
-                                gen_length=int(cfg.inference.gen_length),
+                                gen_length=int(gen_length),
                                 block_length=int(cfg.inference.block_length),
                                 temperature=float(cfg.inference.temperature),
                             )
@@ -220,14 +225,19 @@ def main():
                             in_indices,
                             mask_id=int(cfg.inference.mask_id),
                             steps=int(cfg.inference.steps),
-                            gen_length=int(cfg.inference.gen_length),
+                            gen_length=int(gen_length),
                             block_length=int(cfg.inference.block_length),
                             temperature=float(cfg.inference.temperature),
                         )
-            processed_tokens = int(cfg.inference.gen_length) * batch_size * int(cfg.benchmark.steps)
+            processed_tokens = int(gen_length) * batch_size * int(cfg.benchmark.steps)
             processed_tokens_last = processed_tokens
             mask_ratio_last = None
             return output
+
+        if gen_length <= 0:
+            processed_tokens_last = 0
+            mask_ratio_last = None
+            return None
 
         model.train()
         last_loss = None

@@ -61,7 +61,7 @@ def load_bench_infer_config(path: Path | str) -> BenchInferConfig:
     inference = InferenceConfig(
         prompt=str(i["prompt"]),
         steps=int(i["steps"]),
-        gen_length=int(i["gen_length"]),
+        total_length=int(i.get("total_length", model.context_length)),
         block_length=int(i["block_length"]),
         temperature=float(i.get("temperature", 1.0)),
         mask_id=int(i.get("mask_id", model.mask_token_id)),

@@ -108,11 +108,7 @@ class CheckpointConfig:
 class InferenceConfig:
     prompt: str
     steps: int
-    gen_length: int
-    block_length: int
-    temperature: float
-    mask_id: int
-    gen_length: int
+    total_length: int
     block_length: int
     temperature: float
     mask_id: int

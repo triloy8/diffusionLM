@@ -18,12 +18,12 @@ noise_epsilon = 0.001
 random_trunc_prob = 0.01
 
 [checkpoint]
-ckpt_path = "./runs/2025-08-04_00-16-58_28jyumc2/2000.ckpt"
+ckpt_path = "./runs/2025-10-14_10-42-53/5000.ckpt"
 
 [inference]
-prompt = "I love Lily"
+prompt = "Oh wow, it's Judy!"
 steps = 256
-gen_length = 256
+total_length = 256
 block_length = 128
-temperature = 0.9
+temperature = 0.01
 mask_id = 50256

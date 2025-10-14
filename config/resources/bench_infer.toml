@@ -18,14 +18,14 @@ noise_epsilon = 0.001
 random_trunc_prob = 0.01
 
 [checkpoint]
-ckpt_path = "./runs/2025-10-12_18-51-44/5000.ckpt"
+ckpt_path = "./runs/2025-10-14_10-42-53/5000.ckpt"
 
 [inference]
 prompt = "Once upon a time,"
 steps = 256
-gen_length = 256
+total_length = 256
 block_length = 128
-temperature = 1.0
+temperature = 0.01
 mask_id = 50256
 
 [data]

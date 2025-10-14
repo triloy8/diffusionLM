@@ -67,6 +67,8 @@ Notes:
 uv run diffusionlm-infer --config config/resources/infer.toml
 ```
 
+_Note:_ `inference.total_length` should be the final sequence length (prompt + generated tokens) and must not exceed `model.context_length`; the generated span is computed automatically as `total_length - prompt_tokens`.
+
 - Build memmap datasets from raw text:
 
 ```bash
@@ -95,7 +97,7 @@ uv run diffusionlm-train --config config/resources/train.toml --print-config
 - diffusionlm.inference
   - Purpose: Sampling utilities and simple generation helpers.
   - Key files: `diffusionlm/inference/generate.py`, `diffusionlm/inference/sampling.py`, `diffusionlm/inference/predictor.py`.
-  - Notes: Inference configs provide `prompt`, `steps`, `gen_length`, `block_length`, `temperature`, and `mask_id` for diffusion decoding.
+  - Notes: Inference configs provide `prompt`, `steps`, `total_length`, `block_length`, `temperature`, and `mask_id` for diffusion decoding.
 
 - diffusionlm.tokenizer
   - Purpose: From‑scratch byte‑level BPE trainer and tokenizer IO.

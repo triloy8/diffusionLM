@@ -14,6 +14,13 @@ def infer_transformer(args, *, logger: Optional[Logger] = None, artifact_path: O
     )
     prompt_text = args.prompt
     ids = [tokenizer.encode(prompt_text)]
+    prompt_len = len(ids[0])
+    total_length = int(args.total_length)
+    if total_length < prompt_len:
+        raise ValueError("total_length must be >= prompt token length")
+    gen_length = total_length - prompt_len
+    if total_length > args.context_length:
+        raise ValueError("total_length must be <= model context_length")
 
     model = TransformerLM(
         vocab_size=args.vocab_size,
@@ -39,22 +46,26 @@ def infer_transformer(args, *, logger: Optional[Logger] = None, artifact_path: O
                 "phase": "infer",
                 "params.temperature": float(args.temperature),
                 "params.steps": int(args.steps),
-                "params.gen_length": int(args.gen_length),
+                "params.total_length": int(args.total_length),
+                "params.gen_length": int(gen_length),
                 "params.block_length": int(args.block_length),
                 "params.mask_id": int(args.mask_id),
             }
         )
 
     t0 = time.time()
-    out_indices = diffusion_generate(
-        model,
-        in_indices,
-        mask_id=int(args.mask_id),
-        steps=int(args.steps),
-        gen_length=int(args.gen_length),
-        block_length=int(args.block_length),
-        temperature=float(args.temperature),
-    )
+    if gen_length > 0:
+        out_indices = diffusion_generate(
+            model,
+            in_indices,
+            mask_id=int(args.mask_id),
+            steps=int(args.steps),
+            gen_length=int(gen_length),
+            block_length=int(args.block_length),
+            temperature=float(args.temperature),
+        )
+    else:
+        out_indices = in_indices
     elapsed = time.time() - t0
 
     out_indices_list = out_indices[0].tolist()
@@ -81,7 +92,8 @@ def infer_transformer(args, *, logger: Optional[Logger] = None, artifact_path: O
                     "output": output_string,
                     "temperature": args.temperature,
                     "steps": args.steps,
-                    "gen_length": args.gen_length,
+                    "total_length": args.total_length,
+                    "gen_length": gen_length,
                     "block_length": args.block_length,
                     "mask_id": args.mask_id,
                 }
