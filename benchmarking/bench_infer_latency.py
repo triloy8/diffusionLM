@@ -13,9 +13,11 @@ from config import load_bench_infer_config
 from diffusionlm.tokenizer.tokenizer import Tokenizer
 from diffusionlm.models import TransformerLM
 from diffusionlm.utils.dtypes import DTYPES
-from diffusionlm.training.loss import cross_entropy
+from diffusionlm.inference.generate import diffusion_generate
+from diffusionlm.training.loss import cross_entropy, diffusion_cross_entropy
 from diffusionlm.training.optim import AdamW
 from diffusionlm.training.grad import gradient_clipping
+from diffusionlm.training.data import get_batch as diffusion_get_batch
 from logger import ConsoleLogger
 from profiling import nvtx
 
@@ -138,6 +140,7 @@ def main():
         "steps": cfg.inference.steps,
         "gen_length": cfg.inference.gen_length,
         "block_length": cfg.inference.block_length,
+        "mask_id": cfg.inference.mask_id,
         # bench
         "warmup": cfg.benchmark.warmup,
         "repeats": cfg.benchmark.repeats,
@@ -180,53 +183,117 @@ def main():
     with nvtx.range("bench/setup/run_config"):
         info = logger.start_run(run_config)
 
-    # Warmup: run the same loop shape as the timed section
-    inputs = in_indices[:, :-1]
-    targets = in_indices[:, 1:]
     clip_enabled = bool(cfg.optimizer is not None and cfg.optimizer.grad_clip_max_l2_norm > 0.0)
+    train_dataset = val_dataset if cfg.benchmark.backward else None
+    if cfg.benchmark.backward and train_dataset is None:
+        raise ValueError("benchmark.backward requires a [data] section with a validation memmap")
+    train_batch_size = int(getattr(cfg.benchmark, "train_batch_size", max(batch_size, 1)))
+    train_batch_size = max(train_batch_size, 1)
+
+    processed_tokens_last: int = 0
+    mask_ratio_last: Optional[float] = None
+
+    def _run_workload():
+        nonlocal processed_tokens_last, mask_ratio_last, optimizer
+        processed_tokens = 0
+        mask_ratio_accum = 0.0
+
+        if not cfg.benchmark.backward:
+            model.eval()
+            with torch.no_grad():
+                output = None
+                for _ in range(cfg.benchmark.steps):
+                    if nvtx.enabled("fine"):
+                        with nvtx.range("bench/iter/generate"):
+                            output = diffusion_generate(
+                                model,
+                                in_indices,
+                                mask_id=int(cfg.inference.mask_id),
+                                steps=int(cfg.inference.steps),
+                                gen_length=int(cfg.inference.gen_length),
+                                block_length=int(cfg.inference.block_length),
+                                temperature=float(cfg.inference.temperature),
+                            )
+                    else:
+                        output = diffusion_generate(
+                            model,
+                            in_indices,
+                            mask_id=int(cfg.inference.mask_id),
+                            steps=int(cfg.inference.steps),
+                            gen_length=int(cfg.inference.gen_length),
+                            block_length=int(cfg.inference.block_length),
+                            temperature=float(cfg.inference.temperature),
+                        )
+            processed_tokens = int(cfg.inference.gen_length) * batch_size * int(cfg.benchmark.steps)
+            processed_tokens_last = processed_tokens
+            mask_ratio_last = None
+            return output
+
+        model.train()
+        last_loss = None
+        for _ in range(cfg.benchmark.steps):
+            model.zero_grad(set_to_none=True)
+            if nvtx.enabled("fine"):
+                with nvtx.range("bench/iter/batch"):
+                    batch = diffusion_get_batch(
+                        train_dataset,
+                        batch_size=train_batch_size,
+                        context_length=cfg.model.context_length,
+                        device=cfg.model.device,
+                        mask_token_id=cfg.model.mask_token_id,
+                        noise_epsilon=cfg.model.noise_epsilon,
+                        random_trunc_prob=cfg.model.random_trunc_prob,
+                    )
+            else:
+                batch = diffusion_get_batch(
+                    train_dataset,
+                    batch_size=train_batch_size,
+                    context_length=cfg.model.context_length,
+                    device=cfg.model.device,
+                    mask_token_id=cfg.model.mask_token_id,
+                    noise_epsilon=cfg.model.noise_epsilon,
+                    random_trunc_prob=cfg.model.random_trunc_prob,
+                )
+            if nvtx.enabled("fine"):
+                with nvtx.range("bench/iter/forward"):
+                    logits = model(batch.noisy_inputs)
+                with nvtx.range("bench/iter/loss"):
+                    loss = diffusion_cross_entropy(logits, batch.clean_targets, batch.mask, batch.p_mask)
+                with nvtx.range("bench/iter/backward"):
+                    loss.backward()
+            else:
+                logits = model(batch.noisy_inputs)
+                loss = diffusion_cross_entropy(logits, batch.clean_targets, batch.mask, batch.p_mask)
+                loss.backward()
+            last_loss = loss
+            processed_tokens += int(batch.clean_targets.numel())
+            mask_ratio_accum += float(batch.metadata.get("mask_ratio", 0.0))
+
+            if cfg.benchmark.optimizer_step and optimizer is not None:
+                if clip_enabled:
+                    if nvtx.enabled("fine"):
+                        with nvtx.range("bench/iter/clip"):
+                            gradient_clipping(model.parameters(), cfg.optimizer.grad_clip_max_l2_norm)  # type: ignore[arg-type]
+                    else:
+                        gradient_clipping(model.parameters(), cfg.optimizer.grad_clip_max_l2_norm)  # type: ignore[arg-type]
+                if nvtx.enabled("fine"):
+                    with nvtx.range("bench/iter/opt_step"):
+                        optimizer.step()
+                else:
+                    optimizer.step()
+
+        processed_tokens_last = processed_tokens
+        mask_ratio_last = (mask_ratio_accum / cfg.benchmark.steps) if cfg.benchmark.steps > 0 else None
+        return last_loss
+
     with nvtx.range("bench/warmup"):
         for _ in range(cfg.benchmark.warmup):
-            if not cfg.benchmark.backward:
-                model.eval()
-                with torch.no_grad():
-                    for _ in range(cfg.benchmark.steps):
-                        if nvtx.enabled("fine"):
-                            with nvtx.range("bench/warmup/iter/forward"):
-                                _ = model(inputs)
-                        else:
-                            _ = model(inputs)
-            else:
-                model.train()
-                for _ in range(cfg.benchmark.steps):
-                    model.zero_grad(set_to_none=True)
-                    if nvtx.enabled("fine"):
-                        with nvtx.range("bench/warmup/iter/forward"):
-                            logits = model(inputs)
-                        with nvtx.range("bench/warmup/iter/loss"):
-                            loss = cross_entropy(logits, targets).mean()
-                        with nvtx.range("bench/warmup/iter/backward"):
-                            loss.backward()
-                    else:
-                        logits = model(inputs)
-                        loss = cross_entropy(logits, targets).mean()
-                        loss.backward()
-                    if cfg.benchmark.optimizer_step and optimizer is not None:
-                        # Optional gradient clipping
-                        if clip_enabled:
-                            if nvtx.enabled("fine"):
-                                with nvtx.range("bench/warmup/iter/clip"):
-                                    gradient_clipping(model.parameters(), cfg.optimizer.grad_clip_max_l2_norm)  # type: ignore[arg-type]
-                            else:
-                                gradient_clipping(model.parameters(), cfg.optimizer.grad_clip_max_l2_norm)  # type: ignore[arg-type]
-                        if nvtx.enabled("fine"):
-                            with nvtx.range("bench/warmup/iter/opt_step"):
-                                optimizer.step()
-                        else:
-                            optimizer.step()
+            _ = _run_workload()
 
     # Timed repeats
     latencies_ms: List[float] = []
     tokens_per_sec: List[float] = []
+    mask_ratios: List[float] = []
 
     for r in range(cfg.benchmark.repeats):
         # Always reset model (and optimizer state) before each timed repeat
@@ -242,59 +309,14 @@ def main():
                     weight_decay=cfg.optimizer.weight_decay,
                 )
 
-        def _run():
-            # Standardized micro-bench: repeat forward (and optional backward) on fixed inputs
-            if not cfg.benchmark.backward:
-                model.eval()
-                with torch.no_grad():
-                    last_logits = None
-                    for _ in range(cfg.benchmark.steps):
-                        if nvtx.enabled("fine"):
-                            with nvtx.range("bench/timed/iter/forward"):
-                                last_logits = model(inputs)
-                        else:
-                            last_logits = model(inputs)
-                    return last_logits
-            else:
-                model.train()
-                last_logits = None
-                for _ in range(cfg.benchmark.steps):
-                    model.zero_grad(set_to_none=True)
-                    if nvtx.enabled("fine"):
-                        with nvtx.range("bench/timed/iter/forward"):
-                            last_logits = model(inputs)
-                        with nvtx.range("bench/timed/iter/loss"):
-                            loss = cross_entropy(last_logits, targets).mean()
-                        with nvtx.range("bench/timed/iter/backward"):
-                            loss.backward()
-                    else:
-                        last_logits = model(inputs)
-                        loss = cross_entropy(last_logits, targets).mean()
-                        loss.backward()
-                    if cfg.benchmark.optimizer_step and optimizer is not None:
-                        if clip_enabled:
-                            if nvtx.enabled("fine"):
-                                with nvtx.range("bench/timed/iter/clip"):
-                                    gradient_clipping(model.parameters(), cfg.optimizer.grad_clip_max_l2_norm)  # type: ignore[arg-type]
-                            else:
-                                gradient_clipping(model.parameters(), cfg.optimizer.grad_clip_max_l2_norm)  # type: ignore[arg-type]
-                        if nvtx.enabled("fine"):
-                            with nvtx.range("bench/timed/iter/opt_step"):
-                                optimizer.step()
-                        else:
-                            optimizer.step()
-                return last_logits
-
+        processed_tokens_last = 0
+        mask_ratio_last = None
         nvtx.mark("bench/measure_start")
         with nvtx.range(f"bench/repeat[{r}]/timed"):
-            _, dt = measure(cfg.model.device, _run, synchronize=cfg.benchmark.synchronize)
+            _, dt = measure(cfg.model.device, _run_workload, synchronize=cfg.benchmark.synchronize)
         nvtx.mark("bench/measure_end")
-        # Processed tokens: per iteration, each sequence processes (T_in - 1) positions
-        T_in = int(in_indices.shape[1])
-        processed_tokens = max(T_in - 1, 0) * batch_size * int(cfg.benchmark.steps)
-
         lat_ms = dt * 1000.0
-        tps = (float(processed_tokens) / dt) if dt > 0 else 0.0
+        tps = (float(processed_tokens_last) / dt) if dt > 0 else 0.0
         latencies_ms.append(lat_ms)
         tokens_per_sec.append(tps)
 
@@ -304,12 +326,21 @@ def main():
                     "phase": "bench_infer",
                     "metrics.latency_ms": lat_ms,
                     "metrics.tokens_sec": tps,
-                    "metrics.processed_tokens": int(processed_tokens),
+                    "metrics.processed_tokens": int(processed_tokens_last),
                     "metrics.batch_size": int(batch_size),
                     "metrics.backward": bool(cfg.benchmark.backward),
                 },
                 step=r,
             )
+            if mask_ratio_last is not None:
+                mask_ratios.append(float(mask_ratio_last))
+                logger.log(
+                    {
+                        "phase": "bench_infer",
+                        "metrics.mask_ratio": float(mask_ratio_last),
+                    },
+                    step=r,
+                )
 
     eval_summary: dict[str, float | int] = {}
     if val_dataset is not None:
@@ -379,6 +410,9 @@ def main():
             "metrics.tokens_sec.stddev": stddev(tokens_per_sec),
             "metrics.iters": int(cfg.benchmark.repeats),
         }
+        if mask_ratios:
+            summary_payload["metrics.mask_ratio.mean"] = mean(mask_ratios)
+            summary_payload["metrics.mask_ratio.stddev"] = stddev(mask_ratios)
         summary_payload.update(eval_summary)
         logger.log(summary_payload)
 
