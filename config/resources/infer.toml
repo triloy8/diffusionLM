@@ -18,7 +18,7 @@ noise_epsilon = 0.001
 random_trunc_prob = 0.01
 
 [checkpoint]
-ckpt_path = "./runs/2025-10-14_10-42-53/5000.ckpt"
+ckpt_path = "./runs/2025-10-14_15-07-12/5000.ckpt"
 
 [inference]
 prompt = "Oh wow, it's Judy!"
