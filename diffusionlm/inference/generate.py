@@ -1,51 +1,101 @@
+from __future__ import annotations
+
 import torch
-from diffusionlm.inference.sampling import softmax, top_p_filter
+from diffusionlm.inference.sampling import add_gumbel_noise, compute_transfer_schedule
 
 
 @torch.no_grad()
-def generate(
+def diffusion_generate(
     model,
-    in_indices: torch.Tensor,
-    steps: int,
+    prompt_indices: torch.Tensor,
     *,
-    temperature: float = 1.0,
-    p: float = 0.0,
-    eos_token_id: int | None = None,
-    context_length: int | None = None,
-):
-    """Stateless decode that grows sequences by `steps` using top-p sampling.
+    mask_id: int,
+    steps: int,
+    gen_length: int,
+    block_length: int,
+    temperature: float = 0.0,
+    generator: torch.Generator | None = None,
+) -> torch.Tensor:
+    """Generate sequences via the diffusion reverse process."""
 
-    Args:
-        model: Autoregressive model returning logits for next-token prediction.
-        in_indices: Tensor of shape (B, T0) with token ids.
-        steps: Number of new tokens to generate.
-        temperature: Softmax temperature.
-        p: Top-p (nucleus) sampling threshold.
-        eos_token_id: If provided, stop per sequence after sampling eos.
-        context_length: Optional context window; defaults to model.context_length if available.
-    Returns:
-        Tensor of shape (B, T0 + <=steps) with appended tokens.
-    """
-    device = in_indices.device
-    B = in_indices.shape[0]
-    finished = torch.zeros(B, dtype=torch.bool, device=device)
+    if prompt_indices.dim() != 2:
+        raise ValueError("prompt_indices must be 2D (batch, seq)")
+    if gen_length <= 0:
+        raise ValueError("gen_length must be > 0")
+    if block_length <= 0:
+        raise ValueError("block_length must be > 0")
+    if steps <= 0:
+        raise ValueError("steps must be > 0")
+    if gen_length % block_length != 0:
+        raise ValueError("gen_length must be divisible by block_length")
 
-    ctx = context_length
-    if ctx is None:
-        ctx = getattr(model, "context_length", in_indices.shape[1])
+    blocks = gen_length // block_length
+    if steps % blocks != 0:
+        raise ValueError("steps must be divisible by the number of blocks")
+    steps_per_block = steps // blocks
 
-    for _ in range(steps):
-        context_indices = in_indices if in_indices.shape[1] <= ctx else in_indices[:, -ctx:]
-        logits = model(context_indices)
-        logits = logits[:, -1, :] / temperature
-        probs = softmax(logits, dim=-1)
-        filtered = top_p_filter(probs, p)
-        index_next = torch.multinomial(filtered, num_samples=1)
-        if eos_token_id is not None:
-            index_next[finished] = eos_token_id
-        in_indices = torch.cat([in_indices, index_next], dim=1)
-        if eos_token_id is not None:
-            finished = finished | (index_next.squeeze(1) == eos_token_id)
-            if finished.all():
-                break
-    return in_indices
+    device = prompt_indices.device
+    batch_size, prompt_len = prompt_indices.shape
+    total_len = prompt_len + gen_length
+
+    context_limit = getattr(model, "context_length", None)
+    if context_limit is not None and total_len > int(context_limit):
+        raise ValueError("prompt length + gen_length exceeds model context_length")
+
+    x = torch.full(
+        (batch_size, total_len),
+        fill_value=mask_id,
+        device=device,
+        dtype=prompt_indices.dtype,
+    )
+    x[:, :prompt_len] = prompt_indices
+
+    for block_idx in range(blocks):
+        block_start = prompt_len + block_idx * block_length
+        block_end = block_start + block_length
+        block_mask = (x[:, block_start:block_end] == mask_id)
+        transfer_counts = compute_transfer_schedule(block_mask, steps_per_block)
+
+        for step_idx in range(steps_per_block):
+            mask_index = (x == mask_id)
+            logits = model(x)
+            logits = add_gumbel_noise(logits, temperature, generator=generator)
+            predictions = torch.argmax(logits, dim=-1)
+            predictions = torch.where(mask_index, predictions, x)
+
+            confidence = torch.rand(
+                (batch_size, total_len),
+                device=device,
+                dtype=torch.float32,
+                generator=generator,
+            )
+            confidence[:, block_end:] = float("-inf")
+            confidence = torch.where(mask_index, confidence, torch.full_like(confidence, float("-inf")))
+
+            transfer_mask = torch.zeros_like(mask_index)
+            for b in range(batch_size):
+                k = int(transfer_counts[b, step_idx].item())
+                if k <= 0:
+                    continue
+                # Guard in case of numerical issues when fewer masked tokens remain
+                available = confidence[b] > float("-inf")
+                if available.sum() < k:
+                    k = int(available.sum().item())
+                if k <= 0:
+                    continue
+                topk_indices = torch.topk(confidence[b], k=k, dim=-1).indices
+                transfer_mask[b, topk_indices] = True
+
+            x = torch.where(transfer_mask, predictions, x)
+
+    return x
+
+
+# Backwards-compatible alias
+generate = diffusion_generate
+
+
+__all__ = [
+    "diffusion_generate",
+    "generate",
+]
