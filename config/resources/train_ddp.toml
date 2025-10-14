@@ -45,7 +45,7 @@ dataset = "TinyStoriesV2-GPT4"
 
 [wandb]
 entity = "yiltro8-org"
-project = "transformer_lm"
+project = "diffusion_lm"
 
 [ddp]
 backend = "nccl"        # gloo
