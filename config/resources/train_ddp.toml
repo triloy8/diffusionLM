@@ -24,7 +24,7 @@ cosine_cycle_iters = 4500
 grad_clip_max_l2_norm = 1.0
 
 [training]
-batch_size = 512
+batch_size = 256
 max_train_iteration = 5000
 max_val_iteration = 10
 val_freq_iteration = 125
