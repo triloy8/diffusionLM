@@ -11,4 +11,4 @@ output_filename = "./data/TinyStoriesV2-GPT4-valid.dat"
 [tokenizer]
 vocab_path = "./data/gpt2_vocab.json"
 merges_path = "./data/gpt2_merges.txt"
-special_tokens = ["<|endoftext|>"]
+special_tokens = ["<|endoftext|>", "<|mask|>"]

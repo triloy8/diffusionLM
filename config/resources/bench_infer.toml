@@ -1,10 +1,10 @@
 [tokenizer]
 merges_path = "./data/gpt2_merges.txt"
 vocab_path = "./data/gpt2_vocab.json"
-special_tokens = ["<|endoftext|>"]
+special_tokens = ["<|endoftext|>", "<|mask|>"]
 
 [model]
-vocab_size = 50257
+vocab_size = 50304
 context_length = 256
 d_model = 512
 num_layers = 4
@@ -13,7 +13,7 @@ d_ff = 1344
 rope_theta = 10000.0
 device = "cuda"
 dtype = "float16"
-mask_token_id = 50256
+mask_token_id = 50257
 noise_epsilon = 0.001
 random_trunc_prob = 0.01
 
@@ -26,7 +26,7 @@ steps = 256
 total_length = 256
 block_length = 128
 temperature = 0.01
-mask_id = 50256
+mask_id = 50257
 
 [data]
 np_dat_valid_path = "./data/TinyStoriesV2-GPT4-valid.dat"
