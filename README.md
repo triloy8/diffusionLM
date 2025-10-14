@@ -1,8 +1,8 @@
-# Transformer Language Model from Scratch
+# Diffusion Language Model from Scratch
 
 ## What Is This?
 
-A minimal, from‑scratch Transformer language model implementation with a small, practical toolset (tokenizer, dataset builder, CLI, benchmarks, logging). The focus is on clarity and readability rather than feature breadth or scale.
+A focused, from‑scratch diffusion language model inspired by the LLaDA guidelines. The repo modernises the original `old/` experimentation into a modular package that keeps the same bidirectional Transformer core, adds diffusion-specific batch/noise handling, and ships supporting tools (tokenizer, dataset builder, CLI, benchmarks, logging) with clarity and readability as priorities.
 
 ## Overview
 
