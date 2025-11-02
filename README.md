@@ -81,6 +81,19 @@ uv run diffusionlm-make-data --config config/resources/make_data.toml
 uv run diffusionlm-train --config config/resources/train.toml --print-config
 ```
 
+## Remote Orchestration
+
+The `Justfile` plus helper scripts under `scripts/` provide a thin remote control plane focused on Prime Intellect hosts; set `PRIME_HOST`/`REMOTE_ROOT` to point at the target machine and path. All available recipes:
+- `just bootstrap-remote` runs `scripts/bootstrap_remote.sh` over SSH to install uv/just/tmux, clone the repo, and prepare `data/`, `runs/`, and `env/` directories on the remote.
+- `just data-remote` executes `scripts/fetch_data.sh` remotely to download the TinyStories artifacts into the remote `data/` directory.
+- `just build-remote` syncs dependencies by running `uv sync` (with a frozen lockfile fallback) inside the remote checkout.
+- `just train config=<toml> extra="<args>"` launches `scripts/run_train_remote.sh` inside a tmux session (`diffusionlm-train`) after validating Weights & Biases credentials.
+- `just infer command="<cmd>" args="<extra>"` calls `scripts/run_infer_remote.sh` to execute arbitrary inference or benchmarking commands; defaults derive from `CMD_INFER`.
+- `just nvitop` opens `nvitop` on the remote box for lightweight GPU monitoring (assumes it is installed by the bootstrap step).
+- `just attach-train` attaches your terminal to the `diffusionlm-train` tmux session, while `just kill-train` tears it down if you need to restart.
+- `just fetch run_dir=<name>` pulls a run directory from `${REMOTE_ROOT}/runs/<name>` back to the local `runs/` folder; `just list-runs` prints the remote run directory names.
+- `just sync-env` uploads your local `env/wandb.env` (copy `env/wandb.env.example` and populate `WANDB_API_KEY`) so the remote training session can authenticate with W&B.
+
 ## Modules
 
 - diffusionlm.models
