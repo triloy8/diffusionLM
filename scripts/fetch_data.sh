@@ -5,7 +5,7 @@ usage() {
     echo "Usage: $0 [destination_dir]" >&2
 }
 
-data_dir="${1:-/opt/diffusionLM/data}"
+data_dir="${1:-$(pwd)/data}"
 
 mkdir -p "${data_dir}"
 

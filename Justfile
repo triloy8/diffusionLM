@@ -2,7 +2,6 @@ set shell := ["bash", "-euo", "pipefail", "-c"]
 
 prime_host := env_var_or_default("PRIME_HOST", "prime-node")
 remote_root := env_var_or_default("REMOTE_ROOT", "~/diffusionLM")
-image_name := env_var_or_default("IMAGE_NAME", "diffusionlm")
 infer_command_default := env_var_or_default("CMD_INFER", "uv run diffusionlm-bench-infer --config config/resources/bench_infer.toml")
 
 bootstrap-remote:
@@ -12,50 +11,53 @@ data-remote:
 	ssh {{prime_host}} 'bash -s -- {{remote_root}}/data' < scripts/fetch_data.sh
 
 build-remote:
-	tag=${IMAGE_TAG:-$(git rev-parse --short HEAD)}
-	echo "Building {{image_name}}:${tag} on {{prime_host}}"
-	ssh {{prime_host}} "cd {{remote_root}} && docker build -f docker/Dockerfile -t {{image_name}}:${tag} ."
+	ssh {{prime_host}} "cd {{remote_root}} && export PATH=\"\\$HOME/.local/bin:\\$PATH\" && (uv sync --frozen || uv sync)"
 
 train config="config/resources/train_ddp.toml" extra="":
-	tag=${IMAGE_TAG:-$(git rev-parse --short HEAD)}
-	TAG="${tag}" CONFIG="{{config}}" EXTRA_ARGS="${extra}" ssh {{prime_host}} 'bash -s' <<'EOS'
+	CONFIG="{{config}}" EXTRA_ARGS="{{extra}}" ssh {{prime_host}} 'bash -s' <<'EOS'
 	set -euo pipefail
 	cd {{remote_root}}
+	export PATH="${HOME}/.local/bin:${PATH}"
 	if [ ! -f env/wandb.env ]; then
-	echo "Missing env/wandb.env; run `just sync-env` first" >&2
-	exit 1
+		echo "Missing env/wandb.env; run `just sync-env` first" >&2
+		exit 1
 	fi
 	set -a
 	. env/wandb.env
 	set +a
 	if [ -z "${WANDB_API_KEY:-}" ]; then
-	echo "WANDB_API_KEY is empty" >&2
-	exit 1
+		echo "WANDB_API_KEY is empty" >&2
+		exit 1
 	fi
-	repo_root=$(pwd)
-	docker run --rm --gpus all \
-	    -v "${repo_root}/data:/opt/diffusionLM/data" \
-	    -v "${repo_root}/runs:/opt/diffusionLM/runs" \
-	    -e WANDB_API_KEY="${WANDB_API_KEY}" \
-	    {{image_name}}:"${TAG}" \
-	    diffusionlm-train-ddp --config "${CONFIG}" ${EXTRA_ARGS}
-	EOS
+	if ! command -v tmux >/dev/null 2>&1; then
+		echo "tmux not available on remote host" >&2
+		exit 1
+	fi
+	SESSION="diffusionlm-train"
+	if tmux has-session -t "${SESSION}" 2>/dev/null; then
+		tmux kill-session -t "${SESSION}"
+	fi
+	CMD="uv run diffusionlm-train-ddp --config \"${CONFIG}\" ${EXTRA_ARGS}"
+	tmux new -d -s "${SESSION}" "${CMD}"
+	echo "Started tmux session ${SESSION}"
+EOS
 
 infer command="{{infer_command_default}}" args="":
-	tag=${IMAGE_TAG:-$(git rev-parse --short HEAD)}
-	TAG="${tag}" COMMAND="{{command}}" EXTRA_ARGS="${args}" ssh {{prime_host}} 'bash -s' <<'EOS'
+	COMMAND="{{command}}" EXTRA_ARGS="{{args}}" ssh {{prime_host}} 'bash -s' <<'EOS'
 	set -euo pipefail
 	cd {{remote_root}}
-	repo_root=$(pwd)
-	docker run --rm --gpus all \
-	    -v "${repo_root}/data:/opt/diffusionLM/data" \
-	    -v "${repo_root}/runs:/opt/diffusionLM/runs" \
-	    {{image_name}}:"${TAG}" \
-	    ${COMMAND} ${EXTRA_ARGS}
-	EOS
+	export PATH="${HOME}/.local/bin:${PATH}"
+	${COMMAND} ${EXTRA_ARGS}
+EOS
 
 nvitop:
-	ssh -t {{prime_host}} 'nvitop'
+	ssh -t {{prime_host}} 'export PATH="$HOME/.local/bin:$PATH"; nvitop'
+
+attach-train:
+	ssh -t {{prime_host}} 'tmux attach -t diffusionlm-train'
+
+kill-train:
+	ssh {{prime_host}} 'tmux kill-session -t diffusionlm-train 2>/dev/null || true'
 
 fetch run_dir:
 	mkdir -p runs
