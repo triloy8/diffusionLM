@@ -9,14 +9,6 @@ if [ -z "${COMMAND_INPUT}" ]; then
 	exit 1
 fi
 
-printf 'Remote PWD: '
-pwd
-printf 'Remote host: '
-hostname
-printf 'Remote user: '
-whoami
-printf 'SSH_CONNECTION: %s\n' "${SSH_CONNECTION:-<unset>}"
-
 export PATH="${HOME}/.local/bin:${PATH}"
 
 CMD_STRING="${COMMAND_INPUT}"

@@ -6,14 +6,6 @@ CONFIG="${1:-${CONFIG:-config/resources/train_ddp.toml}}"
 # shellcheck disable=SC2034
 EXTRA_ARGS="${2:-${EXTRA_ARGS:-}}"
 
-printf 'Remote PWD: '
-pwd
-printf 'Remote host: '
-hostname
-printf 'Remote user: '
-whoami
-printf 'SSH_CONNECTION: %s\n' "${SSH_CONNECTION:-<unset>}"
-
 export PATH="${HOME}/.local/bin:${PATH}"
 
 if [ ! -f env/wandb.env ]; then
