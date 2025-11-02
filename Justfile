@@ -8,39 +8,13 @@ bootstrap-remote:
 	ssh {{prime_host}} 'bash -s' < scripts/bootstrap_remote.sh
 
 data-remote:
-	ssh {{prime_host}} 'bash -s -- {{remote_root}}/data' < scripts/fetch_data.sh
+	ssh {{prime_host}} "cd {{remote_root}} && bash -s" < scripts/fetch_data.sh
 
 build-remote:
 	ssh {{prime_host}} "cd {{remote_root}} && export PATH=\"\\$HOME/.local/bin:\\$PATH\" && (uv sync --frozen || uv sync)"
 
 train config="config/resources/train_ddp.toml" extra="":
-	CONFIG="{{config}}" EXTRA_ARGS="{{extra}}" ssh {{prime_host}} 'bash -s' <<'EOS'
-	set -euo pipefail
-	cd {{remote_root}}
-	export PATH="${HOME}/.local/bin:${PATH}"
-	if [ ! -f env/wandb.env ]; then
-		echo "Missing env/wandb.env; run `just sync-env` first" >&2
-		exit 1
-	fi
-	set -a
-	. env/wandb.env
-	set +a
-	if [ -z "${WANDB_API_KEY:-}" ]; then
-		echo "WANDB_API_KEY is empty" >&2
-		exit 1
-	fi
-	if ! command -v tmux >/dev/null 2>&1; then
-		echo "tmux not available on remote host" >&2
-		exit 1
-	fi
-	SESSION="diffusionlm-train"
-	if tmux has-session -t "${SESSION}" 2>/dev/null; then
-		tmux kill-session -t "${SESSION}"
-	fi
-	CMD="uv run diffusionlm-train-ddp --config \"${CONFIG}\" ${EXTRA_ARGS}"
-	tmux new -d -s "${SESSION}" "${CMD}"
-	echo "Started tmux session ${SESSION}"
-EOS
+	ssh {{prime_host}} bash -lc "cd {{remote_root}} && bash scripts/run_train_remote.sh $(printf '%q' '{{config}}') $(printf '%q' '{{extra}}')"
 
 infer command="{{infer_command_default}}" args="":
 	COMMAND="{{command}}" EXTRA_ARGS="{{args}}" ssh {{prime_host}} 'bash -s' <<'EOS'
@@ -48,7 +22,7 @@ infer command="{{infer_command_default}}" args="":
 	cd {{remote_root}}
 	export PATH="${HOME}/.local/bin:${PATH}"
 	${COMMAND} ${EXTRA_ARGS}
-EOS
+	EOS
 
 nvitop:
 	ssh -t {{prime_host}} 'export PATH="$HOME/.local/bin:$PATH"; nvitop'
@@ -68,8 +42,5 @@ list-runs:
 	ssh {{prime_host}} "ls -1 {{remote_root}}/runs"
 
 sync-env:
-	if [ ! -f env/wandb.env ]; then
-	echo "Missing env/wandb.env; copy env/wandb.env.example and fill WANDB_API_KEY" >&2
-	exit 1
-	fi
+	if [ ! -f env/wandb.env ]; then echo "Missing env/wandb.env; copy env/wandb.env.example and fill WANDB_API_KEY" >&2; exit 1; fi
 	scp env/wandb.env {{prime_host}}:{{remote_root}}/env/wandb.env
