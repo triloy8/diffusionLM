@@ -223,3 +223,7 @@ todo/
 *.qdrep
 *.nsys-rep
 *.sqlite
+
+!env/
+env/*
+!env/wandb.env.example
