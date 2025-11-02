@@ -22,15 +22,15 @@ train config="config/resources/train_ddp.toml" extra="":
 	set -euo pipefail
 	cd {{remote_root}}
 	if [ ! -f env/wandb.env ]; then
-	    echo "Missing env/wandb.env; run `just sync-env` first" >&2
-	    exit 1
+	echo "Missing env/wandb.env; run `just sync-env` first" >&2
+	exit 1
 	fi
 	set -a
 	. env/wandb.env
 	set +a
 	if [ -z "${WANDB_API_KEY:-}" ]; then
-	    echo "WANDB_API_KEY is empty" >&2
-	    exit 1
+	echo "WANDB_API_KEY is empty" >&2
+	exit 1
 	fi
 	repo_root=$(pwd)
 	docker run --rm --gpus all \
@@ -39,7 +39,7 @@ train config="config/resources/train_ddp.toml" extra="":
 	    -e WANDB_API_KEY="${WANDB_API_KEY}" \
 	    {{image_name}}:"${TAG}" \
 	    diffusionlm-train-ddp --config "${CONFIG}" ${EXTRA_ARGS}
-EOS
+	EOS
 
 infer command="{{infer_command_default}}" args="":
 	tag=${IMAGE_TAG:-$(git rev-parse --short HEAD)}
@@ -52,7 +52,7 @@ infer command="{{infer_command_default}}" args="":
 	    -v "${repo_root}/runs:/opt/diffusionLM/runs" \
 	    {{image_name}}:"${TAG}" \
 	    ${COMMAND} ${EXTRA_ARGS}
-EOS
+	EOS
 
 nvitop:
 	ssh -t {{prime_host}} 'nvitop'
@@ -67,7 +67,7 @@ list-runs:
 
 sync-env:
 	if [ ! -f env/wandb.env ]; then
-		echo "Missing env/wandb.env; copy env/wandb.env.example and fill WANDB_API_KEY" >&2
-		exit 1
+	echo "Missing env/wandb.env; copy env/wandb.env.example and fill WANDB_API_KEY" >&2
+	exit 1
 	fi
 	scp env/wandb.env {{prime_host}}:{{remote_root}}/env/wandb.env
