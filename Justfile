@@ -19,39 +19,39 @@ build-remote:
 train config="config/resources/train_ddp.toml" extra="":
 	tag=${IMAGE_TAG:-$(git rev-parse --short HEAD)}
 	TAG="${tag}" CONFIG="{{config}}" EXTRA_ARGS="${extra}" ssh {{prime_host}} 'bash -s' <<'EOS'
-set -euo pipefail
-cd {{remote_root}}
-if [ ! -f env/wandb.env ]; then
-    echo "Missing env/wandb.env; run \`just sync-env\` first" >&2
-    exit 1
-fi
-set -a
-. env/wandb.env
-set +a
-if [ -z "${WANDB_API_KEY:-}" ]; then
-    echo "WANDB_API_KEY is empty" >&2
-    exit 1
-fi
-repo_root=$(pwd)
-docker run --rm --gpus all \
-    -v "${repo_root}/data:/opt/diffusionLM/data" \
-    -v "${repo_root}/runs:/opt/diffusionLM/runs" \
-    -e WANDB_API_KEY="${WANDB_API_KEY}" \
-    {{image_name}}:"${TAG}" \
-    diffusionlm-train-ddp --config "${CONFIG}" ${EXTRA_ARGS}
+	set -euo pipefail
+	cd {{remote_root}}
+	if [ ! -f env/wandb.env ]; then
+	    echo "Missing env/wandb.env; run `just sync-env` first" >&2
+	    exit 1
+	fi
+	set -a
+	. env/wandb.env
+	set +a
+	if [ -z "${WANDB_API_KEY:-}" ]; then
+	    echo "WANDB_API_KEY is empty" >&2
+	    exit 1
+	fi
+	repo_root=$(pwd)
+	docker run --rm --gpus all \
+	    -v "${repo_root}/data:/opt/diffusionLM/data" \
+	    -v "${repo_root}/runs:/opt/diffusionLM/runs" \
+	    -e WANDB_API_KEY="${WANDB_API_KEY}" \
+	    {{image_name}}:"${TAG}" \
+	    diffusionlm-train-ddp --config "${CONFIG}" ${EXTRA_ARGS}
 EOS
 
 infer command="{{infer_command_default}}" args="":
 	tag=${IMAGE_TAG:-$(git rev-parse --short HEAD)}
 	TAG="${tag}" COMMAND="{{command}}" EXTRA_ARGS="${args}" ssh {{prime_host}} 'bash -s' <<'EOS'
-set -euo pipefail
-cd {{remote_root}}
-repo_root=$(pwd)
-docker run --rm --gpus all \
-    -v "${repo_root}/data:/opt/diffusionLM/data" \
-    -v "${repo_root}/runs:/opt/diffusionLM/runs" \
-    {{image_name}}:"${TAG}" \
-    ${COMMAND} ${EXTRA_ARGS}
+	set -euo pipefail
+	cd {{remote_root}}
+	repo_root=$(pwd)
+	docker run --rm --gpus all \
+	    -v "${repo_root}/data:/opt/diffusionLM/data" \
+	    -v "${repo_root}/runs:/opt/diffusionLM/runs" \
+	    {{image_name}}:"${TAG}" \
+	    ${COMMAND} ${EXTRA_ARGS}
 EOS
 
 nvitop:
