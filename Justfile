@@ -1,9 +1,9 @@
 set shell := ["bash", "-euo", "pipefail", "-c"]
 
-prime_host := env_var("PRIME_HOST", "prime-node")
-remote_root := env_var("REMOTE_ROOT", "~/diffusionLM")
-image_name := env_var("IMAGE_NAME", "diffusionlm")
-infer_command_default := env_var("CMD_INFER", "uv run diffusionlm-bench-infer --config config/resources/bench_infer.toml")
+prime_host := env_var_or_default("PRIME_HOST", "prime-node")
+remote_root := env_var_or_default("REMOTE_ROOT", "~/diffusionLM")
+image_name := env_var_or_default("IMAGE_NAME", "diffusionlm")
+infer_command_default := env_var_or_default("CMD_INFER", "uv run diffusionlm-bench-infer --config config/resources/bench_infer.toml")
 
 bootstrap-remote:
 	ssh {{prime_host}} 'bash -s' < scripts/bootstrap_remote.sh
