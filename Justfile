@@ -14,15 +14,10 @@ build-remote:
 	ssh {{prime_host}} "cd {{remote_root}} && export PATH=\"\\$HOME/.local/bin:\\$PATH\" && (uv sync --frozen || uv sync)"
 
 train config="config/resources/train_ddp.toml" extra="":
-	ssh {{prime_host}} bash -lc "cd {{remote_root}} && bash scripts/run_train_remote.sh $(printf '%q' '{{config}}') $(printf '%q' '{{extra}}')"
+	ssh {{prime_host}} "cd {{remote_root}} && bash scripts/run_train_remote.sh $(printf '%q' '{{config}}') $(printf '%q' '{{extra}}')"
 
 infer command="{{infer_command_default}}" args="":
-	COMMAND="{{command}}" EXTRA_ARGS="{{args}}" ssh {{prime_host}} 'bash -s' <<'EOS'
-	set -euo pipefail
-	cd {{remote_root}}
-	export PATH="${HOME}/.local/bin:${PATH}"
-	${COMMAND} ${EXTRA_ARGS}
-	EOS
+	ssh {{prime_host}} "cd {{remote_root}} && bash scripts/run_infer_remote.sh $(printf '%q' '{{command}}') $(printf '%q' '{{args}}')"
 
 nvitop:
 	ssh -t {{prime_host}} 'export PATH="$HOME/.local/bin:$PATH"; nvitop'
