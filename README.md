@@ -28,12 +28,6 @@ Requires Python 3.11–3.12 and PyTorch. Using [`uv`](https://github.com/astral-
 uv run diffusionlm-train --config config/resources/train.toml --print-config
 ```
 
-- Or install the package locally (editable):
-
-```bash
-uv pip install -e .
-```
-
 ## Usage Examples
 
 Entry points live in `cli/` and are driven by TOML configs in `config/resources/`.

@@ -37,31 +37,14 @@ diffusionlm-bench-infer = "benchmarking.bench_infer_latency:main"
 diffusionlm-bench-tokenizer = "benchmarking.bench_tokenizer:main"
 
 [build-system]
-requires = ["setuptools>=69", "wheel"]
-build-backend = "setuptools.build_meta"
+requires = ["maturin>=1.7,<2"]
+build-backend = "maturin"
 
-[tool.setuptools]
-package-dir = {"" = "."}
-
-[tool.setuptools.packages.find]
-where = ["."]
-include = ["diffusionlm*", "benchmarking*", "logger*", "cli*", "config*", "profiling*", "databuilder*", "ddp*"]
-
-[tool.setuptools.package-data]
-"config" = [
-  "resources/**",
-]
-exclude = [
-  "tests*",
-  "runs*",
-  "todo*",
-  "wandb*",
-  "configs*",
-  "scripts*",
-  "data*",
-  ".venv*",
-  ".*",
-]
+[tool.maturin]
+bindings = "pyo3"
+module-name = "diffusionlm.tokenizer_rust"
+python-source = "."
+manifest-path = "diffusionlm/tokenizer_rust/Cargo.toml"
 
 [tool.pytest.ini_options]
 addopts = ["-q"]

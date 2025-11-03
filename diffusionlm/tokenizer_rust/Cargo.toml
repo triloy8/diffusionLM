@@ -1,0 +1,16 @@
+[package]
+name = "tokenizer-rs"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+pyo3 = { version = "0.23.3", features = ["extension-module"] }
+
+[features]
+default = []
+cli = []
+
+[[bin]]
+name = "tokenizer_cli"
+path = "src/tokenizer_cli.rs"
+required-features = ["cli"]
