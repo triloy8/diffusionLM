@@ -4,43 +4,41 @@ use std::path::Path;
 use std::collections::HashMap;
 
 // #[pyclass]
-pub struct Tokenizer;
+pub struct Tokenizer{
+    gpt2_encoder: HashMap<u8, char>,
+    gpt2_decoder: HashMap<char, u8>,
+    vocab_encoder: HashMap<u32, String>, 
+    vocab_decoder: HashMap<String, u32>, 
+    merges: HashMap<(String, String), u32>, 
+    special_tokens: Vec<String>,
+}
 
 // #[pymethods]
 impl Tokenizer {
-    // #[new]
-    pub fn new(vocab: HashMap<u32, Vec<u8>>, merges: Vec<(Vec<u8>, Vec<u8>)>, special_tokens: Vec<String>) -> Self {
-        Tokenizer
-    }
-
     // #[staticmethod]
     pub fn from_files<P: AsRef<Path>>(vocab_filepath: P, merges_filepath: P, special_tokens: Vec<String>) ->  Tokenizer {
         // gpt2 unicode encoder/decoder
-        let encoder: HashMap<u8, char> = gpt2_bytes_to_unicode();
-        let decoder: HashMap<char, u8> = encoder.iter().map(|(&id, &ch)| (ch, id)).collect();
+        let gpt2_encoder: HashMap<u8, char> = gpt2_bytes_to_unicode();
+        let gpt2_decoder: HashMap<char, u8> = gpt2_encoder.iter().map(|(&id, &ch)| (ch, id)).collect();
 
         // vocab
         let raw_gpt2_vocab = std::fs::read_to_string(vocab_filepath).expect("Failed to read raw vocab file");
-        // println!("{raw_gpt2_vocab}");
         let mut gpt2_vocab: HashMap<String, u32> = serde_json::from_str::<HashMap<String, u32>>(&raw_gpt2_vocab).expect("Failed to parse to json vocab file");
         for special_token in &special_tokens {
             gpt2_vocab.insert(special_token.clone(), gpt2_vocab.values().len() as u32);
         }
 
-        let mut vocab: HashMap<u32, Vec<u8>> = HashMap::new();
+        let mut vocab_encoder: HashMap<u32, String> = HashMap::new();
+        let mut vocab_decoder: HashMap<String, u32> = HashMap::new();
         for (gpt2_vocab_word, gpt2_vocab_id) in gpt2_vocab {
-            let mut bytes_vec = Vec::<u8>::new();
-            for char in gpt2_vocab_word.chars() {
-                let bytes = decoder.get(&char).unwrap();
-                bytes_vec.push(*bytes);
-            }
-            vocab.insert(gpt2_vocab_id, bytes_vec);
+            vocab_encoder.insert(gpt2_vocab_id, gpt2_vocab_word.clone());
+            vocab_decoder.insert(gpt2_vocab_word, gpt2_vocab_id);
         }
 
         // merges
         let gpt2_merges = std::fs::read_to_string(merges_filepath).expect("Failed to read merges file");
-        let mut merges: Vec<(Vec<u8>, Vec<u8>)> = Vec::new();
-        for line in gpt2_merges.lines(){
+        let mut merges: HashMap<(String, String), u32> = HashMap::new();
+        for (i, line) in gpt2_merges.lines().enumerate() {
             let cleaned_line = line.trim_end();
             
             if cleaned_line.is_empty(){
@@ -49,21 +47,18 @@ impl Tokenizer {
 
             let parts: Vec<&str> = cleaned_line.split(" ").collect();
             if parts.len() == 2 {
-                let mut m1: Vec<u8> = Vec::new();
-                for char in parts[0].to_string().chars(){
-                    let byte = decoder.get(&char).unwrap();
-                    m1.push(*byte)
-                }
-                let mut m2: Vec<u8> = Vec::new();
-                for char in parts[1].to_string().chars(){
-                    let byte = decoder.get(&char).unwrap();
-                    m2.push(*byte)
-                }
-                merges.push((m1, m2));
+                merges.insert((parts[0].to_string(), parts[1].to_string()), i as u32);
             }
         }
 
-        Tokenizer::new(vocab, merges, special_tokens)
+        Tokenizer{
+            gpt2_encoder,
+            gpt2_decoder,
+            vocab_encoder, 
+            vocab_decoder, 
+            merges, 
+            special_tokens
+        }
     }
 
     pub fn encode(&self) {

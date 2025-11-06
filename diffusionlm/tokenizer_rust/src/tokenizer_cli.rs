@@ -1,5 +1,4 @@
 #![cfg(feature = "cli")] 
-use std::println;
 
 use tokenizer_rs::tokenizer::Tokenizer;
 
