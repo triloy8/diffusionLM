@@ -7,9 +7,9 @@ use std::collections::HashMap;
 pub struct Tokenizer{
     gpt2_encoder: HashMap<u8, char>,
     gpt2_decoder: HashMap<char, u8>,
-    vocab_encoder: HashMap<u32, String>, 
-    vocab_decoder: HashMap<String, u32>, 
-    merges: HashMap<(String, String), u32>, 
+    vocab_encoder: HashMap<usize, String>, 
+    vocab_decoder: HashMap<String, usize>, 
+    merges: HashMap<(String, String), usize>, 
     special_tokens: Vec<String>,
 }
 
@@ -23,13 +23,13 @@ impl Tokenizer {
 
         // vocab
         let raw_gpt2_vocab = std::fs::read_to_string(vocab_filepath).expect("Failed to read raw vocab file");
-        let mut gpt2_vocab: HashMap<String, u32> = serde_json::from_str::<HashMap<String, u32>>(&raw_gpt2_vocab).expect("Failed to parse to json vocab file");
+        let mut gpt2_vocab: HashMap<String, usize> = serde_json::from_str::<HashMap<String, usize>>(&raw_gpt2_vocab).expect("Failed to parse to json vocab file");
         for special_token in &special_tokens {
-            gpt2_vocab.insert(special_token.clone(), gpt2_vocab.values().len() as u32);
+            gpt2_vocab.insert(special_token.clone(), gpt2_vocab.values().len());
         }
 
-        let mut vocab_encoder: HashMap<u32, String> = HashMap::new();
-        let mut vocab_decoder: HashMap<String, u32> = HashMap::new();
+        let mut vocab_encoder: HashMap<usize, String> = HashMap::new();
+        let mut vocab_decoder: HashMap<String, usize> = HashMap::new();
         for (gpt2_vocab_word, gpt2_vocab_id) in gpt2_vocab {
             vocab_encoder.insert(gpt2_vocab_id, gpt2_vocab_word.clone());
             vocab_decoder.insert(gpt2_vocab_word, gpt2_vocab_id);
@@ -37,7 +37,7 @@ impl Tokenizer {
 
         // merges
         let gpt2_merges = std::fs::read_to_string(merges_filepath).expect("Failed to read merges file");
-        let mut merges: HashMap<(String, String), u32> = HashMap::new();
+        let mut merges: HashMap<(String, String), usize> = HashMap::new();
         for (i, line) in gpt2_merges.lines().enumerate() {
             let cleaned_line = line.trim_end();
             
@@ -47,7 +47,7 @@ impl Tokenizer {
 
             let parts: Vec<&str> = cleaned_line.split(" ").collect();
             if parts.len() == 2 {
-                merges.insert((parts[0].to_string(), parts[1].to_string()), i as u32);
+                merges.insert((parts[0].to_string(), parts[1].to_string()), i);
             }
         }
 
