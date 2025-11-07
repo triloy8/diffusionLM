@@ -63,7 +63,8 @@ impl Tokenizer {
 
         let re_spec = Regex::new(&format!("({special_tokens_pattern})")).expect("Failed to validate special tokens regex");
 
-        let pat: &str = r"'(?:[sdmt]|ll|ve|re)| ?\p{L}+| ?\p{N}+| ?[^\s\p{L}\p{N}]+|\s+(?!\S)|\s+";
+        // the old gpt2 pattern, the newer one is not supported on regex bc look-around is not implemented
+        let pat: &str = r"(?:'s|'t|'re|'ve|'m|'ll|'d| ?\p{L}+| ?\p{N}+| ?[^\s\p{L}\p{N}]+|\s+(?:\S|\z))";
         let re_pat = Regex::new(pat).expect("Failed to create PAT regex");
 
         Tokenizer{
