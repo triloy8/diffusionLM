@@ -6,6 +6,8 @@ use regex::Regex;
 
 // #[pyclass]
 pub struct Tokenizer{
+    re_spec: Regex,
+    re_pat: Regex,
     gpt2_encoder: HashMap<u8, char>,
     gpt2_decoder: HashMap<char, u8>,
     vocab_encoder: HashMap<usize, String>, 
@@ -52,7 +54,21 @@ impl Tokenizer {
             }
         }
 
+        // regex
+        let special_tokens_pattern = special_tokens
+        .iter()
+        .map(|tok| regex::escape(tok))
+        .collect::<Vec<_>>()
+        .join("|");
+
+        let re_spec = Regex::new(&format!("({special_tokens_pattern})")).expect("Failed to validate special tokens regex");
+
+        let pat: &str = r"'(?:[sdmt]|ll|ve|re)| ?\p{L}+| ?\p{N}+| ?[^\s\p{L}\p{N}]+|\s+(?!\S)|\s+";
+        let re_pat = Regex::new(pat).expect("Failed to create PAT regex");
+
         Tokenizer{
+            re_spec,
+            re_pat,
             gpt2_encoder,
             gpt2_decoder,
             vocab_encoder, 
@@ -68,26 +84,17 @@ impl Tokenizer {
             return vec![text];
         }
 
-        let special_tokens_pattern = self.special_tokens
-        .iter()
-        .map(|tok| regex::escape(tok))
-        .collect::<Vec<_>>()
-        .join("|");
-
-        let splitter = Regex::new(&format!("({special_tokens_pattern})")).expect("Failed to validate special tokens regex");
-        let parts: Vec<String> = splitter.split(&text).map(|s| s.to_string()).collect();
+        let parts: Vec<String> = self.re_spec.split(&text).map(|s| s.to_owned()).collect();
 
         let mut pretoken_list: Vec<String> = Vec::new();
-        let pat: &str = r"'(?:[sdmt]|ll|ve|re)| ?\p{L}+| ?\p{N}+| ?[^\s\p{L}\p{N}]+|\s+(?!\S)|\s+";
-        let re_pat = Regex::new(pat).expect("Failed to create PAT regex");
 
         for part in parts {
             if self.special_tokens.contains(&part) {
-                pretoken_list.push(part.clone());
+                pretoken_list.push(part);
             } else if part.is_empty() {
                 continue;
             } else {
-                for m in re_pat.find_iter(&part) {
+                for m in self.re_pat.find_iter(&part) {
                     pretoken_list.push(m.as_str().to_string());
                 }
             }
