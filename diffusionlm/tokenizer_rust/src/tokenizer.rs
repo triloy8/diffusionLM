@@ -2,6 +2,7 @@
 
 use std::path::Path;
 use std::collections::HashMap;
+use regex::Regex;
 
 // #[pyclass]
 pub struct Tokenizer{
@@ -61,8 +62,40 @@ impl Tokenizer {
         }
     }
 
-    pub fn encode(&self) {
-        todo!()
+    pub fn encode(&self, text: String) -> Vec<String>{
+        // pretoken
+        if self.special_tokens.is_empty() {
+            return vec![text];
+        }
+
+        let special_tokens_pattern = self.special_tokens
+        .iter()
+        .map(|tok| regex::escape(tok))
+        .collect::<Vec<_>>()
+        .join("|");
+
+        let splitter = Regex::new(&format!("({special_tokens_pattern})")).expect("Failed to validate special tokens regex");
+        let parts: Vec<String> = splitter.split(&text).map(|s| s.to_string()).collect();
+
+        let mut pretoken_list: Vec<String> = Vec::new();
+        let pat: &str = r"'(?:[sdmt]|ll|ve|re)| ?\p{L}+| ?\p{N}+| ?[^\s\p{L}\p{N}]+|\s+(?!\S)|\s+";
+        let re_pat = Regex::new(pat).expect("Failed to create PAT regex");
+
+        for part in parts {
+            if self.special_tokens.contains(&part) {
+                pretoken_list.push(part.clone());
+            } else if part.is_empty() {
+                continue;
+            } else {
+                for m in re_pat.find_iter(&part) {
+                    pretoken_list.push(m.as_str().to_string());
+                }
+            }
+        }
+
+        // merges
+        // encodings 
+        vec!["placeholder".to_string()]
     }
 
     pub fn encode_iterable(&self) {
