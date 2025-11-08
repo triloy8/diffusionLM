@@ -180,12 +180,27 @@ impl Tokenizer {
 
     }
 
-    pub fn encode_iterable(&self) {
-        todo!()
+    pub fn encode_iterable<'a, I>(&'a self, iter: I) -> impl Iterator<Item = usize> + 'a 
+    where
+        I: IntoIterator<Item = &'a str> + 'a,
+    {
+        iter.into_iter().flat_map(|line| self.encode(line.to_string()))
     }
 
-    pub fn decode(&self) {
-        todo!()
+    pub fn decode(&self, ids: Vec<usize>) -> String {
+        let gpt2_encoded_string = ids.iter()
+        .map(|id| self.vocab_decoder.get(&id).expect("Decode id not found in vocab").as_str())
+        .collect::<Vec<_>>()
+        .join("");
+
+        let mut utf8_bytes = Vec::new();
+        for char in gpt2_encoded_string.chars(){
+            utf8_bytes.push(*self.gpt2_decoder.get(&char).expect("Decoded char not found in gpt2 decoder"));
+        }
+
+        let decoded_string = String::from_utf8_lossy(&utf8_bytes).into_owned();
+
+        decoded_string
     }
 }
 
