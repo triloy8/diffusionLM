@@ -10,8 +10,8 @@ pub struct Tokenizer{
     re_pat: Regex,
     gpt2_encoder: HashMap<u8, char>,
     gpt2_decoder: HashMap<char, u8>,
-    vocab_encoder: HashMap<usize, String>, 
-    vocab_decoder: HashMap<String, usize>, 
+    vocab_encoder: HashMap<String, usize>, 
+    vocab_decoder: HashMap<usize, String>, 
     merges: HashMap<(String, String), usize>, 
     special_tokens: Vec<String>,
 }
@@ -31,11 +31,11 @@ impl Tokenizer {
             gpt2_vocab.insert(special_token.clone(), gpt2_vocab.values().len());
         }
 
-        let mut vocab_encoder: HashMap<usize, String> = HashMap::new();
-        let mut vocab_decoder: HashMap<String, usize> = HashMap::new();
+        let mut vocab_encoder: HashMap<String, usize> = HashMap::new();
+        let mut vocab_decoder: HashMap<usize, String> = HashMap::new();
         for (gpt2_vocab_word, gpt2_vocab_id) in gpt2_vocab {
-            vocab_encoder.insert(gpt2_vocab_id, gpt2_vocab_word.clone());
-            vocab_decoder.insert(gpt2_vocab_word, gpt2_vocab_id);
+            vocab_encoder.insert(gpt2_vocab_word.clone(), gpt2_vocab_id);
+            vocab_decoder.insert(gpt2_vocab_id, gpt2_vocab_word);
         }
 
         // merges
@@ -79,13 +79,13 @@ impl Tokenizer {
         }
     }
 
-    pub fn encode(&self, text: String) -> Vec<String>{
+    pub fn encode(&self, text: String) -> Vec<usize>{
         // pretoken
-        if self.special_tokens.is_empty() {
-            return vec![text];
-        }
-
-        let parts: Vec<String> = self.re_spec.split(&text).map(|s| s.to_owned()).collect();
+        let parts: Vec<String> = if !self.special_tokens.is_empty(){
+            self.re_spec.split(&text).map(|s| s.to_owned()).collect()
+        } else {
+            vec![text]
+        };
 
         let mut pretoken_list: Vec<String> = Vec::new();
 
@@ -102,8 +102,82 @@ impl Tokenizer {
         }
 
         // merges
+        let mut pretoken_list_merged: Vec<Vec<String>> = Vec::new();
+        for pretoken in pretoken_list {
+            if self.special_tokens.contains(&pretoken) {
+                let mut pretoken_gpt2: Vec<String> = Vec::new();
+                for b in pretoken.as_bytes() {
+                    let ch = self.gpt2_encoder.get(b).expect("Byte not in gpt2_encoder");
+                    pretoken_gpt2.push(ch.to_string());
+                }
+                loop { 
+                    if pretoken_gpt2.len() < 2 {
+                        break;
+                    }
+
+                    #[derive(Clone)]
+                    struct MergeCandidate {
+                        position: usize,
+                        rank: usize,
+                        pair: (String, String),
+                    }
+
+                    let mut mergeable:Vec<MergeCandidate> = Vec::new(); 
+                    for position in 0..(pretoken_gpt2.len()-1){
+                        let p0: String = pretoken_gpt2[position].clone();
+                        let p1: String = pretoken_gpt2[position+1].clone();
+                        let key = (p0.clone(), p1.clone());
+                        if let Some(rank) = self.merges.get(&key){
+                            mergeable.push(MergeCandidate { 
+                                position, 
+                                rank: *rank,
+                                pair: (p0, p1) 
+                            })
+                        }
+                    }
+
+                    if mergeable.is_empty() {
+                        break;
+                    }
+
+                    let best = mergeable
+                    .iter()
+                    .min_by_key(|c| c.rank)
+                    .expect("Expected at least one candidate");
+
+                    let position = best.position.clone();
+                    let pair = best.pair.clone();
+
+                    let mut new_vec: Vec<String> = Vec::new();
+                    for i in 0..position{
+                        new_vec.push(pretoken_gpt2[i].clone());
+                    }
+                    let merged = format!("{}{}", pair.0, pair.1);
+                    new_vec.push(merged);   
+                    for i in (position+2)..pretoken_gpt2.len(){
+                        new_vec.push(pretoken_gpt2[i].clone());
+                    }
+                    
+                    pretoken_gpt2 = new_vec;
+                }
+                pretoken_list_merged.push(pretoken_gpt2);
+
+            } else {
+                pretoken_list_merged.push(vec![pretoken]);
+            }
+        }
+
         // encodings 
-        vec!["placeholder".to_string()]
+        let mut encoding: Vec<usize> = Vec::new();
+        for pretoken_merge in pretoken_list_merged{
+            for merge in pretoken_merge {
+                let id = self.vocab_encoder.get(&merge).expect("Merge not found in vocab_encoder");
+                encoding.push(*id);
+            }
+        }
+
+        encoding
+
     }
 
     pub fn encode_iterable(&self) {
