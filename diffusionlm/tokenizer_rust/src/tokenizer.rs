@@ -104,7 +104,7 @@ impl Tokenizer {
         // merges
         let mut pretoken_list_merged: Vec<Vec<String>> = Vec::new();
         for pretoken in pretoken_list {
-            if self.special_tokens.contains(&pretoken) {
+            if !self.special_tokens.contains(&pretoken) {
                 let mut pretoken_gpt2: Vec<String> = Vec::new();
                 for b in pretoken.as_bytes() {
                     let ch = self.gpt2_encoder.get(b).expect("Byte not in gpt2_encoder");
