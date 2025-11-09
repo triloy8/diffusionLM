@@ -1,5 +1,8 @@
 pub mod tokenizer;
 
+#[cfg(test)]
+mod tests;
+
 // use pyo3::prelude::*;
 
 // #[pymodule]

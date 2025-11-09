@@ -84,9 +84,25 @@ impl Tokenizer {
     }
 
     pub fn encode(&self, text: String) -> Vec<usize>{
-        // pretoken
+        // pretoken emulate re.split in python w/ re.find_iter
         let parts: Vec<String> = if let Some(regex) = &self.re_spec {
-            regex.split(&text).map(|s| s.to_owned()).collect()
+            let mut segments: Vec<String> = Vec::new();
+            let mut last_end = 0;
+            for mat in regex.find_iter(&text) {
+                if mat.start() > last_end {
+                    segments.push(text[last_end..mat.start()].to_string());
+                }
+                segments.push(mat.as_str().to_string());
+                last_end = mat.end();
+            }
+            if last_end < text.len() {
+                segments.push(text[last_end..].to_string());
+            }
+            if segments.is_empty() {
+                vec![text]
+            } else {
+                segments
+            }
         } else {
             vec![text]
         };
@@ -208,7 +224,7 @@ impl Tokenizer {
     }
 }
 
-fn gpt2_bytes_to_unicode() -> HashMap<u8, char> {
+pub(crate) fn gpt2_bytes_to_unicode() -> HashMap<u8, char> {
     let allowed: std::iter::Chain<std::iter::Chain<std::ops::RangeInclusive<char>, std::ops::RangeInclusive<char>>, std::ops::RangeInclusive<char>> = ('!'..='~')
         .chain('¡'..='¬')
         .chain('®'..='ÿ');
