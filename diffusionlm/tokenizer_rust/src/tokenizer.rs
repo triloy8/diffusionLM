@@ -6,7 +6,7 @@ use regex::Regex;
 
 // #[pyclass]
 pub struct Tokenizer{
-    re_spec: Regex,
+    re_spec: Option<Regex>,
     re_pat: Regex,
     gpt2_encoder: HashMap<u8, char>,
     gpt2_decoder: HashMap<char, u8>,
@@ -54,14 +54,18 @@ impl Tokenizer {
             }
         }
 
-        // regex
-        let special_tokens_pattern = special_tokens
-        .iter()
-        .map(|tok| regex::escape(tok))
-        .collect::<Vec<_>>()
-        .join("|");
+        let re_spec = if special_tokens.is_empty() {
+            None
+        } else {
+            // special token regex
+            let special_tokens_pattern = special_tokens
+            .iter()
+            .map(|tok| regex::escape(tok))
+            .collect::<Vec<_>>()
+            .join("|");
 
-        let re_spec = Regex::new(&format!("({special_tokens_pattern})")).expect("Failed to validate special tokens regex");
+            Some(Regex::new(&format!("({special_tokens_pattern})")).expect("Failed to validate special tokens regex"))
+        };
 
         // the old gpt2 pattern, the newer one is not supported on regex bc look-around is not implemented
         let pat: &str = r"(?:'s|'t|'re|'ve|'m|'ll|'d| ?\p{L}+| ?\p{N}+| ?[^\s\p{L}\p{N}]+|\s+(?:\S|\z))";
@@ -81,8 +85,8 @@ impl Tokenizer {
 
     pub fn encode(&self, text: String) -> Vec<usize>{
         // pretoken
-        let parts: Vec<String> = if !self.special_tokens.is_empty(){
-            self.re_spec.split(&text).map(|s| s.to_owned()).collect()
+        let parts: Vec<String> = if let Some(regex) = &self.re_spec {
+            regex.split(&text).map(|s| s.to_owned()).collect()
         } else {
             vec![text]
         };
