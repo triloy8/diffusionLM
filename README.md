@@ -131,8 +131,8 @@ The `Justfile` plus helper scripts under `scripts/` provide a thin remote contro
 
 - benchmarking
   - Purpose: Quick throughput checks for inference and tokenizer.
-  - Key files: `benchmarking/bench_infer_latency.py`, `benchmarking/bench_tokenizer.py`.
-  - Configs: `config/resources/bench_infer.toml`, `config/resources/bench_tokenizer.toml`.
+  - Key files: `benchmarking/bench_infer_latency.py`.
+  - Configs: `config/resources/bench_infer.toml`.
 
 - config
   - Purpose: Typed config schemas, loaders, validation, and example TOMLs.
@@ -157,9 +157,6 @@ The `Justfile` plus helper scripts under `scripts/` provide a thin remote contro
 - Run: `uv run diffusionlm-bench-infer --config config/resources/bench_infer.toml`
   - Measures warmup and repeated diffusion reverse passes, logging latency, tokens/sec, and diffusion-specific metrics (steps, block length, average mask ratio). When the config includes a `[data]` section with `np_dat_valid_path`/`total_val_tokens`, the benchmark can optionally compute a forward perplexity summary across the validation memmap (`perplexity_*` knobs under `[benchmark]`).
 
-- Tokenizer throughput:
-- Run: `uv run diffusionlm-bench-tokenizer --config config/resources/bench_tokenizer.toml`
-  - Measures encode and decode throughput over given texts.
 
 ## Tests
 
