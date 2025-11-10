@@ -30,14 +30,15 @@ fn build_test_tokenizer() -> Tokenizer {
     fs::write(&merges_path, "a b\n").expect("failed to write merges file");
 
     Tokenizer::from_files(&vocab_path, &merges_path, vec!["<|eot|>".to_string()])
+        .expect("failed to build tokenizer fixture")
 }
 
 #[test]
 fn encode_decode_roundtrip_from_files() {
     let tokenizer = build_test_tokenizer();
     let text = "a ab b";
-    let ids = tokenizer.encode(text.to_string());
-    let decoded = tokenizer.decode(ids);
+    let ids = tokenizer.encode(text.to_string()).expect("encode should succeed");
+    let decoded = tokenizer.decode(ids).expect("decode should succeed");
     assert_eq!(decoded, text);
 }
 
@@ -45,14 +46,14 @@ fn encode_decode_roundtrip_from_files() {
 fn merges_respect_special_token_boundaries() {
     let tokenizer = build_test_tokenizer();
     let text = "a<|eot|>b";
-    let ids = tokenizer.encode(text.to_string());
+    let ids = tokenizer.encode(text.to_string()).expect("encode should succeed");
     assert_eq!(ids.len(), 3, "special token should prevent merges across boundary");
 
-    let decoded = tokenizer.decode(ids.clone());
+    let decoded = tokenizer.decode(ids.clone()).expect("decode should succeed");
     assert_eq!(decoded, text);
 
     let text2 = "ab<|eot|>ab";
-    let ids2 = tokenizer.encode(text2.to_string());
+    let ids2 = tokenizer.encode(text2.to_string()).expect("encode should succeed");
     assert_eq!(ids2.len(), 3, "merges should apply independently on each side of special token");
-    assert_eq!(tokenizer.decode(ids2), text2);
+    assert_eq!(tokenizer.decode(ids2).expect("decode should succeed"), text2);
 }

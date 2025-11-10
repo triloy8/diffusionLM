@@ -1,8 +1,33 @@
 // use pyo3::prelude::*;
 
-use std::path::Path;
-use std::collections::HashMap;
+use std::{collections::HashMap, path::Path, string::FromUtf8Error};
 use regex::Regex;
+use thiserror::Error;
+
+// error handling
+pub type Result<T> = std::result::Result<T, TokenizerError>;
+
+#[derive(Debug, Error)]
+pub enum TokenizerError {
+    #[error("I/O error while reading path")]
+    Io(#[from] std::io::Error),
+    #[error("Malformed vocab JSON")]
+    VocabJson(#[from] serde_json::Error),
+    #[error("Regex comp failed")]
+    Regex(#[from] regex::Error),
+    #[error("Byte {0} missing from GPT2 encoder")]
+    MissingByte(u8),
+    #[error("Best mergeable failing for some reason")]
+    MissingBestMerge,
+    #[error("Merge missing from vocab")]
+    MissingMerge,
+    #[error("Token Id {0} missing from vocab decoder")]
+    MissingId(usize),
+    #[error("Missing char from gpt2 decoder")]
+    MissingChar,
+    #[error("Decoded bytes not valid UTF-8")]
+    Utf8(#[from] FromUtf8Error),
+}
 
 // #[pyclass]
 pub struct Tokenizer{
@@ -19,14 +44,14 @@ pub struct Tokenizer{
 // #[pymethods]
 impl Tokenizer {
     // #[staticmethod]
-    pub fn from_files<P: AsRef<Path>>(vocab_filepath: P, merges_filepath: P, special_tokens: Vec<String>) ->  Tokenizer {
+    pub fn from_files<P: AsRef<Path>>(vocab_filepath: P, merges_filepath: P, special_tokens: Vec<String>) ->  Result<Tokenizer> {
         // gpt2 unicode encoder/decoder
         let gpt2_encoder: HashMap<u8, char> = gpt2_bytes_to_unicode();
         let gpt2_decoder: HashMap<char, u8> = gpt2_encoder.iter().map(|(&id, &ch)| (ch, id)).collect();
 
         // vocab
-        let raw_gpt2_vocab = std::fs::read_to_string(vocab_filepath).expect("Failed to read raw vocab file");
-        let mut gpt2_vocab: HashMap<String, usize> = serde_json::from_str::<HashMap<String, usize>>(&raw_gpt2_vocab).expect("Failed to parse to json vocab file");
+        let raw_gpt2_vocab = std::fs::read_to_string(vocab_filepath)?;
+        let mut gpt2_vocab: HashMap<String, usize> = serde_json::from_str::<HashMap<String, usize>>(&raw_gpt2_vocab)?;
         for special_token in &special_tokens {
             gpt2_vocab.insert(special_token.clone(), gpt2_vocab.values().len());
         }
@@ -39,7 +64,7 @@ impl Tokenizer {
         }
 
         // merges
-        let gpt2_merges = std::fs::read_to_string(merges_filepath).expect("Failed to read merges file");
+        let gpt2_merges = std::fs::read_to_string(merges_filepath)?;
         let mut merges: HashMap<(String, String), usize> = HashMap::new();
         for (i, line) in gpt2_merges.lines().enumerate() {
             let cleaned_line = line.trim_end();
@@ -64,14 +89,14 @@ impl Tokenizer {
             .collect::<Vec<_>>()
             .join("|");
 
-            Some(Regex::new(&format!("({special_tokens_pattern})")).expect("Failed to validate special tokens regex"))
+            Some(Regex::new(&format!("({special_tokens_pattern})"))?)
         };
 
         // the old gpt2 pattern, the newer one is not supported on regex bc look-around is not implemented
         let pat: &str = r"(?:'s|'t|'re|'ve|'m|'ll|'d| ?\p{L}+| ?\p{N}+| ?[^\s\p{L}\p{N}]+|\s+(?:\S|\z))";
-        let re_pat = Regex::new(pat).expect("Failed to create PAT regex");
+        let re_pat = Regex::new(pat)?;
 
-        Tokenizer{
+        Ok(Tokenizer{
             re_spec,
             re_pat,
             gpt2_encoder,
@@ -80,10 +105,10 @@ impl Tokenizer {
             vocab_decoder, 
             merges, 
             special_tokens
-        }
+        })
     }
 
-    pub fn encode(&self, text: String) -> Vec<usize>{
+    pub fn encode(&self, text: String) -> Result<Vec<usize>> {
         // pretoken emulate re.split in python w/ re.find_iter
         let parts: Vec<String> = if let Some(regex) = &self.re_spec {
             let mut segments: Vec<String> = Vec::new();
@@ -127,7 +152,7 @@ impl Tokenizer {
             if !self.special_tokens.contains(&pretoken) {
                 let mut pretoken_gpt2: Vec<String> = Vec::new();
                 for b in pretoken.as_bytes() {
-                    let ch = self.gpt2_encoder.get(b).expect("Byte not in gpt2_encoder");
+                    let ch = self.gpt2_encoder.get(b).ok_or(TokenizerError::MissingByte(*b))?;
                     pretoken_gpt2.push(ch.to_string());
                 }
                 loop { 
@@ -163,7 +188,7 @@ impl Tokenizer {
                     let best = mergeable
                     .iter()
                     .min_by_key(|c| c.rank)
-                    .expect("Expected at least one candidate");
+                    .ok_or(TokenizerError::MissingBestMerge)?;
 
                     let position = best.position.clone();
                     let pair = best.pair.clone();
@@ -191,36 +216,44 @@ impl Tokenizer {
         let mut encoding: Vec<usize> = Vec::new();
         for pretoken_merge in pretoken_list_merged{
             for merge in pretoken_merge {
-                let id = self.vocab_encoder.get(&merge).expect("Merge not found in vocab_encoder");
+                let id = self.vocab_encoder.get(&merge).ok_or(TokenizerError::MissingMerge)?;
                 encoding.push(*id);
             }
         }
 
-        encoding
+        Ok(encoding)
 
     }
 
-    pub fn encode_iterable<'a, I>(&'a self, iter: I) -> impl Iterator<Item = usize> + 'a 
+    pub fn encode_iterable<'a, I>(&'a self, iter: I) -> impl Iterator<Item = Result<usize>> + 'a 
     where
         I: IntoIterator<Item = &'a str> + 'a,
     {
-        iter.into_iter().flat_map(|line| self.encode(line.to_string()))
+        iter.into_iter().flat_map(move |line| {
+            match self.encode(line.to_string()) {
+                Ok(ids) => ids.into_iter().map(Ok).collect::<Vec<_>>().into_iter(),
+                Err(err) => vec![Err(err)].into_iter(),
+            }
+        })
     }
 
-    pub fn decode(&self, ids: Vec<usize>) -> String {
-        let gpt2_encoded_string = ids.iter()
-        .map(|id| self.vocab_decoder.get(&id).expect("Decode id not found in vocab").as_str())
-        .collect::<Vec<_>>()
-        .join("");
+    pub fn decode(&self, ids: Vec<usize>) -> Result<String> {
+        let gpt2_encoded_parts = ids.iter()
+        .map(|id| {
+            self.vocab_decoder.get(&id).map(|s| s.as_str()).ok_or(TokenizerError::MissingId(*id))
+        })
+        .collect::<Result<Vec<_>>>()?;
+
+        let gpt2_encoded_string = gpt2_encoded_parts.join("");
 
         let mut utf8_bytes = Vec::new();
         for char in gpt2_encoded_string.chars(){
-            utf8_bytes.push(*self.gpt2_decoder.get(&char).expect("Decoded char not found in gpt2 decoder"));
+            utf8_bytes.push(*self.gpt2_decoder.get(&char).ok_or(TokenizerError::MissingChar)?);
         }
 
         let decoded_string = String::from_utf8_lossy(&utf8_bytes).into_owned();
 
-        decoded_string
+        Ok(decoded_string)
     }
 }
 
