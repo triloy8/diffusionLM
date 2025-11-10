@@ -14,12 +14,3 @@ thiserror = "2.0.17"
 
 [dev-dependencies]
 tempfile = "3.10"
-
-[features]
-default = []
-cli = []
-
-[[bin]]
-name = "tokenizer_cli"
-path = "src/tokenizer_cli.rs"
-required-features = ["cli"]
