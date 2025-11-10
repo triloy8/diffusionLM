@@ -154,11 +154,11 @@ The `Justfile` plus helper scripts under `scripts/` provide a thin remote contro
 - Results are logged with the `ConsoleLogger` to stdout; no files are written.
 
 - Inference latency:
-  - Run: `python -m benchmarking.bench_infer_latency --config config/resources/bench_infer.toml`
+- Run: `uv run diffusionlm-bench-infer --config config/resources/bench_infer.toml`
   - Measures warmup and repeated diffusion reverse passes, logging latency, tokens/sec, and diffusion-specific metrics (steps, block length, average mask ratio). When the config includes a `[data]` section with `np_dat_valid_path`/`total_val_tokens`, the benchmark can optionally compute a forward perplexity summary across the validation memmap (`perplexity_*` knobs under `[benchmark]`).
 
 - Tokenizer throughput:
-  - Run: `python -m benchmarking.bench_tokenizer --config config/resources/bench_tokenizer.toml`
+- Run: `uv run diffusionlm-bench-tokenizer --config config/resources/bench_tokenizer.toml`
   - Measures encode and decode throughput over given texts.
 
 ## Tests

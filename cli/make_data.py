@@ -1,7 +1,7 @@
 import argparse
 
 from config import load_make_data_config
-from diffusionlm.tokenizer.tokenizer import Tokenizer
+from diffusionlm.tokenizer import PythonTokenizer
 from databuilder.dataset_builder import write_token_ids_to_memmap
 from cli.utils import add_config_args, load_config_or_print
 from logger import ConsoleLogger
@@ -19,7 +19,7 @@ def main():
     if cfg_dc is None:
         return
 
-    tokenizer = Tokenizer.from_files(
+    tokenizer = PythonTokenizer.from_files(
         vocab_filepath=str(cfg_dc.tokenizer.vocab_path),
         merges_filepath=str(cfg_dc.tokenizer.merges_path),
         special_tokens=cfg_dc.tokenizer.special_tokens,

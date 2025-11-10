@@ -1,7 +1,7 @@
 [tokenizer]
-merges_path = "path/to/merges.txt"
-vocab_path = "path/to/vocab.json"
-special_tokens = ["<|pad|>", "<|eos|>"]
+merges_path = "./data/gpt2_merges.txt"
+vocab_path = "./data/gpt2_vocab.json"
+special_tokens = ["<|endoftext|>", "<|mask|>"]
 
 [input]
 text_list = [
