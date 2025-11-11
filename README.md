@@ -2,7 +2,7 @@
 
 ## What Is This?
 
-A focused, from‑scratch diffusion language model inspired by the LLaDA guidelines. The repo modernises the original `old/` experimentation into a modular package that keeps the same bidirectional Transformer core, adds diffusion-specific batch/noise handling, and ships supporting tools (tokenizer, dataset builder, CLI, benchmarks, logging) with clarity and readability as priorities.
+A from‑scratch diffusion language model inspired by the LLaDA guidelines. This repo continues the work from my earlier `transformerLM` project, evolving the original masked Transformer into a bidirectional core while expanding it with diffusion-specific batch/noise handling and shipping supporting tools (tokenizer, dataset builder, CLI, benchmarks, logging) with clarity and readability as priorities.
 
 ## Overview
 
