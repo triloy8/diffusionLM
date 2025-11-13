@@ -40,5 +40,18 @@ class AdamW(torch.optim.Optimizer):
                 state["m"] = m
                 state["v"] = v
         return loss
+    
 
-__all__ = ["AdamW"]
+class Muon(torch.optim.Optimizer):
+    """Muon with AdamW fallback"""
+    
+    def __init__(self, params, lr=1e-3, betas=(0.9, 0.999), eps=1e-08, weight_decay=0.01):
+        pass
+
+    def step(self, closure: Optional[Callable] = None):
+        pass
+
+__all__ = [
+    "AdamW", 
+    "Muon"
+]
