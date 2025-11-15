@@ -13,7 +13,7 @@ noise_epsilon = 0.001
 random_trunc_prob = 0.01
 
 [optimizer]
-optimizer_name = "muon"
+optimizer_name = "adamw"
 betas = [0.9, 0.95]
 eps = 1e-8
 weight_decay = 0.001
@@ -25,7 +25,7 @@ cosine_cycle_iters = 4500
 grad_clip_max_l2_norm = 1.0
 
 [training]
-batch_size = 200
+batch_size = 376
 max_train_iteration = 5000
 max_val_iteration = 10
 val_freq_iteration = 125
