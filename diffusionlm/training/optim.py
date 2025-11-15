@@ -33,8 +33,7 @@ class AdamW(torch.optim.Optimizer):
 
                 lr_t = lr * (math.sqrt(1 - betas[1] ** (t + 1)) / (1 - betas[0] ** (t + 1)))
 
-                p.data -= lr_t * (m / (torch.sqrt(v) + eps))
-                p.data -= lr * weight_decay * p.data
+                p.data = (1 - lr * weight_decay) * p.data  - lr_t * (m / (torch.sqrt(v) + eps))
 
                 state["t"] = t + 1
                 state["m"] = m
@@ -110,12 +109,38 @@ class Muon(torch.optim.Optimizer):
                     if p.grad is None:
                         # continue
                         p.grad = torch.zeros_like(p)  # Force synchronization
+
+                    # def _muon_update(grad, momentum, beta=0.95, ns_steps=5, nesterov=True):
+                    #     momentum.lerp_(grad, 1 - beta)
+                    #     update = grad.lerp_(momentum, beta) if nesterov else momentum
+                    #     if update.ndim == 4: # for the case of conv filters
+                    #         update = update.view(len(update), -1)
+                    #     update = zeropower_via_newtonschulz5(update, steps=ns_steps)
+                    #     update *= max(1, grad.size(-2) / grad.size(-1))**0.5
+                    #     return update
+
                     state = self.state[p]
-                    if len(state) == 0:
-                        state["momentum_buffer"] = torch.zeros_like(p)
-                    update = _muon_update(p.grad, state["momentum_buffer"], beta=group["momentum"])
-                    p.mul_(1 - group["lr"] * group["weight_decay"])
+                    # if len(state) == 0:
+                    #     state["momentum_buffer"] = torch.zeros_like(p)
+                    momentum_buffer = state.get("momentum_buffer", torch.zeros(p.shape, device=p.grad.device))
+                    grad = p.grad
+
+                    # state["momentum_buffer"].lerp_(p.grad, 1 - group["momentum"])
+                    momentum_buffer = group["momentum"] * momentum_buffer + (1 - group["momentum"]) * grad
+                    # update = p.grad.lerp_(state["momentum_buffer"], group["momentum"])
+                    update = group["momentum"] * momentum_buffer + (1 - group["momentum"]) * grad
+                    if update.ndim == 4: # for the case of conv filters
+                        update = update.view(len(update), -1)
+                    update = zeropower_via_newtonschulz5(update, steps=5)
+                    update *= max(1, p.grad.size(-2) / p.grad.size(-1))**0.5
+
+                    # p.mul_(1 - group["lr"] * group["weight_decay"])
+                    p.data -= group["lr"] * group["weight_decay"] * p.data
                     p.add_(update.reshape(p.shape), alpha=-group["lr"])
+                    # p.data -= group["lr"] * group["weight_decay"] * p.data
+
+                    # needs an update: 
+                    # state["momentum_buffer"] = momentum_buffer
             else:
                 for p in group["params"]:
                     if p.grad is None:
@@ -132,12 +157,13 @@ class Muon(torch.optim.Optimizer):
 
                     lr_t = group["lr"] * (math.sqrt(1 - group["betas"][1] ** (t + 1)) / (1 - group["betas"][0] ** (t + 1)))
 
-                    p.data -= lr_t * (m / (torch.sqrt(v) + group["eps"]))
-                    p.data -= group["lr"] * group["weight_decay"] * p.data
+                    p.data = (1 - group["lr"] * group["weight_decay"]) * p.data  - lr_t * (m / (torch.sqrt(v) + group["eps"]))
 
                     state["t"] = t + 1
                     state["m"] = m
                     state["v"] = v
+
+        return loss
 
 
 __all__ = [
