@@ -25,6 +25,7 @@ class ModelConfig:
 
 @dataclass
 class OptimizerConfig:
+    optimizer_name: str
     betas: Tuple[float, float]
     eps: float
     weight_decay: float

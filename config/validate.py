@@ -16,6 +16,7 @@ from .schemas import (
 
 ALLOWED_DTYPES = {"float32", "float16", "bfloat16"}
 ALLOWED_DEVICES = {"cpu", "cuda"}
+ALLOWED_OPTIMIZERS = {"adamw", "muon"}
 
 
 def _validate_model(m: ModelConfig) -> None:
@@ -39,6 +40,9 @@ def _validate_model(m: ModelConfig) -> None:
 
 
 def _validate_optimizer(o: OptimizerConfig) -> None:
+    optimizer_name = o.optimizer_name.lower()
+    if optimizer_name not in ALLOWED_OPTIMIZERS:
+        raise ValueError(f"optimizer_name must be one of {sorted(ALLOWED_OPTIMIZERS)}")
     if len(o.betas) != 2:
         raise ValueError("betas must have 2 elements")
     if not (0 <= o.betas[0] < 1 and 0 <= o.betas[1] < 1):

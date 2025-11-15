@@ -51,9 +51,11 @@ def load_train_config(path: Path | str) -> TrainConfig:
         noise_epsilon=float(m.get("noise_epsilon", 1e-3)),
         random_trunc_prob=float(m.get("random_trunc_prob", 0.01)),
     )
+    optimizer_name = str(o.get("optimizer_name", "adamw")).lower()
     betas = o.get("betas", [0.9, 0.95])
     initial_lr = float(o.get("initial_learning_rate", o["max_learning_rate"]))
     optimizer = OptimizerConfig(
+        optimizer_name=optimizer_name,
         betas=(float(betas[0]), float(betas[1])),
         eps=float(o["eps"]),
         weight_decay=float(o["weight_decay"]),

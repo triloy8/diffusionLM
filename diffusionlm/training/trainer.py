@@ -2,7 +2,10 @@ from diffusionlm.models import (
     TransformerLM,
     Linear,
 )
-from diffusionlm.training.optim import AdamW
+from diffusionlm.training.optim import (
+    build_optimizer_param_groups,
+    resolve_optimizer_cls,
+)
 from diffusionlm.training.data import get_batch, DiffusionBatch
 from diffusionlm.training.loss import diffusion_cross_entropy
 from diffusionlm.training.checkpoint import save_checkpoint
@@ -48,6 +51,30 @@ def _seed_everything(seed: int, device: str | torch.device, *, rank: int = 0) ->
     return generator
 
 
+def _prepare_optimizer_setup(cfg, parameters):
+    optimizer_name = str(getattr(cfg, "optimizer_name", "adamw")).lower()
+    setattr(cfg, "optimizer_name", optimizer_name)
+    optimizer_cls = resolve_optimizer_cls(optimizer_name)
+    param_groups = build_optimizer_param_groups(parameters, optimizer_name)
+    kwargs = {
+        "lr": float(cfg.initial_learning_rate),
+        "weight_decay": float(cfg.weight_decay),
+    }
+    betas = getattr(cfg, "betas", (0.9, 0.95))
+    beta_tuple = (float(betas[0]), float(betas[1]))
+    eps = float(getattr(cfg, "eps", 1e-8))
+    if optimizer_name == "adamw":
+        kwargs["betas"] = beta_tuple
+        kwargs["eps"] = eps
+    elif optimizer_name == "muon":
+        kwargs["momentum"] = float(getattr(cfg, "muon_momentum", 0.95))
+        kwargs["betas"] = beta_tuple
+        kwargs["eps"] = eps
+    else:
+        raise ValueError(f"Unsupported optimizer '{optimizer_name}'")
+    return optimizer_cls, param_groups, kwargs
+
+
 def train_transformer(args, *, logger: Logger, run_name: str):
     # checkpoint folder based on run_name provided by logger
     cfg = args
@@ -72,13 +99,8 @@ def train_transformer(args, *, logger: Logger, run_name: str):
         dtype=DTYPES[cfg.dtype],
     )
 
-    optimizer = AdamW(
-        model.parameters(),
-        lr=cfg.initial_learning_rate,
-        betas=cfg.betas,
-        eps=float(cfg.eps),
-        weight_decay=cfg.weight_decay,
-    )
+    optimizer_cls, param_groups, optimizer_kwargs = _prepare_optimizer_setup(cfg, model.parameters())
+    optimizer = optimizer_cls(param_groups, **optimizer_kwargs)
 
     np_arr_train_data = np.memmap(
         args.np_dat_train_path, dtype=np.int32, mode="r", shape=(args.total_train_tokens,)
@@ -177,13 +199,11 @@ def train_transformer_ddp(rank, args, cfg_dc):
 
     ddp_model = DDP(model, cfg.world_size, cfg.bucket_size_mb)
 
+    optimizer_cls, param_groups, optimizer_kwargs = _prepare_optimizer_setup(cfg, model.parameters())
     optimizer = OptimizerStateSharding(
-        model.parameters(),
-        AdamW,
-        lr=cfg.initial_learning_rate,
-        betas=cfg.betas,
-        eps=float(cfg.eps),
-        weight_decay=cfg.weight_decay,
+        param_groups,
+        optimizer_cls,
+        **optimizer_kwargs,
     )
 
     np_arr_train_data = np.memmap(

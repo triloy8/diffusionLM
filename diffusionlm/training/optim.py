@@ -1,7 +1,8 @@
-from collections.abc import Callable
-from typing import Optional
+from collections.abc import Callable, Iterable
+from typing import Dict, List, Optional
 import math
 import torch
+from torch.nn import Parameter
 
 
 class AdamW(torch.optim.Optimizer):
@@ -74,22 +75,34 @@ def zeropower_via_newtonschulz5(G, steps: int):
 
 class Muon(torch.optim.Optimizer):
     """Muon with AdamW fallback"""
-    def __init__(self, param_groups):
+
+    def __init__(
+        self,
+        param_groups,
+        *,
+        lr: float = 0.02,
+        momentum: float = 0.95,
+        weight_decay: float = 0.0,
+        betas=(0.9, 0.95),
+        eps: float = 1e-10,
+    ):
         for group in param_groups:
-            assert "use_muon" in group
+            if "use_muon" not in group:
+                raise ValueError("Muon param group must set 'use_muon'")
             if group["use_muon"]:
-                # defaults
-                group["lr"] = group.get("lr", 0.02)
-                group["momentum"] = group.get("momentum", 0.95)
-                group["weight_decay"] = group.get("weight_decay", 0)
-                assert set(group.keys()) == set(["params", "lr", "momentum", "weight_decay", "use_muon"])
+                group.setdefault("lr", lr)
+                group.setdefault("momentum", momentum)
+                group.setdefault("weight_decay", weight_decay)
+                allowed = {"params", "lr", "momentum", "weight_decay", "use_muon"}
             else:
-                # defaults
-                group["lr"] = group.get("lr", 3e-4)
-                group["betas"] = group.get("betas", (0.9, 0.95))
-                group["eps"] = group.get("eps", 1e-10)
-                group["weight_decay"] = group.get("weight_decay", 0)
-                assert set(group.keys()) == set(["params", "lr", "betas", "eps", "weight_decay", "use_muon"])
+                group.setdefault("lr", lr)
+                group.setdefault("betas", betas)
+                group.setdefault("eps", eps)
+                group.setdefault("weight_decay", weight_decay)
+                allowed = {"params", "lr", "betas", "eps", "weight_decay", "use_muon"}
+            unexpected = set(group.keys()) - allowed
+            if unexpected:
+                raise ValueError(f"Unexpected keys {unexpected} in Muon param group")
         super().__init__(param_groups, dict())
 
     def step(self, closure: Optional[Callable] = None):
@@ -144,7 +157,31 @@ class Muon(torch.optim.Optimizer):
         return loss
 
 
+OPTIMIZER_REGISTRY: Dict[str, type[torch.optim.Optimizer]] = {
+    "adamw": AdamW,
+    "muon": Muon,
+}
+
+
+def resolve_optimizer_cls(name: str) -> type[torch.optim.Optimizer]:
+    key = name.lower()
+    if key not in OPTIMIZER_REGISTRY:
+        raise ValueError(f"Unsupported optimizer '{name}'. Available: {sorted(OPTIMIZER_REGISTRY)}")
+    return OPTIMIZER_REGISTRY[key]
+
+
+def build_optimizer_param_groups(parameters: Iterable[Parameter], optimizer_name: str) -> List[Dict[str, object]]:
+    params_list = list(parameters)
+    param_group: Dict[str, object] = {"params": params_list}
+    if optimizer_name.lower() == "muon":
+        param_group["use_muon"] = True
+    return [param_group]
+
+
 __all__ = [
-    "AdamW", 
-    "Muon"
+    "AdamW",
+    "Muon",
+    "OPTIMIZER_REGISTRY",
+    "resolve_optimizer_cls",
+    "build_optimizer_param_groups",
 ]

@@ -54,6 +54,7 @@ Notes:
 - CPU uses `gloo`; CUDA uses `nccl`. Set `[model].device` and `[ddp].backend` accordingly.
 - Prefer `[logging].backend = "console"` for local runs.
 - Optimizer state sharding is enabled by default in the DDP entry point to reduce per-rank optimizer memory.
+- Choose the optimizer via `[optimizer].optimizer_name` (`"adamw"` default, `"muon"` experimental) while keeping the rest of the `[optimizer]` schedule knobs unchanged.
 
 - Generate text:
 

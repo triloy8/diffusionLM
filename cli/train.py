@@ -24,6 +24,7 @@ def main():
     # Build an argparse-like namespace expected by existing code
     ns = argparse.Namespace(
         # optimizer
+        optimizer_name=cfg_dc.optimizer.optimizer_name,
         betas=(cfg_dc.optimizer.betas[0], cfg_dc.optimizer.betas[1]),
         eps=cfg_dc.optimizer.eps,
         weight_decay=cfg_dc.optimizer.weight_decay,
@@ -73,6 +74,7 @@ def main():
         "mask_token_id": ns.mask_token_id,
         "noise_epsilon": ns.noise_epsilon,
         "random_trunc_prob": ns.random_trunc_prob,
+        "optimizer_name": ns.optimizer_name,
         "betas": ns.betas,
         "eps": ns.eps,
         "weight_decay": ns.weight_decay,
