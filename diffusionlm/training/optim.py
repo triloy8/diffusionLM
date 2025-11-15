@@ -1,7 +1,8 @@
-from collections.abc import Callable, Iterable
+from collections.abc import Callable
 from typing import Dict, List, Optional
 import math
 import torch
+from torch import nn
 from torch.nn import Parameter
 
 
@@ -170,12 +171,68 @@ def resolve_optimizer_cls(name: str) -> type[torch.optim.Optimizer]:
     return OPTIMIZER_REGISTRY[key]
 
 
-def build_optimizer_param_groups(parameters: Iterable[Parameter], optimizer_name: str) -> List[Dict[str, object]]:
-    params_list = list(parameters)
-    param_group: Dict[str, object] = {"params": params_list}
-    if optimizer_name.lower() == "muon":
-        param_group["use_muon"] = True
-    return [param_group]
+def build_optimizer_param_groups(model: nn.Module, optimizer_name: str) -> List[Dict[str, object]]:
+    optimizer_key = optimizer_name.lower()
+    if optimizer_key != "muon":
+        return [{"params": list(model.parameters())}]
+
+    hidden_matrix_params: List[Parameter] = []
+    embed_params: List[Parameter] = []
+    scalar_params: List[Parameter] = []
+    head_params: List[Parameter] = []
+
+    for name, param in model.named_parameters():
+        if not isinstance(param, Parameter):
+            continue
+        lower_name = name.lower()
+        if lower_name.endswith("lm_head.weight"):
+            head_params.append(param)
+        elif "embed" in lower_name:
+            embed_params.append(param)
+        elif param.ndim < 2:
+            scalar_params.append(param)
+        elif lower_name.startswith("layers."):
+            if param.ndim >= 2:
+                hidden_matrix_params.append(param)
+
+    if not hidden_matrix_params:
+        hidden_matrix_params = [p for p in model.parameters() if isinstance(p, Parameter) and p.ndim >= 2]
+
+    def _deduplicate(params: List[Parameter]) -> List[Parameter]:
+        seen: set[int] = set()
+        deduped: List[Parameter] = []
+        for tensor in params:
+            pid = id(tensor)
+            if pid in seen:
+                continue
+            seen.add(pid)
+            deduped.append(tensor)
+        return deduped
+
+    head_params = _deduplicate(head_params)
+    embed_params = _deduplicate(embed_params)
+    scalar_params = _deduplicate(scalar_params)
+    hidden_matrix_params = _deduplicate(hidden_matrix_params)
+
+    adam_groups = [
+        {"params": head_params, "lr": 0.22},
+        {"params": embed_params, "lr": 0.6},
+        {"params": scalar_params, "lr": 0.04},
+    ]
+    adam_groups = [
+        dict(group, betas=(0.8, 0.95), eps=1e-10, use_muon=False)
+        for group in adam_groups
+        if group["params"]
+    ]
+
+    muon_group = {
+        "params": hidden_matrix_params,
+        "lr": 0.05,
+        "momentum": 0.95,
+        "use_muon": True,
+    }
+
+    return [*adam_groups, muon_group]
 
 
 __all__ = [

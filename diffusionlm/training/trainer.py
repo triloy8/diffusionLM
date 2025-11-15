@@ -51,11 +51,11 @@ def _seed_everything(seed: int, device: str | torch.device, *, rank: int = 0) ->
     return generator
 
 
-def _prepare_optimizer_setup(cfg, parameters):
+def _prepare_optimizer_setup(cfg, model):
     optimizer_name = str(getattr(cfg, "optimizer_name", "adamw")).lower()
     setattr(cfg, "optimizer_name", optimizer_name)
     optimizer_cls = resolve_optimizer_cls(optimizer_name)
-    param_groups = build_optimizer_param_groups(parameters, optimizer_name)
+    param_groups = build_optimizer_param_groups(model, optimizer_name)
     kwargs = {
         "lr": float(cfg.initial_learning_rate),
         "weight_decay": float(cfg.weight_decay),
@@ -99,7 +99,7 @@ def train_transformer(args, *, logger: Logger, run_name: str):
         dtype=DTYPES[cfg.dtype],
     )
 
-    optimizer_cls, param_groups, optimizer_kwargs = _prepare_optimizer_setup(cfg, model.parameters())
+    optimizer_cls, param_groups, optimizer_kwargs = _prepare_optimizer_setup(cfg, model)
     optimizer = optimizer_cls(param_groups, **optimizer_kwargs)
 
     np_arr_train_data = np.memmap(
@@ -199,7 +199,7 @@ def train_transformer_ddp(rank, args, cfg_dc):
 
     ddp_model = DDP(model, cfg.world_size, cfg.bucket_size_mb)
 
-    optimizer_cls, param_groups, optimizer_kwargs = _prepare_optimizer_setup(cfg, model.parameters())
+    optimizer_cls, param_groups, optimizer_kwargs = _prepare_optimizer_setup(cfg, model)
     optimizer = OptimizerStateSharding(
         param_groups,
         optimizer_cls,
