@@ -72,15 +72,6 @@ def zeropower_via_newtonschulz5(G, steps: int):
     return X
 
 
-def _muon_update(grad, momentum, beta=0.95, ns_steps=5, nesterov=True):
-    momentum.lerp_(grad, 1 - beta)
-    update = grad.lerp_(momentum, beta) if nesterov else momentum
-    if update.ndim == 4: # for the case of conv filters
-        update = update.view(len(update), -1)
-    update = zeropower_via_newtonschulz5(update, steps=ns_steps)
-    update *= max(1, grad.size(-2) / grad.size(-1))**0.5
-    return update
-
 class Muon(torch.optim.Optimizer):
     """Muon with AdamW fallback"""
     def __init__(self, param_groups):
@@ -110,37 +101,24 @@ class Muon(torch.optim.Optimizer):
                         # continue
                         p.grad = torch.zeros_like(p)  # Force synchronization
 
-                    # def _muon_update(grad, momentum, beta=0.95, ns_steps=5, nesterov=True):
-                    #     momentum.lerp_(grad, 1 - beta)
-                    #     update = grad.lerp_(momentum, beta) if nesterov else momentum
-                    #     if update.ndim == 4: # for the case of conv filters
-                    #         update = update.view(len(update), -1)
-                    #     update = zeropower_via_newtonschulz5(update, steps=ns_steps)
-                    #     update *= max(1, grad.size(-2) / grad.size(-1))**0.5
-                    #     return update
-
                     state = self.state[p]
-                    # if len(state) == 0:
-                    #     state["momentum_buffer"] = torch.zeros_like(p)
-                    momentum_buffer = state.get("momentum_buffer", torch.zeros(p.shape, device=p.grad.device))
+                    m = state.get("m", torch.zeros(p.shape, device=p.grad.device))
                     grad = p.grad
 
-                    # state["momentum_buffer"].lerp_(p.grad, 1 - group["momentum"])
-                    momentum_buffer = group["momentum"] * momentum_buffer + (1 - group["momentum"]) * grad
-                    # update = p.grad.lerp_(state["momentum_buffer"], group["momentum"])
-                    update = group["momentum"] * momentum_buffer + (1 - group["momentum"]) * grad
-                    if update.ndim == 4: # for the case of conv filters
-                        update = update.view(len(update), -1)
-                    update = zeropower_via_newtonschulz5(update, steps=5)
-                    update *= max(1, p.grad.size(-2) / p.grad.size(-1))**0.5
+                    m = group["momentum"] * m + (1 - group["momentum"]) * grad
+                    # nesterov by default
+                    grad = (1 - group["momentum"]) * grad + group["momentum"] * m
+                    b = grad 
+                    if b.ndim == 4: # for the case of conv filters
+                        b = b.view(len(b), -1)
+                    o = zeropower_via_newtonschulz5(b, steps=5)
+                    o *= max(1, grad.size(-2) / grad.size(-1))**0.5
 
-                    # p.mul_(1 - group["lr"] * group["weight_decay"])
-                    p.data -= group["lr"] * group["weight_decay"] * p.data
-                    p.add_(update.reshape(p.shape), alpha=-group["lr"])
-                    # p.data -= group["lr"] * group["weight_decay"] * p.data
+                    p.data *= 1 - group["lr"] * group["weight_decay"]
+                    p.data -= group["lr"] * o.reshape(p.shape)
 
-                    # needs an update: 
-                    # state["momentum_buffer"] = momentum_buffer
+                    # momentum buffer update
+                    state["m"] = m
             else:
                 for p in group["params"]:
                     if p.grad is None:
