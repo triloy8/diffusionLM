@@ -23,8 +23,8 @@ class AdamW(torch.optim.Optimizer):
                 if p.grad is None:
                     continue
                 state = self.state[p]
-                m = state.get("m", torch.zeros(p.shape, device=p.grad.device))
-                v = state.get("v", torch.zeros(p.shape, device=p.grad.device))
+                m = state.get("m", torch.zeros_like(p))
+                v = state.get("v", torch.zeros_like(p))
                 t = state.get("t", 0)
                 grad = p.grad.data
 
@@ -102,7 +102,7 @@ class Muon(torch.optim.Optimizer):
                         p.grad = torch.zeros_like(p)  # Force synchronization
 
                     state = self.state[p]
-                    m = state.get("m", torch.zeros(p.shape, device=p.grad.device))
+                    m = state.get("m", torch.zeros_like(p))
                     grad = p.grad
 
                     m = group["momentum"] * m + (1 - group["momentum"]) * grad
@@ -125,8 +125,8 @@ class Muon(torch.optim.Optimizer):
                         p.grad = torch.zeros_like(p)  # Force synchronization
 
                     state = self.state[p]
-                    m = state.get("m", torch.zeros(p.shape, device=p.grad.device))
-                    v = state.get("v", torch.zeros(p.shape, device=p.grad.device))
+                    m = state.get("m", torch.zeros_like(p))
+                    v = state.get("v", torch.zeros_like(p))
                     t = state.get("t", 0)
                     grad = p.grad
 
