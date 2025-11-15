@@ -46,12 +46,12 @@ dataset = "TinyStoriesV2-GPT4"
 
 [wandb]
 entity = "yiltro8-org"
-project = "diffusion_lm_muon_debug"
+project = "diffusion_lm"
 
 [ddp]
-backend = "gloo"        # gloo/nccl
+backend = "nccl"        # gloo/nccl
 num_nodes = 1
 node_rank = 0
 local_rank = 0
-world_size = 4
+world_size = 1
 bucket_size_mb = 200  # 0 = single bucket
