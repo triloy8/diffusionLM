@@ -55,6 +55,7 @@ Notes:
 - Prefer `[logging].backend = "console"` for local runs.
 - Optimizer state sharding is enabled by default in the DDP entry point to reduce per-rank optimizer memory.
 - Choose the optimizer via `[optimizer].optimizer_name` (`"adamw"` default, `"muon"` experimental) while keeping the rest of the `[optimizer]` schedule knobs unchanged.
+- When using Muon, configure per-group hyperparameters under `[optimizer.muon.*]` (hidden, head, embed, scalar) so each param group carries its own learning-rate range and optimizer settings; AdamW ignores those subtables.
 
 - Generate text:
 

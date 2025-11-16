@@ -1,5 +1,5 @@
 from collections.abc import Callable
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional
 import math
 import torch
 from torch import nn
@@ -171,10 +171,17 @@ def resolve_optimizer_cls(name: str) -> type[torch.optim.Optimizer]:
     return OPTIMIZER_REGISTRY[key]
 
 
-def build_optimizer_param_groups(model: nn.Module, optimizer_name: str) -> List[Dict[str, object]]:
+def build_optimizer_param_groups(
+    model: nn.Module,
+    optimizer_name: str,
+    muon_cfg: Any | None = None,
+) -> List[Dict[str, object]]:
     optimizer_key = optimizer_name.lower()
     if optimizer_key != "muon":
         return [{"params": list(model.parameters())}]
+
+    if muon_cfg is None:
+        raise ValueError("Muon optimizer requires muon_cfg")
 
     hidden_matrix_params: List[Parameter] = []
     embed_params: List[Parameter] = []
@@ -214,21 +221,42 @@ def build_optimizer_param_groups(model: nn.Module, optimizer_name: str) -> List[
     scalar_params = _deduplicate(scalar_params)
     hidden_matrix_params = _deduplicate(hidden_matrix_params)
 
-    adam_groups = [
-        {"params": head_params, "lr": 0.22},
-        {"params": embed_params, "lr": 0.6},
-        {"params": scalar_params, "lr": 0.04},
-    ]
-    adam_groups = [
-        dict(group, betas=(0.8, 0.95), eps=1e-10, use_muon=False)
-        for group in adam_groups
-        if group["params"]
-    ]
+    def _adam_group(params: List[Parameter], group_cfg: Any) -> Dict[str, object]:
+        if not params:
+            return {}
+        betas = getattr(group_cfg, "betas")
+        return {
+            "params": params,
+            "lr": float(group_cfg.initial_learning_rate),
+            "initial_lr": float(group_cfg.initial_learning_rate),
+            "max_lr": float(group_cfg.max_learning_rate),
+            "min_lr": float(group_cfg.min_learning_rate),
+            "betas": (float(betas[0]), float(betas[1])),
+            "eps": float(group_cfg.eps),
+            "weight_decay": float(group_cfg.weight_decay),
+            "use_muon": False,
+        }
 
+    head_cfg = getattr(muon_cfg, "head")
+    embed_cfg = getattr(muon_cfg, "embed")
+    scalar_cfg = getattr(muon_cfg, "scalar")
+
+    adam_groups = [
+        _adam_group(head_params, head_cfg),
+        _adam_group(embed_params, embed_cfg),
+        _adam_group(scalar_params, scalar_cfg),
+    ]
+    adam_groups = [group for group in adam_groups if group]
+
+    hidden_cfg = getattr(muon_cfg, "hidden")
     muon_group = {
         "params": hidden_matrix_params,
-        "lr": 0.05,
-        "momentum": 0.95,
+        "lr": float(hidden_cfg.initial_learning_rate),
+        "initial_lr": float(hidden_cfg.initial_learning_rate),
+        "max_lr": float(hidden_cfg.max_learning_rate),
+        "min_lr": float(hidden_cfg.min_learning_rate),
+        "momentum": float(hidden_cfg.momentum),
+        "weight_decay": float(hidden_cfg.weight_decay),
         "use_muon": True,
     }
 

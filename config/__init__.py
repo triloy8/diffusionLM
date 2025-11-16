@@ -3,6 +3,9 @@ from __future__ import annotations
 from .schemas import (
     ModelConfig,
     OptimizerConfig,
+    MuonOptimizerConfig,
+    MuonHiddenConfig,
+    MuonAdamGroupConfig,
     TrainingConfig,
     DataConfig,
     WandbConfig,
@@ -36,6 +39,9 @@ __all__ = [
     # Schemas
     "ModelConfig",
     "OptimizerConfig",
+    "MuonOptimizerConfig",
+    "MuonHiddenConfig",
+    "MuonAdamGroupConfig",
     "TrainingConfig",
     "DataConfig",
     "WandbConfig",

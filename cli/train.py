@@ -61,6 +61,7 @@ def main():
         np_dat_valid_path=cfg_dc.data.np_dat_valid_path,
         total_val_tokens=cfg_dc.data.total_val_tokens,
         rng_seed=cfg_dc.training.seed,
+        muon_cfg=cfg_dc.optimizer.muon,
     )
     # Build run config payload (optionally include wandb.architecture/dataset)
     run_config = {

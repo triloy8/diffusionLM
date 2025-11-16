@@ -76,6 +76,7 @@ def toy_training_bundle(device) -> TrainingBundle:
         warmup_iters=0,
         cosine_cycle_iters=10,
         grad_clip_max_l2_norm=1.0,
+        muon=None,
     )
 
     training_cfg = RuntimeTrainingConfig(

@@ -19,9 +19,80 @@ from .schemas import (
     TrainTokenizerInputConfig,
     TrainTokenizerOutputConfig,
     TrainTokenizerConfig,
+    MuonOptimizerConfig,
+    MuonHiddenConfig,
+    MuonAdamGroupConfig,
 )
 from .io import _as_path, _expect_keys, _load_toml
 from .validate import _validate_model, _validate_optimizer, _validate_training, _validate_data, _validate_tokenizer
+
+
+def _parse_muon_config(data: Dict[str, Any] | None) -> MuonOptimizerConfig:
+    defaults = {
+        "hidden": {
+            "initial_learning_rate": 0.05,
+            "max_learning_rate": 0.05,
+            "min_learning_rate": 0.05,
+            "momentum": 0.95,
+            "weight_decay": 0.0,
+        },
+        "head": {
+            "initial_learning_rate": 0.22,
+            "max_learning_rate": 0.22,
+            "min_learning_rate": 0.22,
+            "betas": (0.8, 0.95),
+            "eps": 1e-10,
+            "weight_decay": 0.0,
+        },
+        "embed": {
+            "initial_learning_rate": 0.6,
+            "max_learning_rate": 0.6,
+            "min_learning_rate": 0.6,
+            "betas": (0.8, 0.95),
+            "eps": 1e-10,
+            "weight_decay": 0.0,
+        },
+        "scalar": {
+            "initial_learning_rate": 0.04,
+            "max_learning_rate": 0.04,
+            "min_learning_rate": 0.04,
+            "betas": (0.8, 0.95),
+            "eps": 1e-10,
+            "weight_decay": 0.0,
+        },
+    }
+
+    section = data or {}
+
+    hidden_section = section.get("hidden", {})
+    hidden = MuonHiddenConfig(
+        initial_learning_rate=float(hidden_section.get("initial_learning_rate", defaults["hidden"]["initial_learning_rate"])),
+        max_learning_rate=float(hidden_section.get("max_learning_rate", defaults["hidden"]["max_learning_rate"])),
+        min_learning_rate=float(hidden_section.get("min_learning_rate", defaults["hidden"]["min_learning_rate"])),
+        momentum=float(hidden_section.get("momentum", defaults["hidden"]["momentum"])),
+        weight_decay=float(hidden_section.get("weight_decay", defaults["hidden"]["weight_decay"])),
+    )
+
+    def _build_adam_group(key: str) -> MuonAdamGroupConfig:
+        group_section = section.get(key, {})
+        defaults_group = defaults[key]
+        betas_val = group_section.get("betas", defaults_group["betas"])
+        if len(betas_val) != 2:
+            raise ValueError(f"[optimizer.muon.{key}].betas must have 2 elements")
+        return MuonAdamGroupConfig(
+            initial_learning_rate=float(group_section.get("initial_learning_rate", defaults_group["initial_learning_rate"])),
+            max_learning_rate=float(group_section.get("max_learning_rate", defaults_group["max_learning_rate"])),
+            min_learning_rate=float(group_section.get("min_learning_rate", defaults_group["min_learning_rate"])),
+            betas=(float(betas_val[0]), float(betas_val[1])),
+            eps=float(group_section.get("eps", defaults_group["eps"])),
+            weight_decay=float(group_section.get("weight_decay", defaults_group["weight_decay"])),
+        )
+
+    head = _build_adam_group("head")
+    embed = _build_adam_group("embed")
+    scalar = _build_adam_group("scalar")
+
+    return MuonOptimizerConfig(hidden=hidden, head=head, embed=embed, scalar=scalar)
 
 
 def load_train_config(path: Path | str) -> TrainConfig:
@@ -54,6 +125,10 @@ def load_train_config(path: Path | str) -> TrainConfig:
     optimizer_name = str(o.get("optimizer_name", "adamw")).lower()
     betas = o.get("betas", [0.9, 0.95])
     initial_lr = float(o.get("initial_learning_rate", o["max_learning_rate"]))
+    muon_cfg = None
+    muon_section = o.get("muon")
+    if muon_section is not None or optimizer_name == "muon":
+        muon_cfg = _parse_muon_config(muon_section)
     optimizer = OptimizerConfig(
         optimizer_name=optimizer_name,
         betas=(float(betas[0]), float(betas[1])),
@@ -65,6 +140,7 @@ def load_train_config(path: Path | str) -> TrainConfig:
         warmup_iters=int(o["warmup_iters"]),
         cosine_cycle_iters=int(o["cosine_cycle_iters"]),
         grad_clip_max_l2_norm=float(o["grad_clip_max_l2_norm"]),
+        muon=muon_cfg,
     )
     training = TrainingConfig(
         batch_size=int(t["batch_size"]),

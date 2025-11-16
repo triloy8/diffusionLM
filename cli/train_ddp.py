@@ -61,6 +61,7 @@ def main():
         np_dat_valid_path=cfg_dc.data.np_dat_valid_path,
         total_val_tokens=cfg_dc.data.total_val_tokens,
         rng_seed=cfg_dc.training.seed,
+        muon_cfg=cfg_dc.optimizer.muon,
         # ddp
         backend=cfg_dc.ddp.backend,
         num_nodes=cfg_dc.ddp.num_nodes,

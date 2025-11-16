@@ -171,11 +171,18 @@ def train_loop(
                 }, step=train_iteration)
 
         # schedule
-        new_lr = lr_cosine_schedule(train_iteration, max_learning_rate, min_learning_rate, warmup_iters, cosine_cycle_iters)
+        logged_lr = None
         for param_group in optimizer.param_groups:
+            group_max_lr = float(param_group.get("max_lr", max_learning_rate))
+            group_min_lr = float(param_group.get("min_lr", min_learning_rate))
+            group_warmup = int(param_group.get("warmup_iters", warmup_iters))
+            group_cosine = int(param_group.get("cosine_cycle_iters", cosine_cycle_iters))
+            new_lr = lr_cosine_schedule(train_iteration, group_max_lr, group_min_lr, group_warmup, group_cosine)
             param_group["lr"] = new_lr
-        if logger is not None:
-            logger.log({"phase": "train", "metrics.lr": float(new_lr)}, step=train_iteration)
+            if logged_lr is None:
+                logged_lr = float(new_lr)
+        if logger is not None and logged_lr is not None:
+            logger.log({"phase": "train", "metrics.lr": logged_lr}, step=train_iteration)
 
         # validation
         if train_iteration % val_freq_iteration == 0:

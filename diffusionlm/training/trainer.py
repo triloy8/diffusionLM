@@ -55,7 +55,8 @@ def _prepare_optimizer_setup(cfg, model):
     optimizer_name = str(getattr(cfg, "optimizer_name", "adamw")).lower()
     setattr(cfg, "optimizer_name", optimizer_name)
     optimizer_cls = resolve_optimizer_cls(optimizer_name)
-    param_groups = build_optimizer_param_groups(model, optimizer_name)
+    muon_cfg = getattr(cfg, "muon_cfg", None)
+    param_groups = build_optimizer_param_groups(model, optimizer_name, muon_cfg)
     kwargs = {
         "lr": float(cfg.initial_learning_rate),
         "weight_decay": float(cfg.weight_decay),
@@ -72,6 +73,13 @@ def _prepare_optimizer_setup(cfg, model):
         kwargs["eps"] = eps
     else:
         raise ValueError(f"Unsupported optimizer '{optimizer_name}'")
+    for group in param_groups:
+        group.setdefault("initial_lr", float(cfg.initial_learning_rate))
+        group.setdefault("max_lr", float(cfg.max_learning_rate))
+        group.setdefault("min_lr", float(cfg.min_learning_rate))
+        group.setdefault("warmup_iters", int(cfg.warmup_iters))
+        group.setdefault("cosine_cycle_iters", int(cfg.cosine_cycle_iters))
+        group.setdefault("lr", float(group.get("initial_lr")))
     return optimizer_cls, param_groups, kwargs
 
 

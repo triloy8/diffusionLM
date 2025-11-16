@@ -24,6 +24,33 @@ class ModelConfig:
 
 
 @dataclass
+class MuonHiddenConfig:
+    initial_learning_rate: float
+    max_learning_rate: float
+    min_learning_rate: float
+    momentum: float
+    weight_decay: float
+
+
+@dataclass
+class MuonAdamGroupConfig:
+    initial_learning_rate: float
+    max_learning_rate: float
+    min_learning_rate: float
+    betas: Tuple[float, float]
+    eps: float
+    weight_decay: float
+
+
+@dataclass
+class MuonOptimizerConfig:
+    hidden: MuonHiddenConfig
+    head: MuonAdamGroupConfig
+    embed: MuonAdamGroupConfig
+    scalar: MuonAdamGroupConfig
+
+
+@dataclass
 class OptimizerConfig:
     optimizer_name: str
     betas: Tuple[float, float]
@@ -35,6 +62,7 @@ class OptimizerConfig:
     warmup_iters: int
     cosine_cycle_iters: int
     grad_clip_max_l2_norm: float
+    muon: Optional[MuonOptimizerConfig] = None
 
 
 @dataclass

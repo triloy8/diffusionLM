@@ -12,6 +12,7 @@ from .schemas import (
     BenchParams,
     BenchDataConfig,
     BenchTokenizerInput,
+    MuonOptimizerConfig,
 )
 
 ALLOWED_DTYPES = {"float32", "float16", "bfloat16"}
@@ -57,6 +58,39 @@ def _validate_optimizer(o: OptimizerConfig) -> None:
         raise ValueError("min_learning_rate must be <= max_learning_rate")
     if o.initial_learning_rate > o.max_learning_rate:
         raise ValueError("initial_learning_rate must be <= max_learning_rate")
+    if optimizer_name == "muon":
+        if o.muon is None:
+            raise ValueError("Muon optimizer requires [optimizer.muon] configuration")
+        _validate_muon_config(o.muon)
+
+
+def _validate_muon_config(muon: MuonOptimizerConfig) -> None:
+    def _check_lr_range(initial: float, min_lr: float, max_lr: float, label: str) -> None:
+        if initial <= 0 or min_lr <= 0 or max_lr <= 0:
+            raise ValueError(f"{label}: learning rates must be > 0")
+        if min_lr > max_lr:
+            raise ValueError(f"{label}: min_learning_rate must be <= max_learning_rate")
+        if initial > max_lr or initial < min_lr:
+            raise ValueError(f"{label}: initial_learning_rate must be within [min, max]")
+
+    hidden = muon.hidden
+    _check_lr_range(hidden.initial_learning_rate, hidden.min_learning_rate, hidden.max_learning_rate, "muon.hidden")
+    if hidden.momentum <= 0 or hidden.momentum >= 1:
+        raise ValueError("muon.hidden.momentum must be in (0, 1)")
+    if hidden.weight_decay < 0:
+        raise ValueError("muon.hidden.weight_decay must be >= 0")
+
+    for key in ("head", "embed", "scalar"):
+        group = getattr(muon, key)
+        _check_lr_range(group.initial_learning_rate, group.min_learning_rate, group.max_learning_rate, f"muon.{key}")
+        if not (0 <= group.betas[0] < 1 and 0 <= group.betas[1] < 1):
+            raise ValueError(f"muon.{key}.betas must be in [0,1)")
+        if len(group.betas) != 2:
+            raise ValueError(f"muon.{key}.betas must have 2 elements")
+        if group.eps <= 0:
+            raise ValueError(f"muon.{key}.eps must be > 0")
+        if group.weight_decay < 0:
+            raise ValueError(f"muon.{key}.weight_decay must be >= 0")
 
 
 def _validate_training(t: TrainingConfig) -> None:
