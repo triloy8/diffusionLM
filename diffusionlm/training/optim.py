@@ -90,17 +90,18 @@ class Muon(torch.optim.Optimizer):
         for group in param_groups:
             if "use_muon" not in group:
                 raise ValueError("Muon param group must set 'use_muon'")
+            extra_keys = {"initial_lr", "max_lr", "min_lr", "warmup_iters", "cosine_cycle_iters"}
             if group["use_muon"]:
                 group.setdefault("lr", lr)
                 group.setdefault("momentum", momentum)
                 group.setdefault("weight_decay", weight_decay)
-                allowed = {"params", "lr", "momentum", "weight_decay", "use_muon"}
+                allowed = {"params", "lr", "momentum", "weight_decay", "use_muon", *extra_keys}
             else:
                 group.setdefault("lr", lr)
                 group.setdefault("betas", betas)
                 group.setdefault("eps", eps)
                 group.setdefault("weight_decay", weight_decay)
-                allowed = {"params", "lr", "betas", "eps", "weight_decay", "use_muon"}
+                allowed = {"params", "lr", "betas", "eps", "weight_decay", "use_muon", *extra_keys}
             unexpected = set(group.keys()) - allowed
             if unexpected:
                 raise ValueError(f"Unexpected keys {unexpected} in Muon param group")
