@@ -148,7 +148,7 @@ def _run_loop(
     sync_gradients: Optional[Callable[[], None]] = None,
     reduce_metric: Optional[Callable[[float], float]] = None,
     world_size: int = 1,
-    local_rank: int = 0,
+    process_rank: int = 0,
     is_rank_zero: bool = True,
 ) -> None:
     if num_steps <= 0:
@@ -208,7 +208,7 @@ def _run_loop(
         sync_gradients=sync_gradients,
         reduce_metric=reduce_metric,
         world_size=world_size,
-        local_rank=local_rank,
+        process_rank=process_rank,
         is_rank_zero=is_rank_zero,
         step_callback=step_callback,
         start_iteration=base_iteration,
@@ -263,7 +263,13 @@ def run_training_steps_ddp(bundle: TrainingBundle, *, num_steps: int, seed: int 
 
     need_cleanup = False
     if not dist.is_initialized():
-        setup_process_group("gloo", rank=0, world_size=1)
+        setup_process_group(
+            backend="gloo",
+            local_rank=0,
+            num_gpus_per_node=1,
+            num_nodes=1,
+            node_rank=0,
+        )
         need_cleanup = True
     elif dist.get_world_size() != 1:
         raise RuntimeError("Existing process group world_size is not 1")
@@ -307,7 +313,7 @@ def run_training_steps_ddp(bundle: TrainingBundle, *, num_steps: int, seed: int 
             sync_gradients=_sync,
             reduce_metric=allreduce_mean,
             world_size=1,
-            local_rank=0,
+            process_rank=0,
             is_rank_zero=True,
         )
 
@@ -427,7 +433,13 @@ def run_training_with_checkpoint_ddp(
 
     need_cleanup = False
     if not dist.is_initialized():
-        setup_process_group("gloo", rank=0, world_size=1)
+        setup_process_group(
+            backend="gloo",
+            local_rank=0,
+            num_gpus_per_node=1,
+            num_nodes=1,
+            node_rank=0,
+        )
         need_cleanup = True
     elif dist.get_world_size() != 1:
         raise RuntimeError("Existing process group world_size is not 1")
@@ -486,7 +498,7 @@ def run_training_with_checkpoint_ddp(
                 sync_gradients=_sync,
                 reduce_metric=allreduce_mean,
                 world_size=1,
-                local_rank=0,
+                process_rank=0,
                 is_rank_zero=True,
             )
 
@@ -543,7 +555,7 @@ def run_training_with_checkpoint_ddp(
                     sync_gradients=_sync_resume,
                     reduce_metric=allreduce_mean,
                     world_size=1,
-                    local_rank=0,
+                    process_rank=0,
                     is_rank_zero=True,
                 )
 

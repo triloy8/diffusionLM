@@ -180,18 +180,38 @@ def train_transformer(args, *, logger: Logger, run_name: str):
     )
 
 
-def train_transformer_ddp(rank, args, cfg_dc):
+def train_transformer_ddp(local_rank, args, cfg_dc):
     cfg = args
 
-    setup_process_group(cfg.backend, rank, cfg.world_size)
+    num_nodes = int(getattr(cfg, "num_nodes", 1))
+    num_gpus_per_node = int(getattr(cfg, "num_gpus_per_node", 1))
+    local_rank_int = int(local_rank)
+    node_rank = int(getattr(cfg, "node_rank", 0))
+    master_addr = getattr(cfg, "master_addr", "localhost")
+    master_port = getattr(cfg, "master_port", "29500")
+
+    world_size = max(1, num_nodes * num_gpus_per_node)
+    global_rank = node_rank * num_gpus_per_node + local_rank_int
+    setattr(cfg, "world_size", world_size)
+    setattr(cfg, "global_rank", global_rank)
+
+    setup_process_group(
+        backend=cfg.backend,
+        local_rank=local_rank_int,
+        num_gpus_per_node=num_gpus_per_node,
+        num_nodes=num_nodes,
+        node_rank=node_rank,
+        master_addr=master_addr,
+        master_port=master_port,
+    )
 
     seed = getattr(cfg, "rng_seed", getattr(cfg, "seed", None))
     torch_generator = None
     if seed is not None:
-        torch_generator = _seed_everything(int(seed), cfg.device, rank=rank)
+        torch_generator = _seed_everything(int(seed), cfg.device, rank=global_rank)
     setattr(cfg, "torch_generator", torch_generator)
 
-    logger, run_name, ckpting_save_folder = init_logging(rank, cfg, cfg_dc)
+    logger, run_name, ckpting_save_folder = init_logging(global_rank, cfg, cfg_dc)
 
     model = TransformerLM(
         vocab_size=cfg.vocab_size,
@@ -306,8 +326,8 @@ def train_transformer_ddp(rank, args, cfg_dc):
         sync_gradients=_sync,
         reduce_metric=allreduce_mean,
         world_size=cfg.world_size,
-        local_rank=rank,
-        is_rank_zero=(rank == 0),
+        process_rank=global_rank,
+        is_rank_zero=(global_rank == 0),
     )
 
     cleanup_process_group()

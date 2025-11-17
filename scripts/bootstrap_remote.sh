@@ -45,7 +45,7 @@ fi
 
 if ! command -v nvitop >/dev/null 2>&1; then
     if command -v uv >/dev/null 2>&1; then
-        uv tool install nvitop
+        uvx nvitop
     else
         python3 -m pip install --user nvitop
     fi

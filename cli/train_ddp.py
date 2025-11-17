@@ -1,11 +1,11 @@
 import argparse
 from pathlib import Path
 
+import torch.multiprocessing as mp
+
 from config import load_train_config
 from diffusionlm.training.trainer import train_transformer_ddp
 from cli.utils import add_config_args, load_config_or_print
-
-import torch.multiprocessing as mp
 
 
 def _parse_only_config():
@@ -20,6 +20,8 @@ def main():
     cfg_dc = load_config_or_print(load_train_config, args_cfg.config, args_cfg.print_config)
     if cfg_dc is None:
         return
+    if cfg_dc.ddp is None:
+        raise ValueError("DDP config is required when using train_ddp.py")
 
     # Build an argparse-like namespace expected by existing code
     ns = argparse.Namespace(
@@ -65,13 +67,15 @@ def main():
         # ddp
         backend=cfg_dc.ddp.backend,
         num_nodes=cfg_dc.ddp.num_nodes,
+        num_gpus_per_node=cfg_dc.ddp.num_gpus_per_node,
         node_rank=cfg_dc.ddp.node_rank,
-        local_rank=cfg_dc.ddp.local_rank,
-        world_size=cfg_dc.ddp.world_size,
+        master_addr=cfg_dc.ddp.master_addr,
+        master_port=cfg_dc.ddp.master_port,
         bucket_size_mb=cfg_dc.ddp.bucket_size_mb,
     )
 
-    mp.spawn(train_transformer_ddp, args=(ns, cfg_dc), nprocs=ns.world_size, join=True)
+    nprocs = max(1, int(cfg_dc.ddp.num_gpus_per_node))
+    mp.spawn(train_transformer_ddp, args=(ns, cfg_dc), nprocs=nprocs, join=True)
 
 
 if __name__ == "__main__":

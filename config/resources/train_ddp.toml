@@ -14,12 +14,12 @@ random_trunc_prob = 0.01
 
 [optimizer]
 optimizer_name = "muon"
-betas = [0.9, 0.95]
-eps = 1e-10
-weight_decay = 0.05
-initial_learning_rate = 1e-4
-max_learning_rate = 0.0015
-min_learning_rate = 0.00015
+betas = [0.9, 0.95] # adamw
+eps = 1e-10 # adamw
+weight_decay = 0.05 # adamw
+initial_learning_rate = 1e-4 # adamw
+max_learning_rate = 0.0015 # adamw
+min_learning_rate = 0.00015 # adamw
 warmup_iters = 50
 cosine_cycle_iters = 4500
 grad_clip_max_l2_norm = 1.0
@@ -56,7 +56,7 @@ eps = 1e-10
 weight_decay = 0.05
 
 [training]
-batch_size = 376
+batch_size = 188
 max_train_iteration = 5000
 max_val_iteration = 10
 val_freq_iteration = 125
@@ -80,9 +80,10 @@ entity = "yiltro8-org"
 project = "diffusion_lm"
 
 [ddp]
-backend = "nccl"        # gloo/nccl
-num_nodes = 1
-node_rank = 0
-local_rank = 0
-world_size = 1
-bucket_size_mb = 200  # 0 = single bucket
+backend = "nccl"               # gloo/nccl
+num_nodes = 1                  # total nodes participating
+num_gpus_per_node = 1          # processes launched per node (mp.spawn uses this)
+node_rank = 0                  # index of this node
+master_addr = "127.0.0.1"      # rank 0 hostname/IP
+master_port = "29500"
+bucket_size_mb = 200           # 0 = single bucket

@@ -175,14 +175,14 @@ def load_train_config(path: Path | str) -> TrainConfig:
         )
     train_ddp: Optional[DdpConfig] = None
     if ddp:
-        lr = ddp.get("local_rank")
-        ws = ddp.get("world_size")
+        ngpn = int(ddp.get("num_gpus_per_node", 1))
         train_ddp = DdpConfig(
-            backend=str(ddp.get("backend", "gloo")),
+            backend=str(ddp.get("backend", "nccl")),
             num_nodes=int(ddp.get("num_nodes", 1)),
             node_rank=int(ddp.get("node_rank", 0)),
-            local_rank=(int(lr) if lr is not None else None),
-            world_size=(int(ws) if ws is not None else None),
+            num_gpus_per_node=ngpn,
+            master_addr=str(ddp.get("master_addr", "localhost")),
+            master_port=str(ddp.get("master_port", "29500")),
             bucket_size_mb=int(ddp.get("bucket_size_mb", 0)),
         )
 

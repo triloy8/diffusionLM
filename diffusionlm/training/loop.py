@@ -53,7 +53,7 @@ def train_loop(
     sync_gradients: Optional[Callable[[], None]] = None,
     reduce_metric: Optional[Callable[[float], float]] = None,
     world_size: int = 1,
-    local_rank: int = 0,
+    process_rank: int = 0,
     # rank-zero policy
     is_rank_zero: bool = True,
     step_callback: Optional[Callable[[int, torch.nn.Module, torch.optim.Optimizer, float, float], None]] = None,
@@ -92,7 +92,7 @@ def train_loop(
 
         # Optional rank sharding for DDP
         if shard_batch is not None:
-            raw_train_batch = shard_batch(raw_train_batch, world_size, local_rank)
+            raw_train_batch = shard_batch(raw_train_batch, world_size, process_rank)
 
         train_batch = prepare(raw_train_batch)
         train_inputs = _inputs(train_batch)

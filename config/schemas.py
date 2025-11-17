@@ -105,8 +105,9 @@ class DdpConfig:
     backend: str = "nccl"
     num_nodes: int = 1
     node_rank: int = 0
-    local_rank: Optional[int] = None
-    world_size: Optional[int] = None
+    num_gpus_per_node: int = 1
+    master_addr: str = "localhost"
+    master_port: str = "29500"
     bucket_size_mb: int = 0
 
 

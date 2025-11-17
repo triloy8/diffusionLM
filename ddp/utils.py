@@ -8,22 +8,37 @@ import torch.distributed as dist
 
 
 def setup_process_group(
+    *,
     backend: str,
-    rank: int,
-    world_size: int,
+    local_rank: int,
+    num_gpus_per_node: int,
+    num_nodes: int,
+    node_rank: int = 0,
     master_addr: str = "localhost",
     master_port: str = "29500",
-) -> None:
+) -> tuple[int, int]:
     """Initialize torch.distributed with env setup and optional CUDA device selection.
 
-    Safe to call once per process. No return value.
+    Returns `(global_rank, world_size)` for convenience.
     """
-    os.environ.setdefault("MASTER_ADDR", master_addr)
-    os.environ.setdefault("MASTER_PORT", master_port)
+    world_size = max(1, int(num_nodes) * int(num_gpus_per_node))
+    global_rank = int(node_rank) * int(num_gpus_per_node) + int(local_rank)
+
+    os.environ.setdefault("MASTER_ADDR", str(master_addr))
+    os.environ.setdefault("MASTER_PORT", str(master_port))
+    os.environ.setdefault("WORLD_SIZE", str(world_size))
+    os.environ.setdefault("RANK", str(global_rank))
+
     if not dist.is_initialized():
-        dist.init_process_group(backend=backend, rank=rank, world_size=world_size)
+        dist.init_process_group(backend=backend, rank=global_rank, world_size=world_size)
+
     if backend == "nccl" and torch.cuda.is_available():
-        torch.cuda.set_device(rank)
+        device_id = int(local_rank)
+        if torch.cuda.device_count() > 0 and device_id >= torch.cuda.device_count():
+            raise RuntimeError(f"local_rank {device_id} >= CUDA device count {torch.cuda.device_count()}")
+        torch.cuda.set_device(device_id)
+
+    return global_rank, world_size
 
 
 def cleanup_process_group() -> None:
