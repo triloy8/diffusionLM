@@ -5,7 +5,6 @@ from typing import List, Optional, Tuple
 
 import math
 
-import numpy as np
 import torch
 
 from cli.utils import add_config_args, load_config_or_print
@@ -18,53 +17,44 @@ from diffusionlm.training.loss import cross_entropy, diffusion_cross_entropy
 from diffusionlm.training.optim import AdamW
 from diffusionlm.training.grad import gradient_clipping
 from diffusionlm.training.data import get_batch as diffusion_get_batch
+from diffusionlm.training.streaming import HFTokenIteratorFactory, StreamingBatcher
 from logger import ConsoleLogger
 from profiling import nvtx
 
 from .common import measure, mean, stddev
 
 
-def _load_validation_memmap(cfg) -> Optional[np.memmap]:
-    """Open the optional validation memmap for perplexity evaluation."""
-    if getattr(cfg, "data", None) is None:
-        return None
-    val_tokens = cfg.data.total_val_tokens
-    if val_tokens <= 0:
-        raise ValueError("data.total_val_tokens must be > 0 when provided")
-    return np.memmap(
-        cfg.data.np_dat_valid_path,
-        dtype=np.int32,
-        mode="r",
-        shape=(val_tokens,),
-    )
-
-
-def _sample_eval_batch(
-    dataset: np.memmap,
-    batch_size: int,
-    context_length: int,
+def _build_streaming_batcher(
+    data_cfg,
+    tokenizer: Tokenizer,
     device: str,
     *,
-    rng: np.random.Generator,
+    shuffle_buffer_size: int,
+    shuffle_seed: Optional[int],
+) -> StreamingBatcher:
+    iterator = HFTokenIteratorFactory(
+        dataset_name=str(data_cfg.dataset_name),
+        dataset_config=(str(data_cfg.dataset_config) if data_cfg.dataset_config is not None else None),
+        split=str(data_cfg.split),
+        text_field=str(data_cfg.text_field),
+        tokenizer=tokenizer,
+        shuffle_buffer_size=max(0, shuffle_buffer_size),
+        shuffle_seed=shuffle_seed,
+        world_size=1,
+        rank=0,
+    )
+    return StreamingBatcher(iterator, device=device)
+
+
+def _sample_eval_batch_streaming(
+    batcher: StreamingBatcher,
+    batch_size: int,
+    context_length: int,
 ) -> Tuple[torch.Tensor, torch.Tensor]:
-    """Deterministically sample a batch of sequences for evaluation."""
-    dataset_len = dataset.shape[0]
-    if dataset_len <= context_length:
-        raise ValueError("validation dataset must be longer than context_length")
-    max_start = dataset_len - context_length - 1
-    start_indices = rng.integers(0, max_start + 1, size=batch_size)
-
-    sequences = []
-    targets = []
-    for start in start_indices:
-        seq_np = np.asarray(dataset[start:start + context_length], dtype=np.int32)
-        tgt_np = np.asarray(dataset[start + 1:start + context_length + 1], dtype=np.int32)
-        sequences.append(torch.from_numpy(seq_np.copy()))
-        targets.append(torch.from_numpy(tgt_np.copy()))
-
-    seq_tensor = torch.stack(sequences, dim=0).to(device)
-    tgt_tensor = torch.stack(targets, dim=0).to(device)
-    return seq_tensor, tgt_tensor
+    seqs = batcher.draw(batch_size=batch_size, context_length=context_length + 1)
+    inputs = seqs[:, :-1]
+    targets = seqs[:, 1:]
+    return inputs, targets
 
 
 def _parse_only_config():
@@ -119,8 +109,16 @@ def main():
 
     in_indices = torch.tensor(ids, device=cfg.model.device)
 
-    with nvtx.range("bench/setup/val_memmap"):
-        val_dataset = _load_validation_memmap(cfg)
+    train_batcher: Optional[StreamingBatcher] = None
+    if cfg.data is not None:
+        with nvtx.range("bench/setup/data"):
+            train_batcher = _build_streaming_batcher(
+                cfg.data,
+                tokenizer,
+                cfg.model.device,
+                shuffle_buffer_size=int(getattr(cfg.data, "shuffle_buffer_size", 0)),
+                shuffle_seed=getattr(cfg.data, "shuffle_seed", None),
+            )
 
     # Start run logging
     run_config = {
@@ -152,8 +150,9 @@ def main():
         "steps": cfg.benchmark.steps,
         "synchronize": cfg.benchmark.synchronize,
     }
-    if val_dataset is not None:
-        run_config["perplexity.tokens_available"] = int(val_dataset.shape[0])
+    if cfg.data is not None:
+        run_config["data.dataset_name"] = cfg.data.dataset_name
+        run_config["data.split"] = cfg.data.split
     # Optimizer (optional)
     optimizer = None
     if cfg.benchmark.optimizer_step:
@@ -189,9 +188,9 @@ def main():
         info = logger.start_run(run_config)
 
     clip_enabled = bool(cfg.optimizer is not None and cfg.optimizer.grad_clip_max_l2_norm > 0.0)
-    train_dataset = val_dataset if cfg.benchmark.backward else None
+    train_dataset = train_batcher if cfg.benchmark.backward else None
     if cfg.benchmark.backward and train_dataset is None:
-        raise ValueError("benchmark.backward requires a [data] section with a validation memmap")
+        raise ValueError("benchmark.backward requires a [data] section with a streaming dataset")
     train_batch_size = int(getattr(cfg.benchmark, "train_batch_size", max(batch_size, 1)))
     train_batch_size = max(train_batch_size, 1)
 
@@ -353,7 +352,7 @@ def main():
                 )
 
     eval_summary: dict[str, float | int] = {}
-    if val_dataset is not None:
+    if cfg.data is not None:
         eval_batches_cfg = getattr(cfg.benchmark, "perplexity_max_batches", None)
         eval_batch_size_cfg = getattr(cfg.benchmark, "perplexity_batch_size", None)
         eval_seed = getattr(cfg.benchmark, "perplexity_seed", None)
@@ -362,22 +361,26 @@ def main():
         eval_batch_size = int(eval_batch_size_cfg) if eval_batch_size_cfg is not None else (batch_size or 1)
         eval_batch_size = max(eval_batch_size, 1)
 
-        rng = np.random.default_rng(eval_seed if eval_seed is not None else 0)
-
         total_loss = 0.0
         total_tokens = 0
         actual_batches = 0
+
+        eval_batcher = _build_streaming_batcher(
+            cfg.data,
+            tokenizer,
+            cfg.model.device,
+            shuffle_buffer_size=0,
+            shuffle_seed=(int(eval_seed) if eval_seed is not None else None),
+        )
 
         try:
             model.eval()
             with torch.no_grad():
                 for _ in range(eval_batches):
-                    seqs, tgts = _sample_eval_batch(
-                        val_dataset,
+                    seqs, tgts = _sample_eval_batch_streaming(
+                        eval_batcher,
                         eval_batch_size,
                         cfg.model.context_length,
-                        cfg.model.device,
-                        rng=rng,
                     )
                     logits = model(seqs)
                     loss_per_position = cross_entropy(logits, tgts).reshape(-1)

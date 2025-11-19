@@ -29,8 +29,12 @@ temperature = 0.01
 mask_id = 50257
 
 [data]
-np_dat_valid_path = "./data/TinyStoriesV2-GPT4-valid.dat"
-total_val_tokens = 5535291
+dataset_name = "trixyL/tiny-story"
+dataset_config = "TinyStoriesV2-GPT4"
+split = "validation"
+text_field = "text"
+shuffle_buffer_size = 0
+shuffle_seed = 0
 
 [benchmark]
 warmup = 5

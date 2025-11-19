@@ -155,10 +155,16 @@ def _validate_bench_params(b: BenchParams) -> None:
 
 
 def _validate_bench_data(d: BenchDataConfig) -> None:
-    if not d.np_dat_valid_path.exists():
-        raise FileNotFoundError(f"validation dataset not found: {d.np_dat_valid_path}")
-    if d.total_val_tokens <= 0:
-        raise ValueError("total_val_tokens must be > 0")
+    if not d.dataset_name:
+        raise ValueError("data.dataset_name must not be empty")
+    if not d.split:
+        raise ValueError("data.split must not be empty")
+    if not d.text_field:
+        raise ValueError("data.text_field must not be empty")
+    if d.shuffle_buffer_size < 0:
+        raise ValueError("data.shuffle_buffer_size must be >= 0")
+    if d.shuffle_seed is not None and d.shuffle_seed < 0:
+        raise ValueError("data.shuffle_seed must be >= 0 when provided")
 
 
 def _validate_tokenizer_bench_input(i: BenchTokenizerInput) -> None:

@@ -211,8 +211,12 @@ class BenchParams:
 
 @dataclass
 class BenchDataConfig:
-    np_dat_valid_path: Path
-    total_val_tokens: int
+    dataset_name: str
+    dataset_config: Optional[str]
+    split: str
+    text_field: str
+    shuffle_buffer_size: int = 0
+    shuffle_seed: Optional[int] = None
 
 
 @dataclass

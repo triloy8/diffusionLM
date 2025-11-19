@@ -80,10 +80,15 @@ def load_bench_infer_config(path: Path | str) -> BenchInferConfig:
 
     data_config: Optional[BenchDataConfig] = None
     if data_tbl:
-        _expect_keys(data_tbl, "data", ["np_dat_valid_path", "total_val_tokens"])
+        _expect_keys(data_tbl, "data", ["dataset_name", "split", "text_field"])
+        shuffle_seed_val = data_tbl.get("shuffle_seed")
         data_config = BenchDataConfig(
-            np_dat_valid_path=_as_path(data_tbl["np_dat_valid_path"]),
-            total_val_tokens=int(data_tbl["total_val_tokens"]),
+            dataset_name=str(data_tbl["dataset_name"]),
+            dataset_config=(str(data_tbl["dataset_config"]) if data_tbl.get("dataset_config") is not None else None),
+            split=str(data_tbl["split"]),
+            text_field=str(data_tbl["text_field"]),
+            shuffle_buffer_size=int(data_tbl.get("shuffle_buffer_size", 0)),
+            shuffle_seed=(int(shuffle_seed_val) if shuffle_seed_val is not None else None),
         )
 
     _validate_tokenizer(tokenizer)
