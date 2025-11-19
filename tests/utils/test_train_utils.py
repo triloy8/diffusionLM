@@ -15,6 +15,30 @@ from diffusionlm.training import (
 )
 
 
+class _DummyBatcher:
+    """Simple streaming batcher stub for tests."""
+
+    def __init__(self, array: np.ndarray):
+        tokens = torch.from_numpy(np.asarray(array, dtype=np.int64))
+        if tokens.numel() == 0:
+            raise ValueError("array must contain at least one token")
+        self.tokens = tokens
+        self._pos = 0
+
+    def draw(self, batch_size: int, context_length: int) -> torch.Tensor:
+        if context_length > self.tokens.numel():
+            raise ValueError("dataset must be longer than context_length")
+        seqs = []
+        for _ in range(batch_size):
+            end = self._pos + context_length
+            if end > self.tokens.numel():
+                self._pos = 0
+                end = context_length
+            seqs.append(self.tokens[self._pos:end])
+            self._pos = end % self.tokens.numel()
+        return torch.stack(seqs, dim=0)
+
+
 def test_cross_entropy_matches_torch(device):
     B, T, V = 2, 3, 5
     logits = torch.randn(B, T, V, device=device)
@@ -81,7 +105,7 @@ def test_get_batch_shapes_and_targets(tmp_path, device):
     B, T = 2, 4
     generator = torch.Generator(device="cpu").manual_seed(123)
     batch = get_batch(
-        arr,
+        _DummyBatcher(arr),
         batch_size=B,
         context_length=T,
         device=str(device),
@@ -93,7 +117,7 @@ def test_get_batch_shapes_and_targets(tmp_path, device):
     assert batch.clean_targets.shape == (B, T)
     assert batch.noisy_inputs.shape == (B, T)
     assert batch.mask.shape == (B, T)
-    assert batch.p_mask.shape == (B, T)
+    assert batch.p_mask.shape == (B, 1)
     # With monotonic data and zero truncation prob, clean targets retain the original slices
     diffs = batch.clean_targets[:, 1:] - batch.clean_targets[:, :-1]
     assert torch.all(diffs == 1)
@@ -105,7 +129,7 @@ def test_get_batch_raises_on_too_small_dataset(device):
     arr = np.arange(3, dtype=np.int32)  # too small for T=4
     with pytest.raises(ValueError):
         _ = get_batch(
-            arr,
+            _DummyBatcher(arr),
             batch_size=1,
             context_length=4,
             device=str(device),
