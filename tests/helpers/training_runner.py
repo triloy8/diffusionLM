@@ -71,24 +71,40 @@ def _set_all_seeds(seed: int, device: torch.device) -> torch.Generator:
     return generator
 
 
-def _shard_diffusion_batch(batch: DiffusionBatch, world_size: int, rank: int) -> DiffusionBatch:
-    def _chunk(t: torch.Tensor) -> torch.Tensor:
-        return torch.chunk(t, world_size, dim=0)[rank]
+class InMemoryStreamingBatcher:
+    """Simple in-memory token stream used for tests."""
 
-    metadata = dict(batch.metadata) if isinstance(batch.metadata, dict) else {}
-    return DiffusionBatch(
-        noisy_inputs=_chunk(batch.noisy_inputs),
-        clean_targets=_chunk(batch.clean_targets),
-        mask=_chunk(batch.mask),
-        p_mask=_chunk(batch.p_mask),
-        metadata=metadata,
-    )
+    def __init__(self, tokens: torch.Tensor, device: torch.device) -> None:
+        flat = tokens.detach().view(-1).cpu().to(torch.long)
+        if flat.numel() == 0:
+            raise ValueError("Token buffer must be non-empty for streaming batcher tests.")
+        self.tokens = flat
+        self.device = device
+        self._idx = 0
+
+    def _next_token(self) -> int:
+        token = int(self.tokens[self._idx].item())
+        self._idx = (self._idx + 1) % self.tokens.numel()
+        return token
+
+    def draw(self, batch_size: int, context_length: int) -> torch.Tensor:
+        sequences = []
+        for _ in range(batch_size):
+            seq = [self._next_token() for _ in range(context_length)]
+            sequences.append(seq)
+        return torch.tensor(sequences, dtype=torch.long, device=self.device)
+
+    def get_state(self) -> int:
+        return int(self._idx)
+
+    def set_state(self, state: int) -> None:
+        self._idx = int(state) % self.tokens.numel()
 
 
-def _prepare_data_arrays(bundle: TrainingBundle) -> Tuple[np.ndarray, np.ndarray]:
-    train_tokens_np = bundle.dataset.train_tokens.detach().cpu().numpy()
-    valid_tokens_np = bundle.dataset.valid_tokens.detach().cpu().numpy()
-    return train_tokens_np, valid_tokens_np
+def _prepare_streaming_batchers(bundle: TrainingBundle, device: torch.device) -> Tuple[InMemoryStreamingBatcher, InMemoryStreamingBatcher]:
+    train_batcher = InMemoryStreamingBatcher(bundle.dataset.train_tokens, device)
+    valid_batcher = InMemoryStreamingBatcher(bundle.dataset.valid_tokens, device)
+    return train_batcher, valid_batcher
 
 
 def _make_step_callback(
@@ -138,17 +154,14 @@ def _run_loop(
     *,
     bundle: TrainingBundle,
     generator: torch.Generator,
-    train_tokens_np: np.ndarray,
-    valid_tokens_np: np.ndarray,
+    train_batcher: InMemoryStreamingBatcher,
+    valid_batcher: InMemoryStreamingBatcher,
     num_steps: int,
     base_iteration: int,
     snapshots: List[TrainingStepSnapshot],
     hook: Optional[Callable[[int, torch.nn.Module, torch.optim.Optimizer], None]] = None,
-    shard_batch: Optional[Callable[[object, int, int], object]] = None,
     sync_gradients: Optional[Callable[[], None]] = None,
     reduce_metric: Optional[Callable[[float], float]] = None,
-    world_size: int = 1,
-    process_rank: int = 0,
     is_rank_zero: bool = True,
 ) -> None:
     if num_steps <= 0:
@@ -179,8 +192,8 @@ def _run_loop(
     train_loop(
         module,
         optimizer,
-        np_arr_train_data=train_tokens_np,
-        np_arr_valid_data=valid_tokens_np,
+        train_data=train_batcher,
+        val_data=valid_batcher,
         batch_size=training_cfg.batch_size,
         context_length=model_cfg.context_length,
         device=str(model_cfg.device),
@@ -204,11 +217,8 @@ def _run_loop(
         activation_norms=None,
         log_activation_norms=False,
         log_weight_norms=False,
-        shard_batch=shard_batch,
         sync_gradients=sync_gradients,
         reduce_metric=reduce_metric,
-        world_size=world_size,
-        process_rank=process_rank,
         is_rank_zero=is_rank_zero,
         step_callback=step_callback,
         start_iteration=base_iteration,
@@ -229,7 +239,7 @@ def run_training_steps(bundle: TrainingBundle, *, num_steps: int, seed: int | No
     model = bundle.model_factory()
     optimizer = bundle.optimizer_factory(model.parameters())
 
-    train_tokens_np, valid_tokens_np = _prepare_data_arrays(bundle)
+    train_batcher, valid_batcher = _prepare_streaming_batchers(bundle, device)
     snapshots: List[TrainingStepSnapshot] = []
 
     _run_loop(
@@ -237,8 +247,8 @@ def run_training_steps(bundle: TrainingBundle, *, num_steps: int, seed: int | No
         optimizer=optimizer,
         bundle=bundle,
         generator=generator,
-        train_tokens_np=train_tokens_np,
-        valid_tokens_np=valid_tokens_np,
+        train_batcher=train_batcher,
+        valid_batcher=valid_batcher,
         num_steps=num_steps,
         base_iteration=0,
         snapshots=snapshots,
@@ -288,13 +298,8 @@ def run_training_steps_ddp(bundle: TrainingBundle, *, num_steps: int, seed: int 
             weight_decay=optimizer_cfg.weight_decay,
         )
 
-        train_tokens_np, valid_tokens_np = _prepare_data_arrays(bundle)
+        train_batcher, valid_batcher = _prepare_streaming_batchers(bundle, device)
         snapshots: List[TrainingStepSnapshot] = []
-
-        def _shard(batch_obj: object, ws: int, rk: int):
-            if isinstance(batch_obj, DiffusionBatch):
-                return _shard_diffusion_batch(batch_obj, ws, rk)
-            raise ValueError("Expected DiffusionBatch for sharding in tests.")
 
         def _sync():
             ddp_model.finish_gradient_synchronization()
@@ -304,16 +309,13 @@ def run_training_steps_ddp(bundle: TrainingBundle, *, num_steps: int, seed: int 
             optimizer=optimizer,
             bundle=bundle,
             generator=generator,
-            train_tokens_np=train_tokens_np,
-            valid_tokens_np=valid_tokens_np,
+            train_batcher=train_batcher,
+            valid_batcher=valid_batcher,
             num_steps=num_steps,
             base_iteration=0,
             snapshots=snapshots,
-            shard_batch=_shard,
             sync_gradients=_sync,
             reduce_metric=allreduce_mean,
-            world_size=1,
-            process_rank=0,
             is_rank_zero=True,
         )
 
@@ -344,7 +346,7 @@ def run_training_with_checkpoint(
     generator = _set_all_seeds(chosen_seed, device)
     model = bundle.model_factory()
     optimizer = bundle.optimizer_factory(model.parameters())
-    train_tokens_np, valid_tokens_np = _prepare_data_arrays(bundle)
+    train_batcher, valid_batcher = _prepare_streaming_batchers(bundle, device)
 
     snapshots_resumed: List[TrainingStepSnapshot] = []
 
@@ -360,14 +362,16 @@ def run_training_with_checkpoint(
                 state_holder["numpy_state"] = np.random.get_state()
                 state_holder["torch_state"] = torch.random.get_rng_state()
                 state_holder["iteration"] = step_idx
+                state_holder["train_batcher_state"] = train_batcher.get_state()
+                state_holder["valid_batcher_state"] = valid_batcher.get_state()
 
         _run_loop(
             module=model,
             optimizer=optimizer,
             bundle=bundle,
             generator=generator,
-            train_tokens_np=train_tokens_np,
-            valid_tokens_np=valid_tokens_np,
+            train_batcher=train_batcher,
+            valid_batcher=valid_batcher,
             num_steps=checkpoint_step,
             base_iteration=0,
             snapshots=snapshots_resumed,
@@ -395,13 +399,17 @@ def run_training_with_checkpoint(
             np.random.set_state(state_holder["numpy_state"])
             torch.random.set_rng_state(state_holder["torch_state"])
 
+            train_batcher_resume, valid_batcher_resume = _prepare_streaming_batchers(bundle, device)
+            train_batcher_resume.set_state(state_holder["train_batcher_state"])
+            valid_batcher_resume.set_state(state_holder["valid_batcher_state"])
+
             _run_loop(
                 module=model_resume,
                 optimizer=optimizer_resume,
                 bundle=bundle,
                 generator=generator_resume,
-                train_tokens_np=train_tokens_np,
-                valid_tokens_np=valid_tokens_np,
+                train_batcher=train_batcher_resume,
+                valid_batcher=valid_batcher_resume,
                 num_steps=remaining,
                 base_iteration=resume_base_iteration,
                 snapshots=snapshots_resumed,
@@ -459,13 +467,8 @@ def run_training_with_checkpoint_ddp(
             weight_decay=optimizer_cfg.weight_decay,
         )
 
-        train_tokens_np, valid_tokens_np = _prepare_data_arrays(bundle)
+        train_batcher, valid_batcher = _prepare_streaming_batchers(bundle, device)
         snapshots_resumed: List[TrainingStepSnapshot] = []
-
-        def _shard(batch_obj: object, ws: int, rk: int):
-            if isinstance(batch_obj, DiffusionBatch):
-                return _shard_diffusion_batch(batch_obj, ws, rk)
-            raise ValueError("Expected DiffusionBatch for sharding in tests.")
 
         def _sync():
             ddp_model.finish_gradient_synchronization()
@@ -482,23 +485,22 @@ def run_training_with_checkpoint_ddp(
                     state_holder["numpy_state"] = np.random.get_state()
                     state_holder["torch_state"] = torch.random.get_rng_state()
                     state_holder["iteration"] = step_idx
+                    state_holder["train_batcher_state"] = train_batcher.get_state()
+                    state_holder["valid_batcher_state"] = valid_batcher.get_state()
 
             _run_loop(
                 module=ddp_model,
                 optimizer=optimizer,
                 bundle=bundle,
                 generator=generator,
-                train_tokens_np=train_tokens_np,
-                valid_tokens_np=valid_tokens_np,
+                train_batcher=train_batcher,
+                valid_batcher=valid_batcher,
                 num_steps=checkpoint_step,
                 base_iteration=0,
                 snapshots=snapshots_resumed,
                 hook=_hook,
-                shard_batch=_shard,
                 sync_gradients=_sync,
                 reduce_metric=allreduce_mean,
-                world_size=1,
-                process_rank=0,
                 is_rank_zero=True,
             )
 
@@ -533,10 +535,9 @@ def run_training_with_checkpoint_ddp(
                 np.random.set_state(state_holder["numpy_state"])
                 torch.random.set_rng_state(state_holder["torch_state"])
 
-                def _shard_resume(batch_obj: object, ws: int, rk: int):
-                    if isinstance(batch_obj, DiffusionBatch):
-                        return _shard_diffusion_batch(batch_obj, ws, rk)
-                    raise ValueError("Expected DiffusionBatch for sharding in resume tests.")
+                train_batcher_resume, valid_batcher_resume = _prepare_streaming_batchers(bundle, device)
+                train_batcher_resume.set_state(state_holder["train_batcher_state"])
+                valid_batcher_resume.set_state(state_holder["valid_batcher_state"])
 
                 def _sync_resume():
                     ddp_model_resume.finish_gradient_synchronization()
@@ -546,16 +547,13 @@ def run_training_with_checkpoint_ddp(
                     optimizer=optimizer_resume,
                     bundle=bundle,
                     generator=generator_resume,
-                    train_tokens_np=train_tokens_np,
-                    valid_tokens_np=valid_tokens_np,
+                    train_batcher=train_batcher_resume,
+                    valid_batcher=valid_batcher_resume,
                     num_steps=remaining,
                     base_iteration=resume_base_iteration,
                     snapshots=snapshots_resumed,
-                    shard_batch=_shard_resume,
                     sync_gradients=_sync_resume,
                     reduce_metric=allreduce_mean,
-                    world_size=1,
-                    process_rank=0,
                     is_rank_zero=True,
                 )
 

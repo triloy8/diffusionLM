@@ -13,8 +13,8 @@ def train_loop(
     optimizer: torch.optim.Optimizer,
     *,
     # data
-    np_arr_train_data,
-    np_arr_valid_data,
+    train_data,
+    val_data,
     # batching
     batch_size: int,
     context_length: int,
@@ -49,11 +49,8 @@ def train_loop(
     log_activation_norms: bool = False,
     log_weight_norms: bool = False,
     # DDP/unified-loop hooks (optional)
-    shard_batch: Optional[Callable[[object, int, int], object]] = None,
     sync_gradients: Optional[Callable[[], None]] = None,
     reduce_metric: Optional[Callable[[float], float]] = None,
-    world_size: int = 1,
-    process_rank: int = 0,
     # rank-zero policy
     is_rank_zero: bool = True,
     step_callback: Optional[Callable[[int, torch.nn.Module, torch.optim.Optimizer, float, float], None]] = None,
@@ -80,19 +77,13 @@ def train_loop(
     train_iteration = start_iteration
     while True:
         model.train()
-        # If sharding is requested, draw a larger batch so each rank gets a slice
-        eff_batch_size = batch_size * world_size if shard_batch is not None else batch_size
         raw_train_batch = get_batch(
-            dataset=np_arr_train_data,
-            batch_size=eff_batch_size,
+            dataset=train_data,
+            batch_size=batch_size,
             context_length=context_length,
             device=device,
             generator=batch_generator,
         )
-
-        # Optional rank sharding for DDP
-        if shard_batch is not None:
-            raw_train_batch = shard_batch(raw_train_batch, world_size, process_rank)
 
         train_batch = prepare(raw_train_batch)
         train_inputs = _inputs(train_batch)
@@ -192,7 +183,7 @@ def train_loop(
             while True:
                 with torch.no_grad():
                     raw_val_batch = get_batch(
-                        dataset=np_arr_valid_data,
+                        dataset=val_data,
                         batch_size=batch_size,
                         context_length=context_length,
                         device=device,

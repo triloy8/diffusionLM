@@ -2,8 +2,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from typing import Any, Dict
-import numpy as np
-import numpy.typing as npt
 import torch
 import random
 
@@ -30,7 +28,7 @@ def _rand_int(high: int, *, device: torch.device, generator: torch.Generator | N
 
 
 def get_batch(
-    dataset: npt.NDArray,
+    dataset,
     batch_size: int,
     context_length: int,
     device: str,
@@ -40,24 +38,10 @@ def get_batch(
     random_trunc_prob: float = 0.01,
     generator: torch.Generator | None = None,
 ) -> DiffusionBatch:
-    dataset_len = dataset.shape[0]
     device_obj = torch.device(device)
     rng_device = generator.device if generator is not None and hasattr(generator, "device") else torch.device("cpu")
 
-    if dataset_len <= context_length:
-        raise ValueError("dataset must be longer than context_length")
-
-    sampled_sequence_stack = []
-    for _ in range(batch_size):
-        if generator is not None:
-            starting_index = int(torch.randint(0, dataset_len - context_length, (1,), generator=generator, device=rng_device).item())
-        else:
-            starting_index = random.randint(0, dataset_len - context_length - 1)
-        np_sampled_sequence = dataset[starting_index : starting_index + context_length]
-        sampled_sequence = torch.from_numpy(np.asarray(np_sampled_sequence, dtype=dataset.dtype)).to(device_obj, dtype=torch.long)
-        sampled_sequence_stack.append(sampled_sequence)
-
-    clean_targets = torch.stack(sampled_sequence_stack, dim=0)  # (B, T)
+    clean_targets = dataset.draw(batch_size=batch_size, context_length=context_length).to(device_obj, dtype=torch.long)
 
     random_trunc_applied = False
     if random_trunc_prob > 0:

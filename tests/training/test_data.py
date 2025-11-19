@@ -4,12 +4,32 @@ import torch
 from diffusionlm.training.data import get_batch
 
 
+class DummyBatcher:
+    def __init__(self, array: np.ndarray):
+        self.tokens = torch.from_numpy(array.astype(np.int64))
+        if self.tokens.numel() == 0:
+            raise ValueError("array must contain tokens")
+        self._idx = 0
+
+    def draw(self, batch_size: int, context_length: int) -> torch.Tensor:
+        sequences = []
+        total_tokens = self.tokens.numel()
+        for _ in range(batch_size):
+            if self._idx + context_length > total_tokens:
+                self._idx = 0
+            seq = self.tokens[self._idx : self._idx + context_length]
+            self._idx = (self._idx + context_length) % total_tokens
+            sequences.append(seq)
+        return torch.stack(sequences, dim=0)
+
+
 def test_get_batch_metadata_mask_ratio_and_truncation(device):
     arr = np.arange(100, dtype=np.int32)
     generator = torch.Generator(device="cpu").manual_seed(42)
+    batcher = DummyBatcher(arr)
 
     batch = get_batch(
-        arr,
+        batcher,
         batch_size=2,
         context_length=8,
         device=str(device),
@@ -27,9 +47,10 @@ def test_get_batch_metadata_mask_ratio_and_truncation(device):
 def test_get_batch_random_truncation(device):
     arr = np.arange(100, dtype=np.int32)
     generator = torch.Generator(device="cpu").manual_seed(123)
+    batcher = DummyBatcher(arr)
 
     batch = get_batch(
-        arr,
+        batcher,
         batch_size=1,
         context_length=16,
         device=str(device),

@@ -17,11 +17,11 @@ def write(path: Path, content: str):
 
 
 def test_train_config_happy_and_validation(tmp_path: Path):
-    # Create dummy data files
-    train = tmp_path / "train.bin"
-    valid = tmp_path / "valid.bin"
-    train.write_bytes(b"")
-    valid.write_bytes(b"")
+    # Create dummy tokenizer files
+    vocab = tmp_path / "vocab.json"
+    merges = tmp_path / "merges.txt"
+    vocab.write_text("{}")
+    merges.write_text("")
 
     cfg_path = tmp_path / "train.toml"
     write(cfg_path, f"""
@@ -60,20 +60,28 @@ def test_train_config_happy_and_validation(tmp_path: Path):
 
     [data]
     runs_path = "{tmp_path.as_posix()}"
-    np_dat_train_path = "{train.as_posix()}"
-    total_train_tokens = 100
-    np_dat_valid_path = "{valid.as_posix()}"
-    total_val_tokens = 50
+    dataset_name = "example/dataset"
+    dataset_config = "default"
+    train_split = "train"
+    val_split = "validation"
+    text_field = "text"
+    shuffle_buffer_size = 1000
+    shuffle_seed = 123
+
+    [data.tokenizer]
+    vocab_path = "{vocab.as_posix()}"
+    merges_path = "{merges.as_posix()}"
+    special_tokens = ["<|endoftext|>", "<|mask|>"]
     """)
 
     cfg = load_train_config(cfg_path)
-    # Paths should be Path objects in dataclass
-    assert cfg.data.np_dat_train_path.exists()
+    assert cfg.data.tokenizer.vocab_path.exists()
+    assert cfg.data.shuffle_buffer_size == 1000
     assert cfg.optimizer.initial_learning_rate == pytest.approx(0.001)
     assert cfg.training.seed == 42
     # pretty dict stringifies paths
     pretty = asdict_pretty(cfg)
-    assert isinstance(pretty["data"]["np_dat_train_path"], str)
+    assert isinstance(pretty["data"]["tokenizer"]["vocab_path"], str)
 
     # Validation error: d_model % num_heads != 0
     bad_cfg = tmp_path / "bad_train.toml"

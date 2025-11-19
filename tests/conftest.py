@@ -16,6 +16,7 @@ from config import (
     DataConfig,
     ModelConfig,
     OptimizerConfig,
+    TokenizerConfig,
     TrainingConfig as RuntimeTrainingConfig,
     TrainConfig as RuntimeTrainConfig,
 )
@@ -88,12 +89,21 @@ def toy_training_bundle(device) -> TrainingBundle:
         seed=123,
     )
 
+    tokenizer_cfg = TokenizerConfig(
+        merges_path=Path("tests/data/tokenizer/merges.txt"),
+        vocab_path=Path("tests/data/tokenizer/vocab.json"),
+        special_tokens=["<|endoftext|>", "<|mask|>"],
+    )
     data_cfg = DataConfig(
         runs_path=Path("./runs"),
-        np_dat_train_path=Path("./toy_train.dat"),
-        total_train_tokens=int(dataset.train_tokens.numel()),
-        np_dat_valid_path=Path("./toy_valid.dat"),
-        total_val_tokens=int(dataset.valid_tokens.numel()),
+        dataset_name="tests/dummy",
+        dataset_config=None,
+        train_split="train",
+        val_split="validation",
+        text_field="text",
+        tokenizer=tokenizer_cfg,
+        shuffle_buffer_size=0,
+        shuffle_seed=None,
     )
 
     train_cfg = RuntimeTrainConfig(

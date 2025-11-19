@@ -65,10 +65,18 @@ seed = 3407
 
 [data]
 runs_path = "./runs"
-np_dat_train_path = "./data/TinyStoriesV2-GPT4-train.dat"
-total_train_tokens = 547994686
-np_dat_valid_path = "./data/TinyStoriesV2-GPT4-valid.dat"
-total_val_tokens = 5535291
+dataset_name = "trixyL/tiny-story"
+dataset_config = "TinyStoriesV2-GPT4"
+train_split = "train"
+val_split = "validation"
+text_field = "text"
+shuffle_buffer_size = 10000
+shuffle_seed = 3407
+
+[data.tokenizer]
+vocab_path = "./data/gpt2_vocab.json"
+merges_path = "./data/gpt2_merges.txt"
+special_tokens = ["<|endoftext|>", "<|mask|>"]
 
 [logging]
 backend = "wandb"

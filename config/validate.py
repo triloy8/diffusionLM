@@ -102,13 +102,19 @@ def _validate_training(t: TrainingConfig) -> None:
 
 
 def _validate_data(d: DataConfig) -> None:
-    # Inputs should exist; create of outputs handled by caller.
-    if not d.np_dat_train_path.exists():
-        raise FileNotFoundError(f"Training dataset not found: {d.np_dat_train_path}")
-    if not d.np_dat_valid_path.exists():
-        raise FileNotFoundError(f"Validation dataset not found: {d.np_dat_valid_path}")
-    if d.total_train_tokens <= 0 or d.total_val_tokens <= 0:
-        raise ValueError("total_*_tokens must be > 0")
+    if not d.dataset_name:
+        raise ValueError("dataset_name must not be empty")
+    if not d.train_split:
+        raise ValueError("train_split must not be empty")
+    if not d.val_split:
+        raise ValueError("val_split must not be empty")
+    if not d.text_field:
+        raise ValueError("text_field must not be empty")
+    if d.shuffle_buffer_size < 0:
+        raise ValueError("shuffle_buffer_size must be >= 0")
+    if d.shuffle_seed is not None and d.shuffle_seed < 0:
+        raise ValueError("shuffle_seed must be >= 0 when provided")
+    _validate_tokenizer(d.tokenizer)
 
 
 def _validate_inference(i: InferenceConfig) -> None:

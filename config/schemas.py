@@ -78,10 +78,14 @@ class TrainingConfig:
 @dataclass
 class DataConfig:
     runs_path: Path
-    np_dat_train_path: Path
-    total_train_tokens: int
-    np_dat_valid_path: Path
-    total_val_tokens: int
+    dataset_name: str
+    dataset_config: Optional[str]
+    train_split: str
+    val_split: str
+    text_field: str
+    tokenizer: "TokenizerConfig"
+    shuffle_buffer_size: int = 0
+    shuffle_seed: Optional[int] = None
 
 
 @dataclass

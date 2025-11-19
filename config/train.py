@@ -150,12 +150,27 @@ def load_train_config(path: Path | str) -> TrainConfig:
         ckpting_save_iter=int(t["ckpting_save_iter"]),
         seed=(int(t["seed"]) if t.get("seed") is not None else None),
     )
+    _expect_keys(d, "data", ["runs_path", "dataset_name", "train_split", "val_split", "text_field", "tokenizer"])
+    tokenizer_tbl = d.get("tokenizer")
+    if tokenizer_tbl is None:
+        raise ValueError("[data.tokenizer] section is required")
+    _expect_keys(tokenizer_tbl, "data.tokenizer", ["merges_path", "vocab_path"])
+    tokenizer_cfg = TokenizerConfig(
+        merges_path=_as_path(tokenizer_tbl["merges_path"]),
+        vocab_path=_as_path(tokenizer_tbl["vocab_path"]),
+        special_tokens=list(tokenizer_tbl.get("special_tokens", [])),
+    )
+    shuffle_seed_val = d.get("shuffle_seed")
     data = DataConfig(
         runs_path=_as_path(d["runs_path"]),
-        np_dat_train_path=_as_path(d["np_dat_train_path"]),
-        total_train_tokens=int(d["total_train_tokens"]),
-        np_dat_valid_path=_as_path(d["np_dat_valid_path"]),
-        total_val_tokens=int(d["total_val_tokens"]),
+        dataset_name=str(d["dataset_name"]),
+        dataset_config=(str(d["dataset_config"]) if d.get("dataset_config") is not None else None),
+        train_split=str(d["train_split"]),
+        val_split=str(d["val_split"]),
+        text_field=str(d["text_field"]),
+        tokenizer=tokenizer_cfg,
+        shuffle_buffer_size=int(d.get("shuffle_buffer_size", 0)),
+        shuffle_seed=(int(shuffle_seed_val) if shuffle_seed_val is not None else None),
     )
     wandb: Optional[WandbConfig] = None
     if w:

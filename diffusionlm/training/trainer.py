@@ -12,6 +12,7 @@ from diffusionlm.training.checkpoint import save_checkpoint
 from diffusionlm.training.schedule import lr_cosine_schedule
 from diffusionlm.training.grad import gradient_clipping
 from diffusionlm.training.loop import train_loop
+from diffusionlm.training.streaming import HFTokenIteratorFactory, StreamingBatcher
 
 from datetime import datetime
 import numpy as np
@@ -26,6 +27,7 @@ from logger import Logger
 from logger import ConsoleLogger, WandbLogger, RankZeroLogger
 from ddp import DDP, OptimizerStateSharding
 from ddp.utils import broadcast_string, setup_process_group, cleanup_process_group, allreduce_mean
+from diffusionlm.tokenizer.tokenizer import Tokenizer
 
 
 def _seed_everything(seed: int, device: str | torch.device, *, rank: int = 0) -> torch.Generator:
@@ -110,13 +112,38 @@ def train_transformer(args, *, logger: Logger, run_name: str):
     optimizer_cls, param_groups, optimizer_kwargs = _prepare_optimizer_setup(cfg, model)
     optimizer = optimizer_cls(param_groups, **optimizer_kwargs)
 
-    np_arr_train_data = np.memmap(
-        args.np_dat_train_path, dtype=np.int32, mode="r", shape=(args.total_train_tokens,)
+    tokenizer = Tokenizer.from_files(
+        str(args.tokenizer_vocab_path),
+        str(args.tokenizer_merges_path),
+        special_tokens=list(getattr(args, "tokenizer_special_tokens", ())),
     )
-
-    np_arr_valid_data = np.memmap(
-        args.np_dat_valid_path, dtype=np.int32, mode="r", shape=(args.total_val_tokens,)
+    shuffle_seed = getattr(args, "shuffle_seed", None)
+    if shuffle_seed is None:
+        shuffle_seed = getattr(args, "rng_seed", getattr(cfg, "seed", None))
+    train_iterator_factory = HFTokenIteratorFactory(
+        dataset_name=str(args.dataset_name),
+        dataset_config=(str(args.dataset_config) if args.dataset_config is not None else None),
+        split=str(args.train_split),
+        text_field=str(args.text_field),
+        tokenizer=tokenizer,
+        shuffle_buffer_size=int(getattr(args, "shuffle_buffer_size", 0)),
+        shuffle_seed=(int(shuffle_seed) if shuffle_seed is not None else None),
+        world_size=1,
+        rank=0,
     )
+    val_iterator_factory = HFTokenIteratorFactory(
+        dataset_name=str(args.dataset_name),
+        dataset_config=(str(args.dataset_config) if args.dataset_config is not None else None),
+        split=str(args.val_split),
+        text_field=str(args.text_field),
+        tokenizer=tokenizer,
+        shuffle_buffer_size=0,
+        shuffle_seed=None,
+        world_size=1,
+        rank=0,
+    )
+    train_batcher = StreamingBatcher(train_iterator_factory, device=str(cfg.device))
+    val_batcher = StreamingBatcher(val_iterator_factory, device=str(cfg.device))
 
     # activation norm utils
     activation_norms = {}
@@ -152,8 +179,8 @@ def train_transformer(args, *, logger: Logger, run_name: str):
     train_loop(
         model,
         optimizer,
-        np_arr_train_data=np_arr_train_data,
-        np_arr_valid_data=np_arr_valid_data,
+        train_data=train_batcher,
+        val_data=val_batcher,
         batch_size=cfg.batch_size,
         context_length=cfg.context_length,
         device=str(cfg.device),
@@ -234,13 +261,39 @@ def train_transformer_ddp(local_rank, args, cfg_dc):
         **optimizer_kwargs,
     )
 
-    np_arr_train_data = np.memmap(
-        args.np_dat_train_path, dtype=np.int32, mode="r", shape=(args.total_train_tokens,)
+    tokenizer = Tokenizer.from_files(
+        str(args.tokenizer_vocab_path),
+        str(args.tokenizer_merges_path),
+        special_tokens=list(getattr(args, "tokenizer_special_tokens", ())),
     )
-
-    np_arr_valid_data = np.memmap(
-        args.np_dat_valid_path, dtype=np.int32, mode="r", shape=(args.total_val_tokens,)
+    shuffle_seed = getattr(args, "shuffle_seed", None)
+    if shuffle_seed is None:
+        shuffle_seed = getattr(args, "rng_seed", getattr(cfg, "seed", None))
+    per_rank_seed = (int(shuffle_seed) if shuffle_seed is not None else 0) + global_rank
+    train_iterator_factory = HFTokenIteratorFactory(
+        dataset_name=str(args.dataset_name),
+        dataset_config=(str(args.dataset_config) if args.dataset_config is not None else None),
+        split=str(args.train_split),
+        text_field=str(args.text_field),
+        tokenizer=tokenizer,
+        shuffle_buffer_size=int(getattr(args, "shuffle_buffer_size", 0)),
+        shuffle_seed=per_rank_seed,
+        world_size=cfg.world_size,
+        rank=global_rank,
     )
+    val_iterator_factory = HFTokenIteratorFactory(
+        dataset_name=str(args.dataset_name),
+        dataset_config=(str(args.dataset_config) if args.dataset_config is not None else None),
+        split=str(args.val_split),
+        text_field=str(args.text_field),
+        tokenizer=tokenizer,
+        shuffle_buffer_size=0,
+        shuffle_seed=None,
+        world_size=cfg.world_size,
+        rank=global_rank,
+    )
+    train_batcher = StreamingBatcher(train_iterator_factory, device=str(cfg.device))
+    val_batcher = StreamingBatcher(val_iterator_factory, device=str(cfg.device))
 
     # activation norm utils
     activation_norms = {}
@@ -276,29 +329,14 @@ def train_transformer_ddp(local_rank, args, cfg_dc):
     def _compute_loss(logits: torch.Tensor, batch) -> torch.Tensor:
         return diffusion_cross_entropy(logits, batch.clean_targets, batch.mask, batch.p_mask)
 
-    def _shard_batch(batch_obj, ws: int, rk: int):
-        if isinstance(batch_obj, DiffusionBatch):
-            def _chunk(t: torch.Tensor) -> torch.Tensor:
-                return torch.chunk(t, ws, dim=0)[rk]
-
-            metadata = dict(batch_obj.metadata) if isinstance(batch_obj.metadata, dict) else {}
-            return DiffusionBatch(
-                noisy_inputs=_chunk(batch_obj.noisy_inputs),
-                clean_targets=_chunk(batch_obj.clean_targets),
-                mask=_chunk(batch_obj.mask),
-                p_mask=_chunk(batch_obj.p_mask),
-                metadata=metadata,
-            )
-        raise ValueError("DDP expects DiffusionBatch instances for sharding.")
-
     def _sync():
         ddp_model.finish_gradient_synchronization()
 
     train_loop(
         ddp_model,
         optimizer,
-        np_arr_train_data=np_arr_train_data,
-        np_arr_valid_data=np_arr_valid_data,
+        train_data=train_batcher,
+        val_data=val_batcher,
         batch_size=cfg.batch_size,
         context_length=cfg.context_length,
         device=str(cfg.device),
@@ -322,11 +360,8 @@ def train_transformer_ddp(local_rank, args, cfg_dc):
         activation_norms=activation_norms,
         log_activation_norms=True,
         log_weight_norms=True,
-        shard_batch=_shard_batch,
         sync_gradients=_sync,
         reduce_metric=allreduce_mean,
-        world_size=cfg.world_size,
-        process_rank=global_rank,
         is_rank_zero=(global_rank == 0),
     )
 
