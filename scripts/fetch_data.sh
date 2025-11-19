@@ -24,7 +24,5 @@ download() {
     mv "${tmp}" "${dest}"
 }
 
-download "https://huggingface.co/datasets/trixyL/tiny-story/resolve/main/TinyStoriesV2-GPT4-train.dat"
-download "https://huggingface.co/datasets/trixyL/tiny-story/resolve/main/TinyStoriesV2-GPT4-valid.dat"
 download "https://huggingface.co/datasets/trixyL/tiny-story/resolve/main/gpt2_merges.txt"
 download "https://huggingface.co/datasets/trixyL/tiny-story/resolve/main/gpt2_vocab.json"

@@ -10,7 +10,7 @@ A from‑scratch diffusion language model inspired by the LLaDA guidelines. This
 - From‑scratch training: AdamW optimizer, cosine LR schedule, gradient clipping, checkpointing.
 - From‑scratch tokenizer: byte‑level BPE training and IO, producing `vocab.json` and `merges.txt`.
 - Diffusion inference: bidirectional decoding with configurable mask scheduling (steps, block length, temperature).
-- Databuilder: memmap pipeline for large corpora (token counting and ID writing).
+- Streaming data: Hugging Face `datasets` streaming pipeline with on‑the‑fly tokenization (legacy memmap builder retained for archival conversions).
 - CLI + TOML configs: consistent, simple entry points.
 - Logging: console JSON or Weights & Biases.
 - Distributed training (DDP): minimal wrapper with async gradient buckets, optimizer state sharding, rank-zero logging, and aggregated metrics.
@@ -65,23 +65,36 @@ uv run diffusionlm-infer --config config/resources/infer.toml
 
 _Note:_ `inference.total_length` should be the final sequence length (prompt + generated tokens) and must not exceed `model.context_length`; the generated span is computed automatically as `total_length - prompt_tokens`.
 
-- Build memmap datasets from raw text:
-
-```bash
-uv run diffusionlm-make-data --config config/resources/make_data.toml
-```
-
 - Inspect effective configuration without running:
 
 ```bash
 uv run diffusionlm-train --config config/resources/train.toml --print-config
 ```
 
+## Datasets & Tokenizer Assets
+
+Training now streams data directly from Hugging Face Datasets. To prepare your environment:
+
+1. **Grab tokenizer files** (if you don’t already have them). Run `scripts/fetch_data.sh <output_dir>` to download `gpt2_vocab.json` and `gpt2_merges.txt` into `data/` (or another path you supply). Point `[data.tokenizer]` in your configs to those files.
+2. **Choose a dataset** available via `datasets.load_dataset`. Configure `[data]` with `dataset_name`, optional `dataset_config`, `train_split`, `val_split`, and the text field to tokenize. Streaming supports both public Hub datasets and local files (e.g., `load_dataset("json", data_files=...)`).
+3. **Cache for offline runs**: set `HF_DATASETS_CACHE=/path/to/cache` and run training/benchmarking once with network access (or use `huggingface-cli download ...`). After the cache is populated, set `HF_DATASETS_OFFLINE=1` to force offline mode. Private datasets require `huggingface-cli login` or an `HF_TOKEN` in the environment.
+4. **Shuffling**: `[data].shuffle_buffer_size` controls the streaming shuffle window; bump it up (e.g., 10_000) for better randomization, or leave at 0 to read the dataset order as-is. `shuffle_seed` seeds the buffer RNG; DDP adds the rank to keep shards deterministic and independent.
+
+### Legacy memmap pipeline
+
+The old `.dat` memmap builder still lives under `databuilder/` for archival conversions:
+
+```bash
+uv run diffusionlm-make-data --config config/resources/make_data.toml
+```
+
+This is no longer needed for training but remains available if you must export datasets in the historical format.
+
 ## Remote Orchestration
 
 The `Justfile` plus helper scripts under `scripts/` provide a thin remote control plane focused on Prime Intellect hosts; set `PRIME_HOST`/`REMOTE_ROOT` to point at the target machine and path. All available recipes:
 - `just bootstrap-remote` runs `scripts/bootstrap_remote.sh` over SSH to install uv/just/tmux, clone the repo, and prepare `data/`, `runs/`, and `env/` directories on the remote.
-- `just data-remote` executes `scripts/fetch_data.sh` remotely to download the TinyStories artifacts into the remote `data/` directory.
+- `just data-remote` executes `scripts/fetch_data.sh` remotely to download the GPT‑2 tokenizer vocab/merges into the remote `data/` directory (streaming datasets are fetched via Hugging Face at runtime).
 - `just build-remote` syncs dependencies by running `uv sync` (with a frozen lockfile fallback) inside the remote checkout.
 - `just train config=<toml> extra="<args>"` launches `scripts/run_train_remote.sh` inside a tmux session (`diffusionlm-train`) after validating Weights & Biases credentials.
 - `just infer command="<cmd>" args="<extra>"` calls `scripts/run_infer_remote.sh` to execute arbitrary inference or benchmarking commands; defaults derive from `CMD_INFER`.
@@ -99,7 +112,7 @@ The `Justfile` plus helper scripts under `scripts/` provide a thin remote contro
   - Notes: dtype helpers under `diffusionlm/utils/dtypes.py`.
 
 - diffusionlm.training
-  - Purpose: Training loop, loss, optimizer, schedule, checkpointing, and batching over memmap data.
+  - Purpose: Training loop, loss, optimizer, schedule, checkpointing, and streaming batch construction.
   - Key files: `diffusionlm/training/trainer.py`, `diffusionlm/training/loop.py`, `diffusionlm/training/optim.py`, `diffusionlm/training/schedule.py`, `diffusionlm/training/checkpoint.py`, `diffusionlm/training/data.py`.
   - Notes: `[model]` config now includes `mask_token_id`, `noise_epsilon`, and `random_trunc_prob` for diffusion-aware batching.
 
@@ -114,7 +127,7 @@ The `Justfile` plus helper scripts under `scripts/` provide a thin remote contro
   - Artifacts: `vocab.json`, `merges.txt` (with optional special tokens).
 
 - databuilder
-  - Purpose: Dataset building helpers for large corpora (memmap writer, token counting).
+  - Purpose: Legacy dataset helpers for writing `.dat` memmaps (kept for archival conversions).
   - Key files: `databuilder/dataset_builder.py`.
   - Usage: driven via `diffusionlm-make-data` and `config/resources/make_data.toml`.
 
