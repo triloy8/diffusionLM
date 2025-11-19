@@ -2,7 +2,7 @@
 
 ## What Is This?
 
-A from‑scratch diffusion language model inspired by the LLaDA guidelines. This repo continues the work from my earlier `transformerLM` project, evolving the original masked Transformer into a bidirectional core while expanding it with diffusion-specific batch/noise handling and shipping supporting tools (tokenizer, dataset builder, CLI, benchmarks, logging) with clarity and readability as priorities.
+This project started life as a from‑scratch diffusion language model inspired by the LLaDA guidelines and has since grown into a mini deployable stack. The earlier `transformerLM` prototype evolved into a bidirectional core, and the repository now bundles the supporting pieces (tokenizer, streaming data pipeline, CLI, benchmarks, logging, orchestration scripts) needed to train and serve diffusion LMs end to end.
 
 ## Overview
 
@@ -250,3 +250,8 @@ print(memory.summary())
 print(memory.peaks())
 memory.reset_peaks()
 ```
+
+## Future Work
+
+- [ ] Checkpoint resume state for streaming data (persist iterator/shuffle RNG state so resumed training matches the original run exactly).
+- [ ] Rework perplexity reporting so metrics better reflect diffusion LLM behavior (the current LM-style cross-entropy doesn’t translate).
