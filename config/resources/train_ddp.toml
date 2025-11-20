@@ -59,15 +59,15 @@ weight_decay = 0.05
 batch_size = 188
 max_train_iteration = 10000
 max_val_iteration = 10
-val_freq_iteration = 125
+val_freq_iteration = 250
 ckpting_save_iter = 1000
 seed = 3407
-skip_validation = true
+skip_validation = false
 
 [data]
 runs_path = "./runs"
-dataset_name = "Skylion007/openwebtext"
-dataset_config = ""
+dataset_name = "allenai/c4"
+dataset_config = "en"
 train_split = "train"
 val_split = "validation"
 text_field = "text"
