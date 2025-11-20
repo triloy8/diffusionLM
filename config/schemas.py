@@ -73,6 +73,7 @@ class TrainingConfig:
     val_freq_iteration: int
     ckpting_save_iter: int
     seed: Optional[int] = None
+    skip_validation: bool = False
 
 
 @dataclass

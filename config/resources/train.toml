@@ -62,6 +62,7 @@ max_val_iteration = 10
 val_freq_iteration = 125
 ckpting_save_iter = 1000
 seed = 3407
+skip_validation = false
 
 [data]
 runs_path = "./runs"

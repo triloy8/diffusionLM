@@ -55,6 +55,7 @@ def train_loop(
     is_rank_zero: bool = True,
     step_callback: Optional[Callable[[int, torch.nn.Module, torch.optim.Optimizer, float, float], None]] = None,
     start_iteration: int = 0,
+    skip_validation: bool = False,
 ):
     """A minimal training loop extracted into a reusable function.
 
@@ -176,7 +177,7 @@ def train_loop(
             logger.log({"phase": "train", "metrics.lr": logged_lr}, step=train_iteration)
 
         # validation
-        if train_iteration % val_freq_iteration == 0:
+        if (not skip_validation) and train_iteration % val_freq_iteration == 0:
             model.eval()
             val_iteration = 0
             running_val_loss = 0.0

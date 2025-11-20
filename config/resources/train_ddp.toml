@@ -57,16 +57,17 @@ weight_decay = 0.05
 
 [training]
 batch_size = 188
-max_train_iteration = 5000
+max_train_iteration = 10000
 max_val_iteration = 10
 val_freq_iteration = 125
 ckpting_save_iter = 1000
 seed = 3407
+skip_validation = true
 
 [data]
 runs_path = "./runs"
-dataset_name = "trixyL/tiny-story"
-dataset_config = "TinyStoriesV2-GPT4"
+dataset_name = "HuggingFaceFW/fineweb"
+dataset_config = ""
 train_split = "train"
 val_split = "validation"
 text_field = "text"
@@ -80,8 +81,8 @@ special_tokens = ["<|endoftext|>", "<|mask|>"]
 
 [logging]
 backend = "wandb"
-architecture = "TransformerLM"
-dataset = "TinyStoriesV2-GPT4"
+architecture = "DiffusionLM"
+dataset = "FineWeb"
 
 [wandb]
 entity = "yiltro8-org"

@@ -149,6 +149,7 @@ def load_train_config(path: Path | str) -> TrainConfig:
         val_freq_iteration=int(t["val_freq_iteration"]),
         ckpting_save_iter=int(t["ckpting_save_iter"]),
         seed=(int(t["seed"]) if t.get("seed") is not None else None),
+        skip_validation=bool(t.get("skip_validation", False)),
     )
     _expect_keys(d, "data", ["runs_path", "dataset_name", "train_split", "val_split", "text_field", "tokenizer"])
     tokenizer_tbl = d.get("tokenizer")

@@ -18,7 +18,7 @@ noise_epsilon = 0.001
 random_trunc_prob = 0.01
 
 [checkpoint]
-ckpt_path = "./runs/2025-10-14_15-07-12/5000.ckpt"
+ckpt_path = "./runs/2025-11-17_03-01-57/5000.ckpt"
 
 [inference]
 prompt = "Once upon a time,"
@@ -29,9 +29,9 @@ temperature = 0.01
 mask_id = 50257
 
 [data]
-dataset_name = "trixyL/tiny-story"
-dataset_config = "TinyStoriesV2-GPT4"
-split = "validation"
+dataset_name = "HuggingFaceFW/fineweb"
+dataset_config = ""
+split = "train"
 text_field = "text"
 shuffle_buffer_size = 0
 shuffle_seed = 0

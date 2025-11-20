@@ -1,4 +1,4 @@
-# Diffusion Language Model from Scratch
+# Diffusion Language Model mini stack
 
 ## What Is This?
 
@@ -56,6 +56,7 @@ Notes:
 - Optimizer state sharding is enabled by default in the DDP entry point to reduce per-rank optimizer memory.
 - Choose the optimizer via `[optimizer].optimizer_name` (`"adamw"` default, `"muon"` experimental) while keeping the rest of the `[optimizer]` schedule knobs unchanged.
 - When using Muon, configure per-group hyperparameters under `[optimizer.muon.*]` (hidden, head, embed, scalar) so each param group carries its own learning-rate range and optimizer settings; AdamW ignores those subtables.
+- To fully skip validation (e.g., when no separate split exists), set `[training].skip_validation = true`; otherwise the loop will run `max_val_iteration` batches every `val_freq_iteration` steps.
 
 - Generate text:
 
@@ -254,6 +255,7 @@ memory.reset_peaks()
 ## Future Work
 
 - [ ] Checkpoint resume state for streaming data (persist iterator/shuffle RNG state so resumed training matches the original run exactly).
-- [ ] Add a deterministic streaming dataset fixture/smoke test so CI exercises `datasets.load_dataset` end-to-end offline.
+- [ ] Add a deterministic streaming dataset fixture/smoke test so bench/tests `datasets.load_dataset` end-to-end offline.
 - [ ] Rework perplexity reporting so metrics better reflect diffusion LLM behavior (the current LM-style cross-entropy doesn’t translate).
 - [ ] Instrument the streaming loader (tokens/sec, shuffle buffer occupancy, cache provenance) and log dataset metadata per run.
+- [ ] Provide an HF-oriented `make_data` path (e.g., parquet/JSON writer) to replace the legacy `.dat` builder for people who still need offline preprocessing.
