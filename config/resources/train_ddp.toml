@@ -20,8 +20,8 @@ weight_decay = 0.05 # adamw
 initial_learning_rate = 1e-4 # adamw
 max_learning_rate = 0.0015 # adamw
 min_learning_rate = 0.00015 # adamw
-warmup_iters = 100
-cosine_cycle_iters = 9000
+warmup_iters = 50
+cosine_cycle_iters = 4500
 grad_clip_max_l2_norm = 1.0
 
 [optimizer.muon.hidden]
@@ -57,17 +57,17 @@ weight_decay = 0.05
 
 [training]
 batch_size = 188
-max_train_iteration = 10000
+max_train_iteration = 5000
 max_val_iteration = 10
-val_freq_iteration = 250
+val_freq_iteration = 125
 ckpting_save_iter = 1000
 seed = 3407
 skip_validation = false
 
 [data]
 runs_path = "./runs"
-dataset_name = "allenai/c4"
-dataset_config = "realnewslike"
+dataset_name = "roneneldan/TinyStories"
+dataset_config = ""
 train_split = "train"
 val_split = "validation"
 text_field = "text"
@@ -82,7 +82,7 @@ special_tokens = ["<|endoftext|>", "<|mask|>"]
 [logging]
 backend = "wandb"
 architecture = "DiffusionLM"
-dataset = "Ai2C4-realnewslike"
+dataset = "TinyStories"
 
 [wandb]
 entity = "yiltro8-org"
