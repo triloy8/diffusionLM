@@ -1,7 +1,10 @@
 import json
-from pathlib import Path
 import textwrap
+from copy import deepcopy
+from pathlib import Path
+
 import pytest
+import tomllib
 from pydantic import ValidationError
 
 from config import (
@@ -10,7 +13,15 @@ from config import (
     load_make_data_config,
     load_train_tokenizer_config,
     asdict_pretty,
+    TrainConfig,
+    InferConfig,
+    MakeDataConfig,
+    TrainTokenizerConfig,
+    BenchInferConfig,
+    BenchTokenizerConfig,
 )
+
+RESOURCE_ROOT = Path("config/resources")
 
 
 def write(path: Path, content: str):
@@ -251,3 +262,70 @@ def test_optimizer_initial_lr_defaults_to_max(tmp_path: Path):
     """)
     cfg = load_train_config(cfg_path)
     assert cfg.optimizer.initial_learning_rate == pytest.approx(cfg.optimizer.max_learning_rate)
+
+
+def _write_text(path: Path, content: str = "") -> str:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(content)
+    return str(path)
+
+
+def _write_bytes(path: Path, data: bytes = b"") -> str:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_bytes(data)
+    return str(path)
+
+
+def _patch_tokenizer(tbl: dict, tmp_path: Path) -> None:
+    tbl["vocab_path"] = _write_text(tmp_path / "vocab.json", "{}")
+    tbl["merges_path"] = _write_text(tmp_path / "merges.txt", "")
+
+
+def _patch_train_like(cfg: dict, tmp_path: Path) -> dict:
+    _patch_tokenizer(cfg["data"]["tokenizer"], tmp_path)
+    return cfg
+
+
+def _patch_infer_like(cfg: dict, tmp_path: Path) -> dict:
+    _patch_tokenizer(cfg["tokenizer"], tmp_path)
+    cfg["checkpoint"]["ckpt_path"] = _write_bytes(tmp_path / "ckpt.bin", b"\0\1")
+    return cfg
+
+
+def _patch_bench_infer(cfg: dict, tmp_path: Path) -> dict:
+    return _patch_infer_like(cfg, tmp_path)
+
+
+def _patch_make_data(cfg: dict, tmp_path: Path) -> dict:
+    cfg["input"]["input_filename"] = _write_text(tmp_path / "input.txt", "hello")
+    _patch_tokenizer(cfg["tokenizer"], tmp_path)
+    return cfg
+
+
+def _patch_train_tokenizer(cfg: dict, tmp_path: Path) -> dict:
+    cfg["input"]["input_path"] = _write_text(tmp_path / "corpus.txt", "hello")
+    return cfg
+
+
+def _patch_bench_tokenizer(cfg: dict, tmp_path: Path) -> dict:
+    _patch_tokenizer(cfg["tokenizer"], tmp_path)
+    return cfg
+
+
+RESOURCE_CASES = [
+    ("train.toml", TrainConfig, _patch_train_like),
+    ("train_ddp.toml", TrainConfig, _patch_train_like),
+    ("infer.toml", InferConfig, _patch_infer_like),
+    ("bench_infer.toml", BenchInferConfig, _patch_bench_infer),
+    ("bench_tokenizer.toml", BenchTokenizerConfig, _patch_bench_tokenizer),
+    ("make_data.toml", MakeDataConfig, _patch_make_data),
+    ("train_tokenizer.toml", TrainTokenizerConfig, _patch_train_tokenizer),
+]
+
+
+@pytest.mark.parametrize(("filename", "schema", "patcher"), RESOURCE_CASES)
+def test_resource_configs_validate(filename: str, schema, patcher, tmp_path: Path):
+    raw = tomllib.load((RESOURCE_ROOT / filename).open("rb"))
+    patched = patcher(deepcopy(raw), tmp_path)
+    cfg = schema.model_validate(patched)
+    assert cfg is not None

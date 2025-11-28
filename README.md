@@ -71,6 +71,7 @@ _Note:_ `inference.total_length` should be the final sequence length (prompt + g
 ```bash
 uv run diffusionlm-train --config config/resources/train.toml --print-config
 ```
+> Config loaders use Pydantic validation, so missing/extra keys or bad values raise `pydantic.ValidationError` with detailed paths.
 
 ## Datasets & Tokenizer Assets
 
@@ -154,6 +155,7 @@ The `Justfile` plus helper scripts under `scripts/` provide a thin remote contro
   - Purpose: Typed config schemas, loaders, validation, and example TOMLs.
   - Key files: `config/train.py`, `config/infer.py`, `config/bench_infer.py`, `config/bench_tokenizer.py`, `config/io.py`, `config/schemas.py`.
   - Examples: `config/resources/*.toml`.
+  - Validation: Schemas are implemented with Pydantic v2 (`extra="forbid"`), so malformed or misspelled fields raise `pydantic.ValidationError` with structured error paths; CLI `--print-config` output comes from `model_dump()` with file paths stringified.
 
 - profiling
   - Purpose: Lightweight helpers for memory/runtime profiling, including NVTX ranges.
