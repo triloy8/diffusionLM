@@ -11,12 +11,6 @@ def _as_path(value: Any) -> Path:
     return value if isinstance(value, Path) else Path(value)
 
 
-def _expect_keys(d: Dict[str, Any], name: str, keys: List[str]) -> None:
-    missing = [k for k in keys if k not in d]
-    if missing:
-        raise ValueError(f"Missing keys in [{name}]: {missing}")
-
-
 def _load_toml(path: Path) -> Dict[str, Any]:
     with open(path, "rb") as f:
         return tomllib.load(f)
