@@ -11,7 +11,6 @@ from .schemas import (
     LoggingConfig,
 )
 from .io import _as_path, _expect_keys, _load_toml
-from .validate import _validate_tokenizer, _validate_tokenizer_bench_input
 
 
 def load_bench_tokenizer_config(path: Path | str) -> BenchTokenizerConfig:
@@ -30,11 +29,6 @@ def load_bench_tokenizer_config(path: Path | str) -> BenchTokenizerConfig:
     input_cfg = BenchTokenizerInput(text_list=list(i["text_list"]))
     bench = BenchTokenizerParams(repeats=int(b.get("repeats", 5)))
 
-    _validate_tokenizer(tokenizer)
-    _validate_tokenizer_bench_input(input_cfg)
-    if bench.repeats <= 0:
-        raise ValueError("benchmark.repeats must be > 0")
-
     logging: Optional[LoggingConfig] = None
     if lg:
         logging = LoggingConfig(
@@ -45,4 +39,3 @@ def load_bench_tokenizer_config(path: Path | str) -> BenchTokenizerConfig:
         )
 
     return BenchTokenizerConfig(tokenizer=tokenizer, input=input_cfg, benchmark=bench, logging=logging)
-

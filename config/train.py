@@ -24,7 +24,6 @@ from .schemas import (
     MuonAdamGroupConfig,
 )
 from .io import _as_path, _expect_keys, _load_toml
-from .validate import _validate_model, _validate_optimizer, _validate_training, _validate_data, _validate_tokenizer
 
 
 def _parse_muon_config(data: Dict[str, Any] | None) -> MuonOptimizerConfig:
@@ -202,11 +201,6 @@ def load_train_config(path: Path | str) -> TrainConfig:
             bucket_size_mb=int(ddp.get("bucket_size_mb", 0)),
         )
 
-    _validate_model(model)
-    _validate_optimizer(optimizer)
-    _validate_training(training)
-    _validate_data(data)
-
     return TrainConfig(model=model, optimizer=optimizer, training=training, data=data, wandb=wandb, logging=logging, ddp=train_ddp)
 
 
@@ -228,12 +222,6 @@ def load_make_data_config(path: Path | str) -> MakeDataConfig:
         special_tokens=list(t.get("special_tokens", [])),
     )
 
-    if not input_cfg.input_filename.exists():
-        raise FileNotFoundError(f"input_filename not found: {input_cfg.input_filename}")
-    if input_cfg.total_tokens <= 0:
-        raise ValueError("total_tokens must be > 0")
-    _validate_tokenizer(tokenizer)
-
     return MakeDataConfig(input=input_cfg, output=output_cfg, tokenizer=tokenizer)
 
 
@@ -252,10 +240,5 @@ def load_train_tokenizer_config(path: Path | str) -> TrainTokenizerConfig:
         merges_path=_as_path(o["merges_path"]),
         vocab_path=_as_path(o["vocab_path"]),
     )
-
-    if not input_cfg.input_path.exists():
-        raise FileNotFoundError(f"input_path not found: {input_cfg.input_path}")
-    if input_cfg.vocab_size <= 0:
-        raise ValueError("vocab_size must be > 0")
 
     return TrainTokenizerConfig(input=input_cfg, output=output_cfg)

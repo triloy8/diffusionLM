@@ -1,14 +1,146 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
 from pathlib import Path
 from typing import List, Optional, Tuple
 
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
-# ===== Dataclasses (Schemas) =====
+ALLOWED_DTYPES = {"float32", "float16", "bfloat16"}
+ALLOWED_DEVICES = {"cpu", "cuda"}
+ALLOWED_OPTIMIZERS = {"adamw", "muon"}
 
-@dataclass
-class ModelConfig:
+
+class _BaseConfig(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+
+class MuonHiddenConfig(_BaseConfig):
+    initial_learning_rate: float = 0.05
+    max_learning_rate: float = 0.05
+    min_learning_rate: float = 0.05
+    momentum: float = 0.95
+    weight_decay: float = 0.0
+
+    @model_validator(mode="after")
+    def _validate_hidden(self):
+        self._check_lr_range("muon.hidden")
+        if not (0 < self.momentum < 1):
+            raise ValueError("muon.hidden.momentum must be in (0, 1)")
+        if self.weight_decay < 0:
+            raise ValueError("muon.hidden.weight_decay must be >= 0")
+        return self
+
+    def _check_lr_range(self, label: str):
+        if self.initial_learning_rate <= 0 or self.min_learning_rate <= 0 or self.max_learning_rate <= 0:
+            raise ValueError(f"{label}: learning rates must be > 0")
+        if self.min_learning_rate > self.max_learning_rate:
+            raise ValueError(f"{label}: min_learning_rate must be <= max_learning_rate")
+        if not (self.min_learning_rate <= self.initial_learning_rate <= self.max_learning_rate):
+            raise ValueError(f"{label}: initial_learning_rate must be within [min, max]")
+
+
+class MuonAdamGroupConfig(_BaseConfig):
+    initial_learning_rate: float
+    max_learning_rate: float
+    min_learning_rate: float
+    betas: Tuple[float, float]
+    eps: float
+    weight_decay: float = 0.0
+
+    @model_validator(mode="after")
+    def _validate_group(self):
+        if self.initial_learning_rate <= 0 or self.min_learning_rate <= 0 or self.max_learning_rate <= 0:
+            raise ValueError("muon group learning rates must be > 0")
+        if self.min_learning_rate > self.max_learning_rate:
+            raise ValueError("muon group min_learning_rate must be <= max_learning_rate")
+        if not (self.min_learning_rate <= self.initial_learning_rate <= self.max_learning_rate):
+            raise ValueError("muon group initial_learning_rate must be within [min, max]")
+        if len(self.betas) != 2 or not (0 <= self.betas[0] < 1 and 0 <= self.betas[1] < 1):
+            raise ValueError("muon group betas must be 2 values in [0, 1)")
+        if self.eps <= 0:
+            raise ValueError("muon group eps must be > 0")
+        if self.weight_decay < 0:
+            raise ValueError("muon group weight_decay must be >= 0")
+        return self
+
+
+class MuonOptimizerConfig(_BaseConfig):
+    hidden: MuonHiddenConfig = Field(default_factory=MuonHiddenConfig)
+    head: MuonAdamGroupConfig = Field(
+        default_factory=lambda: MuonAdamGroupConfig(
+            initial_learning_rate=0.22,
+            max_learning_rate=0.22,
+            min_learning_rate=0.22,
+            betas=(0.8, 0.95),
+            eps=1e-10,
+            weight_decay=0.0,
+        )
+    )
+    embed: MuonAdamGroupConfig = Field(
+        default_factory=lambda: MuonAdamGroupConfig(
+            initial_learning_rate=0.6,
+            max_learning_rate=0.6,
+            min_learning_rate=0.6,
+            betas=(0.8, 0.95),
+            eps=1e-10,
+            weight_decay=0.0,
+        )
+    )
+    scalar: MuonAdamGroupConfig = Field(
+        default_factory=lambda: MuonAdamGroupConfig(
+            initial_learning_rate=0.04,
+            max_learning_rate=0.04,
+            min_learning_rate=0.04,
+            betas=(0.8, 0.95),
+            eps=1e-10,
+            weight_decay=0.0,
+        )
+    )
+
+
+class OptimizerConfig(_BaseConfig):
+    optimizer_name: str = "adamw"
+    betas: Tuple[float, float] = (0.9, 0.95)
+    eps: float
+    weight_decay: float
+    initial_learning_rate: Optional[float] = None
+    max_learning_rate: float
+    min_learning_rate: float
+    warmup_iters: int
+    cosine_cycle_iters: int
+    grad_clip_max_l2_norm: float
+    muon: Optional[MuonOptimizerConfig] = None
+
+    @model_validator(mode="after")
+    def _validate_optimizer(self):
+        self.optimizer_name = self.optimizer_name.lower()
+        if self.optimizer_name not in ALLOWED_OPTIMIZERS:
+            raise ValueError(f"optimizer_name must be one of {sorted(ALLOWED_OPTIMIZERS)}")
+        if len(self.betas) != 2 or not (0 <= self.betas[0] < 1 and 0 <= self.betas[1] < 1):
+            raise ValueError("optimizer betas must be 2 values in [0, 1)")
+        if self.eps <= 0:
+            raise ValueError("eps must be > 0")
+        if self.weight_decay < 0:
+            raise ValueError("weight_decay must be >= 0")
+        if self.initial_learning_rate is None:
+            self.initial_learning_rate = self.max_learning_rate
+        for attr in ("initial_learning_rate", "max_learning_rate", "min_learning_rate", "grad_clip_max_l2_norm"):
+            if getattr(self, attr) <= 0:
+                raise ValueError(f"{attr} must be > 0")
+        for attr in ("warmup_iters", "cosine_cycle_iters"):
+            if getattr(self, attr) < 0:
+                raise ValueError(f"{attr} must be >= 0")
+        if self.min_learning_rate > self.max_learning_rate:
+            raise ValueError("min_learning_rate must be <= max_learning_rate")
+        if self.initial_learning_rate > self.max_learning_rate:
+            raise ValueError("initial_learning_rate must be <= max_learning_rate")
+        if self.optimizer_name == "muon":
+            if self.muon is None:
+                raise ValueError("Muon optimizer requires muon configuration")
+        return self
+
+
+class ModelConfig(_BaseConfig):
     vocab_size: int
     context_length: int
     d_model: int
@@ -18,55 +150,45 @@ class ModelConfig:
     rope_theta: float
     device: str
     dtype: str
-    mask_token_id: int
+    mask_token_id: Optional[int] = None
     noise_epsilon: float = 1e-3
     random_trunc_prob: float = 0.01
 
+    @field_validator("device")
+    @classmethod
+    def _validate_device(cls, v: str) -> str:
+        if v not in ALLOWED_DEVICES:
+            raise ValueError(f"device must be one of {sorted(ALLOWED_DEVICES)}")
+        return v
 
-@dataclass
-class MuonHiddenConfig:
-    initial_learning_rate: float
-    max_learning_rate: float
-    min_learning_rate: float
-    momentum: float
-    weight_decay: float
+    @field_validator("dtype")
+    @classmethod
+    def _validate_dtype(cls, v: str) -> str:
+        if v not in ALLOWED_DTYPES:
+            raise ValueError(f"dtype must be one of {sorted(ALLOWED_DTYPES)}")
+        return v
 
-
-@dataclass
-class MuonAdamGroupConfig:
-    initial_learning_rate: float
-    max_learning_rate: float
-    min_learning_rate: float
-    betas: Tuple[float, float]
-    eps: float
-    weight_decay: float
-
-
-@dataclass
-class MuonOptimizerConfig:
-    hidden: MuonHiddenConfig
-    head: MuonAdamGroupConfig
-    embed: MuonAdamGroupConfig
-    scalar: MuonAdamGroupConfig
-
-
-@dataclass
-class OptimizerConfig:
-    optimizer_name: str
-    betas: Tuple[float, float]
-    eps: float
-    weight_decay: float
-    initial_learning_rate: float
-    max_learning_rate: float
-    min_learning_rate: float
-    warmup_iters: int
-    cosine_cycle_iters: int
-    grad_clip_max_l2_norm: float
-    muon: Optional[MuonOptimizerConfig] = None
+    @model_validator(mode="after")
+    def _validate_model(self):
+        for field in ("vocab_size", "context_length", "d_model", "num_layers", "num_heads", "d_ff"):
+            if getattr(self, field) <= 0:
+                raise ValueError(f"{field} must be > 0")
+        if self.d_model % self.num_heads != 0:
+            raise ValueError("d_model must be divisible by num_heads")
+        if self.rope_theta <= 0:
+            raise ValueError("rope_theta must be > 0")
+        if self.mask_token_id is None:
+            self.mask_token_id = self.vocab_size - 1
+        if not (0 <= self.mask_token_id < self.vocab_size):
+            raise ValueError("mask_token_id must be in [0, vocab_size)")
+        if not (0 < self.noise_epsilon <= 1):
+            raise ValueError("noise_epsilon must be in (0, 1]")
+        if not (0 <= self.random_trunc_prob <= 1):
+            raise ValueError("random_trunc_prob must be in [0, 1]")
+        return self
 
 
-@dataclass
-class TrainingConfig:
+class TrainingConfig(_BaseConfig):
     batch_size: int
     max_train_iteration: int
     max_val_iteration: int
@@ -75,38 +197,73 @@ class TrainingConfig:
     seed: Optional[int] = None
     skip_validation: bool = False
 
+    @model_validator(mode="after")
+    def _validate_training(self):
+        for attr in ("batch_size", "max_train_iteration", "max_val_iteration", "val_freq_iteration", "ckpting_save_iter"):
+            if getattr(self, attr) <= 0:
+                raise ValueError(f"{attr} must be > 0")
+        if self.seed is not None and self.seed < 0:
+            raise ValueError("seed must be >= 0 when provided")
+        return self
 
-@dataclass
-class DataConfig:
+
+class TokenizerConfig(_BaseConfig):
+    merges_path: Path
+    vocab_path: Path
+    special_tokens: List[str] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def _validate_tokenizer(self):
+        if not self.vocab_path.exists():
+            raise FileNotFoundError(f"vocab_path not found: {self.vocab_path}")
+        if not self.merges_path.exists():
+            raise FileNotFoundError(f"merges_path not found: {self.merges_path}")
+        return self
+
+
+class DataConfig(_BaseConfig):
     runs_path: Path
     dataset_name: str
-    dataset_config: Optional[str]
+    dataset_config: Optional[str] = None
     train_split: str
     val_split: str
     text_field: str
-    tokenizer: "TokenizerConfig"
+    tokenizer: TokenizerConfig
     shuffle_buffer_size: int = 0
     shuffle_seed: Optional[int] = None
 
+    @model_validator(mode="after")
+    def _validate_data(self):
+        if not self.dataset_name:
+            raise ValueError("dataset_name must not be empty")
+        if not self.train_split:
+            raise ValueError("train_split must not be empty")
+        if not self.val_split:
+            raise ValueError("val_split must not be empty")
+        if not self.text_field:
+            raise ValueError("text_field must not be empty")
+        if self.shuffle_buffer_size < 0:
+            raise ValueError("shuffle_buffer_size must be >= 0")
+        if self.shuffle_seed is not None and self.shuffle_seed < 0:
+            raise ValueError("shuffle_seed must be >= 0 when provided")
+        return self
 
-@dataclass
-class WandbConfig:
+
+class WandbConfig(_BaseConfig):
     entity: Optional[str] = None
     project: Optional[str] = None
     architecture: Optional[str] = None
     dataset: Optional[str] = None
 
 
-@dataclass
-class LoggingConfig:
-    backend: Optional[str] = None  # "console" | "wandb" | "noop" | "jsonl"
+class LoggingConfig(_BaseConfig):
+    backend: Optional[str] = None
     run_name: Optional[str] = None
     architecture: Optional[str] = None
     dataset: Optional[str] = None
 
 
-@dataclass
-class DdpConfig:
+class DdpConfig(_BaseConfig):
     backend: str = "nccl"
     num_nodes: int = 1
     node_rank: int = 0
@@ -116,8 +273,7 @@ class DdpConfig:
     bucket_size_mb: int = 0
 
 
-@dataclass
-class TrainConfig:
+class TrainConfig(_BaseConfig):
     model: ModelConfig
     optimizer: OptimizerConfig
     training: TrainingConfig
@@ -127,81 +283,113 @@ class TrainConfig:
     ddp: Optional[DdpConfig] = None
 
 
-@dataclass
-class TokenizerConfig:
-    merges_path: Path
-    vocab_path: Path
-    special_tokens: List[str]
-
-
-@dataclass
-class CheckpointConfig:
+class CheckpointConfig(_BaseConfig):
     ckpt_path: Path
 
+    @model_validator(mode="after")
+    def _validate_checkpoint(self):
+        if not self.ckpt_path.exists():
+            raise FileNotFoundError(f"ckpt_path not found: {self.ckpt_path}")
+        return self
 
-@dataclass
-class InferenceConfig:
+
+class InferenceConfig(_BaseConfig):
     prompt: str
     steps: int
-    total_length: int
+    total_length: Optional[int] = None
     block_length: int
-    temperature: float
-    mask_id: int
+    temperature: float = 1.0
+    mask_id: Optional[int] = None
+
+    @model_validator(mode="after")
+    def _validate_inference(self):
+        if not self.prompt:
+            raise ValueError("prompt must not be empty")
+        if self.steps <= 0:
+            raise ValueError("steps must be > 0")
+        if self.block_length <= 0:
+            raise ValueError("block_length must be > 0")
+        if self.temperature <= 0:
+            raise ValueError("temperature must be > 0")
+        if self.mask_id is not None and self.mask_id < 0:
+            raise ValueError("mask_id must be >= 0")
+        if self.total_length is not None and self.total_length <= 0:
+            raise ValueError("total_length must be > 0 when provided")
+        return self
 
 
-@dataclass
-class InferConfig:
+class InferConfig(_BaseConfig):
     tokenizer: TokenizerConfig
     model: ModelConfig
     checkpoint: CheckpointConfig
     inference: InferenceConfig
     logging: Optional[LoggingConfig] = None
 
+    @model_validator(mode="after")
+    def _finalize_inference(self):
+        inf = self.inference
+        updates = {}
+        if inf.total_length is None:
+            updates["total_length"] = self.model.context_length
+        if inf.mask_id is None:
+            updates["mask_id"] = self.model.mask_token_id
+        if updates:
+            inf = inf.model_copy(update=updates)
+        self.inference = inf
+        return self
 
-@dataclass
-class MakeDataInputConfig:
+
+class MakeDataInputConfig(_BaseConfig):
     input_filename: Path
     total_tokens: int
 
+    @model_validator(mode="after")
+    def _validate_make_input(self):
+        if not self.input_filename.exists():
+            raise FileNotFoundError(f"input_filename not found: {self.input_filename}")
+        if self.total_tokens <= 0:
+            raise ValueError("total_tokens must be > 0")
+        return self
 
-@dataclass
-class MakeDataOutputConfig:
+
+class MakeDataOutputConfig(_BaseConfig):
     output_filename: Path
 
 
-@dataclass
-class MakeDataConfig:
+class MakeDataConfig(_BaseConfig):
     input: MakeDataInputConfig
     output: MakeDataOutputConfig
     tokenizer: TokenizerConfig
 
 
-@dataclass
-class TrainTokenizerInputConfig:
+class TrainTokenizerInputConfig(_BaseConfig):
     input_path: Path
     vocab_size: int
-    special_tokens: List[str]
+    special_tokens: List[str] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def _validate_tt_input(self):
+        if not self.input_path.exists():
+            raise FileNotFoundError(f"input_path not found: {self.input_path}")
+        if self.vocab_size <= 0:
+            raise ValueError("vocab_size must be > 0")
+        return self
 
 
-@dataclass
-class TrainTokenizerOutputConfig:
+class TrainTokenizerOutputConfig(_BaseConfig):
     merges_path: Path
     vocab_path: Path
 
 
-@dataclass
-class TrainTokenizerConfig:
+class TrainTokenizerConfig(_BaseConfig):
     input: TrainTokenizerInputConfig
     output: TrainTokenizerOutputConfig
 
 
-# ===== Benchmark Schemas =====
-
-@dataclass
-class BenchParams:
-    warmup: int
-    repeats: int
-    steps: int
+class BenchParams(_BaseConfig):
+    warmup: int = 2
+    repeats: int = 5
+    steps: Optional[int] = None
     synchronize: bool = True
     backward: bool = False
     optimizer_step: bool = False
@@ -209,19 +397,47 @@ class BenchParams:
     perplexity_batch_size: Optional[int] = None
     perplexity_seed: Optional[int] = None
 
+    @model_validator(mode="after")
+    def _validate_bench(self):
+        if self.warmup < 0:
+            raise ValueError("warmup must be >= 0")
+        if self.repeats <= 0:
+            raise ValueError("repeats must be > 0")
+        if self.steps is not None and self.steps <= 0:
+            raise ValueError("steps must be > 0 when provided")
+        if self.perplexity_max_batches is not None and self.perplexity_max_batches <= 0:
+            raise ValueError("perplexity_max_batches must be > 0 when provided")
+        if self.perplexity_batch_size is not None and self.perplexity_batch_size <= 0:
+            raise ValueError("perplexity_batch_size must be > 0 when provided")
+        if self.perplexity_seed is not None and self.perplexity_seed < 0:
+            raise ValueError("perplexity_seed must be >= 0 when provided")
+        return self
 
-@dataclass
-class BenchDataConfig:
+
+class BenchDataConfig(_BaseConfig):
     dataset_name: str
-    dataset_config: Optional[str]
+    dataset_config: Optional[str] = None
     split: str
     text_field: str
     shuffle_buffer_size: int = 0
     shuffle_seed: Optional[int] = None
 
+    @model_validator(mode="after")
+    def _validate_bench_data(self):
+        if not self.dataset_name:
+            raise ValueError("data.dataset_name must not be empty")
+        if not self.split:
+            raise ValueError("data.split must not be empty")
+        if not self.text_field:
+            raise ValueError("data.text_field must not be empty")
+        if self.shuffle_buffer_size < 0:
+            raise ValueError("data.shuffle_buffer_size must be >= 0")
+        if self.shuffle_seed is not None and self.shuffle_seed < 0:
+            raise ValueError("data.shuffle_seed must be >= 0 when provided")
+        return self
 
-@dataclass
-class BenchInferConfig:
+
+class BenchInferConfig(_BaseConfig):
     tokenizer: TokenizerConfig
     model: ModelConfig
     checkpoint: CheckpointConfig
@@ -231,28 +447,63 @@ class BenchInferConfig:
     logging: Optional[LoggingConfig] = None
     optimizer: Optional["OptimizerBenchConfig"] = None
 
+    @model_validator(mode="after")
+    def _finalize_bench(self):
+        updates = {}
+        if self.inference.total_length is None:
+            updates["total_length"] = self.model.context_length
+        if self.inference.mask_id is None:
+            updates["mask_id"] = self.model.mask_token_id
+        if updates:
+            self.inference = self.inference.model_copy(update=updates)
+        if self.benchmark.steps is None:
+            self.benchmark = self.benchmark.model_copy(update={"steps": self.model.context_length})
+        return self
 
-@dataclass
-class OptimizerBenchConfig:
-    lr: float
-    betas: Tuple[float, float]
-    eps: float
-    weight_decay: float
+
+class OptimizerBenchConfig(_BaseConfig):
+    lr: float = 0.0
+    betas: Tuple[float, float] = (0.9, 0.999)
+    eps: float = 1e-8
+    weight_decay: float = 0.0
     grad_clip_max_l2_norm: float = 0.0
 
+    @model_validator(mode="after")
+    def _validate_optimizer_bench(self):
+        if len(self.betas) != 2 or not (0 <= self.betas[0] < 1 and 0 <= self.betas[1] < 1):
+            raise ValueError("optimizer betas must be 2 values in [0, 1)")
+        if self.eps <= 0:
+            raise ValueError("optimizer eps must be > 0")
+        if self.grad_clip_max_l2_norm < 0:
+            raise ValueError("grad_clip_max_l2_norm must be >= 0")
+        if self.weight_decay < 0:
+            raise ValueError("weight_decay must be >= 0")
+        if self.lr < 0:
+            raise ValueError("lr must be >= 0")
+        return self
 
-@dataclass
-class BenchTokenizerInput:
+
+class BenchTokenizerInput(_BaseConfig):
     text_list: List[str]
 
+    @model_validator(mode="after")
+    def _validate_text_list(self):
+        if not self.text_list:
+            raise ValueError("input.text_list must not be empty")
+        return self
 
-@dataclass
-class BenchTokenizerParams:
-    repeats: int
+
+class BenchTokenizerParams(_BaseConfig):
+    repeats: int = 5
+
+    @model_validator(mode="after")
+    def _validate_bench_params(self):
+        if self.repeats <= 0:
+            raise ValueError("benchmark.repeats must be > 0")
+        return self
 
 
-@dataclass
-class BenchTokenizerConfig:
+class BenchTokenizerConfig(_BaseConfig):
     tokenizer: TokenizerConfig
     input: BenchTokenizerInput
     benchmark: BenchTokenizerParams

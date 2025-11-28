@@ -15,13 +15,6 @@ from .schemas import (
     OptimizerBenchConfig,
 )
 from .io import _as_path, _expect_keys, _load_toml
-from .validate import (
-    _validate_tokenizer,
-    _validate_model,
-    _validate_inference,
-    _validate_bench_params,
-    _validate_bench_data,
-)
 
 
 def load_bench_infer_config(path: Path | str) -> BenchInferConfig:
@@ -90,15 +83,6 @@ def load_bench_infer_config(path: Path | str) -> BenchInferConfig:
             shuffle_buffer_size=int(data_tbl.get("shuffle_buffer_size", 0)),
             shuffle_seed=(int(shuffle_seed_val) if shuffle_seed_val is not None else None),
         )
-
-    _validate_tokenizer(tokenizer)
-    _validate_model(model)
-    _validate_inference(inference)
-    _validate_bench_params(benchmark)
-    if data_config is not None:
-        _validate_bench_data(data_config)
-    if not checkpoint.ckpt_path.exists():
-        raise FileNotFoundError(f"ckpt_path not found: {checkpoint.ckpt_path}")
 
     logging: Optional[LoggingConfig] = None
     if lg:

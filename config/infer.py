@@ -1,6 +1,3 @@
-"""Inference config loader (to be populated in Step 2)."""
-
-# Placeholder module; content will be moved from diffusionlm/config.py
 from __future__ import annotations
 
 from pathlib import Path
@@ -15,7 +12,6 @@ from .schemas import (
     LoggingConfig,
 )
 from .io import _as_path, _expect_keys, _load_toml
-from .validate import _validate_tokenizer, _validate_model, _validate_inference
 
 
 def load_infer_config(path: Path | str) -> InferConfig:
@@ -56,12 +52,6 @@ def load_infer_config(path: Path | str) -> InferConfig:
         temperature=float(i.get("temperature", 1.0)),
         mask_id=int(i.get("mask_id", model.mask_token_id)),
     )
-
-    _validate_tokenizer(tokenizer)
-    _validate_model(model)
-    _validate_inference(inference)
-    if not checkpoint.ckpt_path.exists():
-        raise FileNotFoundError(f"ckpt_path not found: {checkpoint.ckpt_path}")
 
     logging: Optional[LoggingConfig] = None
     if lg:
