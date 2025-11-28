@@ -1,10 +1,11 @@
 from __future__ import annotations
 
-from dataclasses import asdict
+from dataclasses import asdict, is_dataclass
 from pathlib import Path
 from typing import Any, Dict, List
 import tomllib
 from importlib import resources as importlib_resources
+from pydantic import BaseModel
 
 
 def _as_path(value: Any) -> Path:
@@ -16,23 +17,27 @@ def _load_toml(path: Path) -> Dict[str, Any]:
         return tomllib.load(f)
 
 
-def asdict_pretty(dc) -> Dict[str, Any]:
-    # Convert dataclass to dict with stringified Paths for printing
-    def _stringify(obj):
-        if isinstance(obj, Path):
-            return str(obj)
-        return obj
+def asdict_pretty(obj: Any) -> Dict[str, Any]:
+    """Convert a Pydantic model (or dataclass) to a JSON-serializable dict with str Paths."""
 
-    d = asdict(dc)
+    def normalize(value: Any):
+        if isinstance(value, BaseModel):
+            value = value.model_dump()
+        elif is_dataclass(value):
+            value = asdict(value)
 
-    def walk(x):
-        if isinstance(x, dict):
-            return {k: walk(v) for k, v in x.items()}
-        if isinstance(x, list):
-            return [walk(v) for v in x]
-        return _stringify(x)
+        if isinstance(value, dict):
+            return {k: normalize(v) for k, v in value.items()}
+        if isinstance(value, list):
+            return [normalize(v) for v in value]
+        if isinstance(value, Path):
+            return str(value)
+        return value
 
-    return walk(d)
+    result = normalize(obj)
+    if not isinstance(result, dict):
+        raise TypeError("asdict_pretty expects model/dataclass producing a mapping")
+    return result
 
 
 # ===== Resources helpers =====
