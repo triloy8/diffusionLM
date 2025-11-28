@@ -20,7 +20,7 @@ infer command="{{infer_command_default}}" args="":
 	ssh {{prime_host}} "cd {{remote_root}} && bash scripts/run_infer_remote.sh $(printf '%q' '{{command}}') $(printf '%q' '{{args}}')"
 
 nvitop:
-	ssh -t {{prime_host}} 'export PATH="$HOME/.local/bin:$PATH"; nvitop'
+	ssh -t {{prime_host}} 'export PATH="$HOME/.local/bin:$PATH"; uvx nvitop'
 
 attach-train:
 	ssh -t {{prime_host}} 'tmux attach -t diffusionlm-train'
