@@ -2,6 +2,7 @@ import json
 from pathlib import Path
 import textwrap
 import pytest
+from pydantic import ValidationError
 
 from config import (
     load_train_config,
@@ -79,6 +80,9 @@ def test_train_config_happy_and_validation(tmp_path: Path):
     assert cfg.data.shuffle_buffer_size == 1000
     assert cfg.optimizer.initial_learning_rate == pytest.approx(0.001)
     assert cfg.training.seed == 42
+    dump = cfg.model_dump()
+    assert dump["model"]["mask_token_id"] == 31
+    assert dump["optimizer"]["initial_learning_rate"] == dump["optimizer"]["max_learning_rate"]
     # pretty dict stringifies paths
     pretty = asdict_pretty(cfg)
     assert isinstance(pretty["data"]["tokenizer"]["vocab_path"], str)
@@ -86,8 +90,9 @@ def test_train_config_happy_and_validation(tmp_path: Path):
     # Validation error: d_model % num_heads != 0
     bad_cfg = tmp_path / "bad_train.toml"
     write(bad_cfg, cfg_path.read_text().replace("num_heads = 2", "num_heads = 3"))
-    with pytest.raises(ValueError):
+    with pytest.raises(ValidationError) as exc:
         load_train_config(bad_cfg)
+    assert "d_model must be divisible by num_heads" in str(exc.value)
 
 
 def test_infer_config_happy_and_errors(tmp_path: Path):
@@ -134,14 +139,24 @@ def test_infer_config_happy_and_errors(tmp_path: Path):
     # Invalid block_length (must be > 0)
     bad = tmp_path / "infer_bad.toml"
     write(bad, cfg_path.read_text().replace("block_length = 8", "block_length = 0"))
-    with pytest.raises(ValueError):
+    with pytest.raises(ValidationError) as exc:
         load_infer_config(bad)
+    assert "block_length must be > 0" in str(exc.value)
 
     # Invalid temperature
     bad_t = tmp_path / "infer_bad_t.toml"
     write(bad_t, cfg_path.read_text().replace("temperature = 1.0", "temperature = 0.0"))
-    with pytest.raises(ValueError):
+    with pytest.raises(ValidationError) as exc:
         load_infer_config(bad_t)
+    assert "temperature must be > 0" in str(exc.value)
+
+    # Extra key should be rejected
+    bad_extra = tmp_path / "infer_extra.toml"
+    write(bad_extra, cfg_path.read_text().replace('[model]\n', '[model]\nunknown = 123\n', 1))
+    with pytest.raises(ValidationError) as exc:
+        load_infer_config(bad_extra)
+    # errors() contains path ('model', 'unknown')
+    assert any(err["loc"] == ("model", "unknown") for err in exc.value.errors())
 
 
 def test_make_data_and_train_tokenizer_loaders(tmp_path: Path):
@@ -187,3 +202,52 @@ def test_make_data_and_train_tokenizer_loaders(tmp_path: Path):
     """)
     cfg_tt = load_train_tokenizer_config(tt_cfg)
     assert cfg_tt.input.input_path.exists()
+
+
+def test_optimizer_initial_lr_defaults_to_max(tmp_path: Path):
+    vocab = tmp_path / "vocab.json"
+    merges = tmp_path / "merges.txt"
+    vocab.write_text("{}")
+    merges.write_text("")
+    cfg_path = tmp_path / "train_defaults.toml"
+    write(cfg_path, f"""
+    [model]
+    vocab_size = 16
+    context_length = 8
+    d_model = 8
+    num_layers = 1
+    num_heads = 2
+    d_ff = 16
+    rope_theta = 10000.0
+    device = "cpu"
+    dtype = "float32"
+
+    [optimizer]
+    eps = 1e-8
+    weight_decay = 0.0
+    max_learning_rate = 0.01
+    min_learning_rate = 0.001
+    warmup_iters = 0
+    cosine_cycle_iters = 10
+    grad_clip_max_l2_norm = 1.0
+
+    [training]
+    batch_size = 2
+    max_train_iteration = 2
+    max_val_iteration = 1
+    val_freq_iteration = 1
+    ckpting_save_iter = 2
+
+    [data]
+    runs_path = "{tmp_path.as_posix()}"
+    dataset_name = "example/dataset"
+    train_split = "train"
+    val_split = "validation"
+    text_field = "text"
+
+    [data.tokenizer]
+    vocab_path = "{vocab.as_posix()}"
+    merges_path = "{merges.as_posix()}"
+    """)
+    cfg = load_train_config(cfg_path)
+    assert cfg.optimizer.initial_learning_rate == pytest.approx(cfg.optimizer.max_learning_rate)
