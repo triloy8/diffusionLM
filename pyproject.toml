@@ -1,7 +1,7 @@
 [project]
 name = "diffusionlm"
 version = "1.0.0"
-description = "A from scratch implementation of a Transformer Language Model"
+description = "Diffusion LM mini stack: from-scratch core with tokenizer, streaming data, CLI, and lightweight benchmarks."
 readme = "README.md"
 requires-python = ">=3.11,<3.13"
 dependencies = [
