@@ -115,7 +115,7 @@ def train_transformer(args, *, logger: Logger, run_name: str):
     tokenizer = Tokenizer.from_files(
         str(args.tokenizer_vocab_path),
         str(args.tokenizer_merges_path),
-        special_tokens=list(getattr(args, "tokenizer_special_tokens", ())),
+        str(args.tokenizer_special_tokens_path)
     )
     shuffle_seed = getattr(args, "shuffle_seed", None)
     if shuffle_seed is None:
@@ -265,7 +265,7 @@ def train_transformer_ddp(local_rank, args, cfg_dc):
     tokenizer = Tokenizer.from_files(
         str(args.tokenizer_vocab_path),
         str(args.tokenizer_merges_path),
-        special_tokens=list(getattr(args, "tokenizer_special_tokens", ())),
+        str(args.tokenizer_special_tokens_path),
     )
     shuffle_seed = getattr(args, "shuffle_seed", None)
     if shuffle_seed is None:

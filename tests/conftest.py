@@ -92,7 +92,7 @@ def toy_training_bundle(device) -> TrainingBundle:
     tokenizer_cfg = TokenizerConfig(
         merges_path=Path("tests/data/tokenizer/merges.txt"),
         vocab_path=Path("tests/data/tokenizer/vocab.json"),
-        special_tokens=["<|endoftext|>", "<|mask|>"],
+        special_tokens_path=Path("tests/data/tokenizer/special_tokens.json"),
     )
     data_cfg = DataConfig(
         runs_path=Path("./runs"),

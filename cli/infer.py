@@ -23,7 +23,7 @@ def main():
         # tokenizer
         merges_path=str(cfg_dc.tokenizer.merges_path),
         vocab_path=str(cfg_dc.tokenizer.vocab_path),
-        special_tokens=list(cfg_dc.tokenizer.special_tokens),
+        special_tokens_path=str(cfg_dc.tokenizer.special_tokens_path),
         # model
         vocab_size=cfg_dc.model.vocab_size,
         context_length=cfg_dc.model.context_length,

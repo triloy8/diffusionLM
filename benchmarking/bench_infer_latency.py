@@ -76,7 +76,7 @@ def main():
         tokenizer = Tokenizer.from_files(
             vocab_filepath=str(cfg.tokenizer.vocab_path),
             merges_filepath=str(cfg.tokenizer.merges_path),
-            special_tokens=cfg.tokenizer.special_tokens,
+            special_tokens_path=str(cfg.tokenizer.special_tokens_path),
         )
         prompts: List[str] = [cfg.inference.prompt]
         ids: List[List[int]] = [tokenizer.encode(prompt) for prompt in prompts]

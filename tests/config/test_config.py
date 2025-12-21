@@ -32,8 +32,10 @@ def test_train_config_happy_and_validation(tmp_path: Path):
     # Create dummy tokenizer files
     vocab = tmp_path / "vocab.json"
     merges = tmp_path / "merges.txt"
+    special_tokens = tmp_path / "special_tokens.json"
     vocab.write_text("{}")
     merges.write_text("")
+    special_tokens.write_text(json.dumps({"<|endoftext|>": 31, "<|mask|>": 32}))
 
     cfg_path = tmp_path / "train.toml"
     write(cfg_path, f"""
@@ -83,7 +85,7 @@ def test_train_config_happy_and_validation(tmp_path: Path):
     [data.tokenizer]
     vocab_path = "{vocab.as_posix()}"
     merges_path = "{merges.as_posix()}"
-    special_tokens = ["<|endoftext|>", "<|mask|>"]
+    special_tokens_path = "{special_tokens.as_posix()}"
     """)
 
     cfg = load_train_config(cfg_path)
@@ -109,9 +111,11 @@ def test_train_config_happy_and_validation(tmp_path: Path):
 def test_infer_config_happy_and_errors(tmp_path: Path):
     merges = tmp_path / "merges.txt"
     vocab = tmp_path / "vocab.json"
+    special_tokens = tmp_path / "special_tokens.json"
     ckpt = tmp_path / "model.ckpt"
     merges.write_text("")
     vocab.write_text("{}")
+    special_tokens.write_text(json.dumps({"<|eot|>": 31}))
     ckpt.write_bytes(b"\0\1")
 
     cfg_path = tmp_path / "infer.toml"
@@ -119,7 +123,7 @@ def test_infer_config_happy_and_errors(tmp_path: Path):
     [tokenizer]
     merges_path = "{merges.as_posix()}"
     vocab_path = "{vocab.as_posix()}"
-    special_tokens = ["<|eot|>"]
+    special_tokens_path = "{special_tokens.as_posix()}"
 
     [model]
     vocab_size = 32
@@ -192,7 +196,7 @@ def test_make_data_and_train_tokenizer_loaders(tmp_path: Path):
     [tokenizer]
     merges_path = "{merges.as_posix()}"
     vocab_path = "{vocab.as_posix()}"
-    special_tokens = []
+    special_tokens_path = "{special_tokens.as_posix()}"
     """)
     cfg_mk = load_make_data_config(make_cfg)
     assert cfg_mk.input.input_filename.exists()
@@ -279,6 +283,7 @@ def _write_bytes(path: Path, data: bytes = b"") -> str:
 def _patch_tokenizer(tbl: dict, tmp_path: Path) -> None:
     tbl["vocab_path"] = _write_text(tmp_path / "vocab.json", "{}")
     tbl["merges_path"] = _write_text(tmp_path / "merges.txt", "")
+    tbl["special_tokens_path"] = _write_text(tmp_path / "special_tokens.json", "{}")
 
 
 def _patch_train_like(cfg: dict, tmp_path: Path) -> dict:

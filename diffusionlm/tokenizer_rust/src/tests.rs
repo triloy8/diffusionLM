@@ -15,6 +15,7 @@ fn build_test_tokenizer() -> Tokenizer {
     let tmp_dir = tempdir().expect("failed to create tempdir for tokenizer fixtures");
     let vocab_path = tmp_dir.path().join("vocab.json");
     let merges_path = tmp_dir.path().join("merges.txt");
+    let special_tokens_path = tmp_dir.path().join("special_tokens.json");
 
     let enc = gpt2_bytes_to_unicode();
 
@@ -28,8 +29,19 @@ fn build_test_tokenizer() -> Tokenizer {
     let vocab_serialized = serde_json::to_string(&vocab_json).expect("failed to serialize vocab json");
     fs::write(&vocab_path, vocab_serialized).expect("failed to write vocab json");
     fs::write(&merges_path, "a b\n").expect("failed to write merges file");
+    let special_tokens_json = json!({
+        "<|eot|>": 4
+    });
+    let special_tokens_serialized =
+        serde_json::to_string(&special_tokens_json).expect("failed to serialize special tokens json");
+    fs::write(&special_tokens_path, special_tokens_serialized)
+        .expect("failed to write special tokens file");
 
-    Tokenizer::from_files(&vocab_path, &merges_path, vec!["<|eot|>".to_string()])
+    Tokenizer::from_files(
+        &vocab_path,
+        &merges_path,
+        &special_tokens_path,
+    )
         .expect("failed to build tokenizer fixture")
 }
 

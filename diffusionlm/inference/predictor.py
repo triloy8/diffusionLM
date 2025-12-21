@@ -10,7 +10,9 @@ from logger import Logger
 
 def infer_transformer(args, *, logger: Optional[Logger] = None, artifact_path: Optional[str] = None):
     tokenizer = Tokenizer.from_files(
-        vocab_filepath=args.vocab_path, merges_filepath=args.merges_path, special_tokens=args.special_tokens
+        vocab_filepath=args.vocab_path,
+        merges_filepath=args.merges_path,
+        special_tokens_path=args.special_tokens_path,
     )
     prompt_text = args.prompt
     ids = [tokenizer.encode(prompt_text)]

@@ -90,10 +90,16 @@ def test_tokenizer_from_files_roundtrip(tmp_path):
 
     vocab_path = tmp_path / "vocab.json"
     merges_path = tmp_path / "merges.txt"
+    special_tokens_path = tmp_path / "special_tokens.json"
     vocab_path.write_text(__import__("json").dumps(vocab_json))
     merges_path.write_text(merges_txt)
+    special_tokens_path.write_text(__import__("json").dumps({"<|eot|>": 4}))
 
-    tok = Tokenizer.from_files(str(vocab_path), str(merges_path), special_tokens=["<|eot|>"])
+    tok = Tokenizer.from_files(
+        str(vocab_path),
+        str(merges_path),
+        str(special_tokens_path),
+    )
     text = "a ab b"
     ids = tok.encode(text)
     out = tok.decode(ids)

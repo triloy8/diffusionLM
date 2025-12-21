@@ -22,14 +22,13 @@ impl PyTokenizer {
 #[pymethods]
 impl PyTokenizer {
     #[staticmethod]
-    #[pyo3(signature = (vocab_filepath, merges_filepath, special_tokens=None))]
+    #[pyo3(signature = (vocab_filepath, merges_filepath, special_tokens_path))]
     pub fn from_files(
         vocab_filepath: &str,
         merges_filepath: &str,
-        special_tokens: Option<Vec<String>>,
+        special_tokens_path: &str,
     ) -> PyResult<Self> {
-        let specials = special_tokens.unwrap_or_default();
-        let inner = tokenizer::Tokenizer::from_files(vocab_filepath, merges_filepath, specials)?;
+        let inner = tokenizer::Tokenizer::from_files(vocab_filepath, merges_filepath, special_tokens_path)?;
         Ok(Self::new(inner))
     }
 

@@ -64,7 +64,7 @@ def main():
         text_field=cfg_dc.data.text_field,
         tokenizer_vocab_path=cfg_dc.data.tokenizer.vocab_path,
         tokenizer_merges_path=cfg_dc.data.tokenizer.merges_path,
-        tokenizer_special_tokens=tuple(cfg_dc.data.tokenizer.special_tokens),
+        tokenizer_special_tokens_path=str(cfg_dc.data.tokenizer.special_tokens_path),
         shuffle_buffer_size=cfg_dc.data.shuffle_buffer_size,
         shuffle_seed=cfg_dc.data.shuffle_seed,
         rng_seed=cfg_dc.training.seed,

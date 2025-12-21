@@ -30,10 +30,12 @@ class Tokenizer:
         self.special_tokens = special_tokens or []
     
     @classmethod
-    def from_files(cls, 
-                   vocab_filepath: str, 
-                   merges_filepath: str, 
-                   special_tokens=None):
+    def from_files(
+        cls,
+        vocab_filepath: str,
+        merges_filepath: str,
+        special_tokens_path: str,
+    ):
 
         # vocab w/ special tokens
         with open(vocab_filepath) as vocab_f:
@@ -42,11 +44,13 @@ class Tokenizer:
             gpt2_vocab_index: bytes([cls.gpt2_byte_decoder[token] for token in gpt2_vocab_item])
             for gpt2_vocab_item, gpt2_vocab_index in gpt2_vocab.items()
         }
-        if special_tokens:
-            for special_token in special_tokens:
-                byte_encoded_special_token = special_token.encode("utf-8")
-                if byte_encoded_special_token not in set(vocab.values()):
-                    vocab[len(vocab)] = byte_encoded_special_token
+        gpt2_special_tokens = {}
+        with open(special_tokens_path, encoding="utf-8") as special_tokens_f:
+            gpt2_special_tokens = json.load(special_tokens_f)
+        for special_token in gpt2_special_tokens.keys():
+            byte_encoded_special_token = special_token.encode("utf-8")
+            if byte_encoded_special_token not in set(vocab.values()):
+                vocab[len(vocab)] = byte_encoded_special_token
 
         # merges
         gpt2_bpe_merges = []
@@ -63,7 +67,7 @@ class Tokenizer:
             for merge_token_1, merge_token_2 in gpt2_bpe_merges
         ]
 
-        return cls(vocab, merges, special_tokens)
+        return cls(vocab, merges, list(gpt2_special_tokens.keys()))
 
     def encode(self, 
                text: str) -> list[int]:
@@ -80,8 +84,8 @@ class Tokenizer:
         for part in parts:
             if part in self.special_tokens:
                 pretoken_list.append(part)
-            elif part in "":
-                continue
+            elif not part:
+              continue
             else:
                 pretoken_list.extend(m.group(0) for m in re.finditer(PAT, part))
 

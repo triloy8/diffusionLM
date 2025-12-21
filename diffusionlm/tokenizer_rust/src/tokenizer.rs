@@ -44,7 +44,11 @@ pub struct Tokenizer{
 // #[pymethods]
 impl Tokenizer {
     // #[staticmethod]
-    pub fn from_files<P: AsRef<Path>>(vocab_filepath: P, merges_filepath: P, special_tokens: Vec<String>) ->  Result<Tokenizer> {
+    pub fn from_files<P: AsRef<Path>>(
+        vocab_filepath: P,
+        merges_filepath: P,
+        special_tokens_path: P,
+    ) -> Result<Tokenizer> {
         // gpt2 unicode encoder/decoder
         let gpt2_encoder: HashMap<u8, char> = gpt2_bytes_to_unicode();
         let gpt2_decoder: HashMap<char, u8> = gpt2_encoder.iter().map(|(&id, &ch)| (ch, id)).collect();
@@ -52,8 +56,17 @@ impl Tokenizer {
         // vocab
         let raw_gpt2_vocab = std::fs::read_to_string(vocab_filepath)?;
         let mut gpt2_vocab: HashMap<String, usize> = serde_json::from_str::<HashMap<String, usize>>(&raw_gpt2_vocab)?;
-        for special_token in &special_tokens {
-            gpt2_vocab.insert(special_token.clone(), gpt2_vocab.values().len());
+        let mut special_tokens: Vec<String> = Vec::new();
+        let raw_special_tokens = std::fs::read_to_string(special_tokens_path)?;
+        let special_tokens_map: HashMap<String, usize> =
+            serde_json::from_str::<HashMap<String, usize>>(&raw_special_tokens)?;
+        special_tokens = Vec::with_capacity(special_tokens_map.len());
+        for (special_token, token_id) in special_tokens_map {
+            special_tokens.push(special_token.clone());
+            gpt2_vocab.insert(special_token, token_id);
+        }
+        if !special_tokens.is_empty() {
+            special_tokens.sort_by(|a, b| b.len().cmp(&a.len()));
         }
 
         let mut vocab_encoder: HashMap<String, usize> = HashMap::new();

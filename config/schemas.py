@@ -210,7 +210,7 @@ class TrainingConfig(_BaseConfig):
 class TokenizerConfig(_BaseConfig):
     merges_path: Path
     vocab_path: Path
-    special_tokens: List[str] = Field(default_factory=list)
+    special_tokens_path: Path
 
     @model_validator(mode="after")
     def _validate_tokenizer(self):
@@ -218,6 +218,8 @@ class TokenizerConfig(_BaseConfig):
             raise FileNotFoundError(f"vocab_path not found: {self.vocab_path}")
         if not self.merges_path.exists():
             raise FileNotFoundError(f"merges_path not found: {self.merges_path}")
+        if not self.special_tokens_path.exists():
+            raise FileNotFoundError(f"special_tokens_path not found: {self.special_tokens_path}")
         return self
 
 

@@ -22,7 +22,7 @@ def main():
     tokenizer = Tokenizer.from_files(
         vocab_filepath=str(cfg_dc.tokenizer.vocab_path),
         merges_filepath=str(cfg_dc.tokenizer.merges_path),
-        special_tokens=cfg_dc.tokenizer.special_tokens,
+        special_tokens_path=str(cfg_dc.tokenizer.special_tokens_path),
     )
 
     logger = ConsoleLogger()
