@@ -47,10 +47,9 @@ class Tokenizer:
         gpt2_special_tokens = {}
         with open(special_tokens_path, encoding="utf-8") as special_tokens_f:
             gpt2_special_tokens = json.load(special_tokens_f)
-        for special_token in gpt2_special_tokens.keys():
+        for special_token, token_id in gpt2_special_tokens.items():
             byte_encoded_special_token = special_token.encode("utf-8")
-            if byte_encoded_special_token not in set(vocab.values()):
-                vocab[len(vocab)] = byte_encoded_special_token
+            vocab[int(token_id)] = byte_encoded_special_token
 
         # merges
         gpt2_bpe_merges = []
