@@ -93,6 +93,16 @@ def train_loop(
         # forward
         train_logits = model(train_inputs)
         train_loss = compute_loss(train_logits, train_batch)
+        if logger is not None and device.startswith("cuda") and torch.cuda.is_available():
+            logger.log(
+                {
+                    "phase": "train",
+                    "metrics.cuda.mem_allocated_mb/fwd": float(torch.cuda.memory_allocated() / 1e6),
+                    "metrics.cuda.mem_reserved_mb/fwd": float(torch.cuda.memory_reserved() / 1e6),
+                    "metrics.cuda.max_mem_allocated_mb/fwd": float(torch.cuda.max_memory_allocated() / 1e6),
+                },
+                step=train_iteration,
+            )
         # Optionally reduce metrics across ranks before logging
         tloss_val = float(train_loss.item())
         if reduce_metric is not None:
@@ -112,6 +122,7 @@ def train_loop(
                     "phase": "train",
                     "metrics.tokens_batch": int(token_count),
                     "metrics.tokens_seen": int(tokens_seen),
+                    "metrics.inputs_shape": list(train_inputs.shape),
                 },
                 step=train_iteration,
             )
@@ -159,6 +170,16 @@ def train_loop(
         # backward
         optimizer.zero_grad()
         train_loss.backward()
+        if logger is not None and device.startswith("cuda") and torch.cuda.is_available():
+            logger.log(
+                {
+                    "phase": "train",
+                    "metrics.cuda.mem_allocated_mb/bwd": float(torch.cuda.memory_allocated() / 1e6),
+                    "metrics.cuda.mem_reserved_mb/bwd": float(torch.cuda.memory_reserved() / 1e6),
+                    "metrics.cuda.max_mem_allocated_mb/bwd": float(torch.cuda.max_memory_allocated() / 1e6),
+                },
+                step=train_iteration,
+            )
         grads = [p.grad for p in model.parameters() if p.grad is not None]
         l2_norm = torch.norm(torch.stack([g.detach().norm(2) for g in grads]))
         l2_val = float(l2_norm.item())
@@ -187,6 +208,18 @@ def train_loop(
                     "metrics.weight_norms/min": float(np.min(vals)),
                     **{f"metrics.weight_norms/{k}": v for k, v in norms.items()},
                 }, step=train_iteration)
+                if device.startswith("cuda") and torch.cuda.is_available():
+                    logger.log(
+                        {
+                            "phase": "train",
+                            "metrics.cuda.mem_allocated_mb/weight_norms": float(torch.cuda.memory_allocated() / 1e6),
+                            "metrics.cuda.mem_reserved_mb/weight_norms": float(torch.cuda.memory_reserved() / 1e6),
+                            "metrics.cuda.max_mem_allocated_mb/weight_norms": float(
+                                torch.cuda.max_memory_allocated() / 1e6
+                            ),
+                        },
+                        step=train_iteration,
+                    )
 
         # schedule
         logged_lr = None
