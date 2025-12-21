@@ -170,20 +170,7 @@ def train_loop(
 
         # backward
         optimizer.zero_grad()
-        try:
-            train_loss.backward()
-        except RuntimeError as exc:
-            if logger is not None:
-                logger.log(
-                    {
-                        "phase": "train",
-                        "event": "backward_failed",
-                        "metrics.failed_step": int(train_iteration),
-                        "metrics.failed_message": str(exc)[:200],
-                    },
-                    step=train_iteration,
-                )
-            raise
+        train_loss.backward()
         if logger is not None and device.startswith("cuda") and torch.cuda.is_available():
             logger.log(
                 {

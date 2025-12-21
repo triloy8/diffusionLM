@@ -202,8 +202,8 @@ def train_transformer(args, *, logger: Logger, run_name: str):
         batch_generator=torch_generator,
         logger=logger,
         activation_norms=activation_norms,
-        log_activation_norms=True,
-        log_weight_norms=True,
+        log_activation_norms=False,
+        log_weight_norms=False,
         skip_validation=bool(getattr(cfg, "skip_validation", False)),
     )
 
