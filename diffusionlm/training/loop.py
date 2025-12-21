@@ -122,7 +122,8 @@ def train_loop(
                     "phase": "train",
                     "metrics.tokens_batch": int(token_count),
                     "metrics.tokens_seen": int(tokens_seen),
-                    "metrics.inputs_shape": list(train_inputs.shape),
+                    "metrics.inputs_shape/batch": int(train_inputs.shape[0]),
+                    "metrics.inputs_shape/seq_len": int(train_inputs.shape[1]),
                 },
                 step=train_iteration,
             )
@@ -169,7 +170,20 @@ def train_loop(
 
         # backward
         optimizer.zero_grad()
-        train_loss.backward()
+        try:
+            train_loss.backward()
+        except RuntimeError as exc:
+            if logger is not None:
+                logger.log(
+                    {
+                        "phase": "train",
+                        "event": "backward_failed",
+                        "metrics.failed_step": int(train_iteration),
+                        "metrics.failed_message": str(exc)[:200],
+                    },
+                    step=train_iteration,
+                )
+            raise
         if logger is not None and device.startswith("cuda") and torch.cuda.is_available():
             logger.log(
                 {
