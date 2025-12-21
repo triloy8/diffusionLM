@@ -59,5 +59,3 @@ class TransformerLM(nn.Module):
             with nvtx.range("model/lm_head"):
                 logits = self.lm_head(normed_output_seq)
             return logits
-
-    # Note: Decoding is done via `diffusionlm.inference.generate.generate`.
