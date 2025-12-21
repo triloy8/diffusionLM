@@ -115,6 +115,16 @@ def train_loop(
                 },
                 step=train_iteration,
             )
+            if device.startswith("cuda") and torch.cuda.is_available():
+                logger.log(
+                    {
+                        "phase": "train",
+                        "metrics.cuda.mem_allocated_mb": float(torch.cuda.memory_allocated() / 1e6),
+                        "metrics.cuda.mem_reserved_mb": float(torch.cuda.memory_reserved() / 1e6),
+                        "metrics.cuda.max_mem_allocated_mb": float(torch.cuda.max_memory_allocated() / 1e6),
+                    },
+                    step=train_iteration,
+                )
             if isinstance(batch_metadata, dict):
                 if "mask_ratio" in batch_metadata:
                     logger.log(
