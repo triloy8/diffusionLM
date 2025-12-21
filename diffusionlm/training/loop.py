@@ -76,6 +76,7 @@ def train_loop(
         raise ValueError("Prepared batch must expose `noisy_inputs` for model input.")
 
     train_iteration = start_iteration
+    tokens_seen = 0
     while True:
         model.train()
         raw_train_batch = get_batch(
@@ -99,6 +100,21 @@ def train_loop(
         if logger is not None:
             logger.log({"phase": "train", "metrics.train_loss": tloss_val}, step=train_iteration)
             batch_metadata = getattr(train_batch, "metadata", None)
+            if isinstance(batch_metadata, dict):
+                token_count = batch_metadata.get("token_count")
+            else:
+                token_count = None
+            if token_count is None:
+                token_count = int(train_inputs.numel())
+            tokens_seen += int(token_count)
+            logger.log(
+                {
+                    "phase": "train",
+                    "metrics.tokens_batch": int(token_count),
+                    "metrics.tokens_seen": int(tokens_seen),
+                },
+                step=train_iteration,
+            )
             if isinstance(batch_metadata, dict):
                 if "mask_ratio" in batch_metadata:
                     logger.log(
@@ -181,6 +197,7 @@ def train_loop(
             model.eval()
             val_iteration = 0
             running_val_loss = 0.0
+            val_tokens = 0
             while True:
                 with torch.no_grad():
                     raw_val_batch = get_batch(
@@ -195,6 +212,7 @@ def train_loop(
                     val_logits = model(val_inputs)
                     val_loss = compute_loss(val_logits, val_batch)
                     running_val_loss += float(val_loss.item())
+                    val_tokens += int(val_inputs.numel())
                 val_iteration += 1
                 if max_val_iteration is not None and val_iteration >= max_val_iteration:
                     break
@@ -203,7 +221,14 @@ def train_loop(
             if reduce_metric is not None:
                 vloss_val = float(reduce_metric(vloss_val))
             if logger is not None:
-                logger.log({"phase": "val", "metrics.val_loss": vloss_val}, step=train_iteration)
+                logger.log(
+                    {
+                        "phase": "val",
+                        "metrics.val_loss": vloss_val,
+                        "metrics.val_tokens": int(val_tokens),
+                    },
+                    step=train_iteration,
+                )
 
         # checkpoints
         if (

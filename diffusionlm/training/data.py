@@ -66,6 +66,7 @@ def get_batch(
         "random_truncation_applied": random_trunc_applied,
         "sequence_length": seq_len,
         "mask_ratio": float(mask.float().mean().detach().cpu().item()),
+        "token_count": int(clean_targets.numel()),
     }
 
     return DiffusionBatch(
