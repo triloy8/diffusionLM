@@ -67,12 +67,12 @@ grad_accum_steps = 2
 
 [data]
 runs_path = "./runs"
-dataset_name = "HuggingFaceFW/finewiki"
-dataset_config = "en"
+dataset_name = "karpathy/fineweb-edu-100b-shuffle"
+dataset_config = ""
 train_split = "train"
 val_split = "validation"
 text_field = "text"
-shuffle_buffer_size = 10000
+shuffle_buffer_size = 0
 shuffle_seed = 3407
 
 [data.tokenizer]
