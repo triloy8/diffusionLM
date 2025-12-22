@@ -1,4 +1,4 @@
-# Diffusion Language Model mini stack
+# Diffusion Language Model
 
 ## What Is This?
 
