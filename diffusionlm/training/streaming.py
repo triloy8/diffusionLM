@@ -2,11 +2,13 @@ from __future__ import annotations
 
 from collections import deque
 from typing import Deque, Iterable, Iterator, Optional
+import time
 
 from datasets import load_dataset
 import torch
 
 from diffusionlm.tokenizer.tokenizer import Tokenizer
+from logger import Logger
 
 
 class HFTokenIteratorFactory:
@@ -91,11 +93,22 @@ class HFTokenIteratorFactory:
 class StreamingBatcher:
     """Rolling token buffer that emits fixed-length sequences for batching."""
 
-    def __init__(self, iterator_factory: HFTokenIteratorFactory, *, device: str | torch.device) -> None:
+    def __init__(
+        self,
+        iterator_factory: HFTokenIteratorFactory,
+        *,
+        device: str | torch.device,
+        logger: Optional[Logger] = None,
+        stall_warn_s: float = 10.0,
+        stall_repeat_s: float = 30.0,
+    ) -> None:
         self.iterator_factory = iterator_factory
         self.device = torch.device(device)
         self._buffer: Deque[int] = deque()
         self._iterator: Iterator[int] = self.iterator_factory()
+        self._logger = logger
+        self._stall_warn_s = float(stall_warn_s)
+        self._stall_repeat_s = float(stall_repeat_s)
 
     def _next_token(self) -> int:
         while True:
@@ -105,8 +118,33 @@ class StreamingBatcher:
                 self._iterator = self.iterator_factory()
 
     def _ensure_tokens(self, count: int) -> None:
+        start = time.monotonic()
+        last_log = start
         while len(self._buffer) < count:
             self._buffer.append(self._next_token())
+            if self._logger is None:
+                continue
+            now = time.monotonic()
+            elapsed = now - start
+            if elapsed < self._stall_warn_s or (now - last_log) < self._stall_repeat_s:
+                continue
+            last_log = now
+            self._logger.log(
+                {
+                    "phase": "data",
+                    "event": "streaming_stall",
+                    "metrics.elapsed_s": float(elapsed),
+                    "metrics.buffer_len": int(len(self._buffer)),
+                    "metrics.tokens_needed": int(count),
+                    "metrics.shuffle_buffer_size": int(self.iterator_factory.shuffle_buffer_size),
+                    "metrics.epoch": int(self.iterator_factory._epoch),
+                    "metrics.rank": int(self.iterator_factory.rank),
+                    "metrics.world_size": int(self.iterator_factory.world_size),
+                    "data.dataset_name": str(self.iterator_factory.dataset_name),
+                    "data.dataset_config": str(self.iterator_factory.dataset_config or ""),
+                    "data.split": str(self.iterator_factory.split),
+                }
+            )
 
     def draw(self, batch_size: int, context_length: int) -> torch.Tensor:
         tokens_needed = batch_size * context_length

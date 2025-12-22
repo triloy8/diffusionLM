@@ -142,8 +142,8 @@ def train_transformer(args, *, logger: Logger, run_name: str):
         world_size=1,
         rank=0,
     )
-    train_batcher = StreamingBatcher(train_iterator_factory, device=str(cfg.device))
-    val_batcher = StreamingBatcher(val_iterator_factory, device=str(cfg.device))
+    train_batcher = StreamingBatcher(train_iterator_factory, device=str(cfg.device), logger=logger)
+    val_batcher = StreamingBatcher(val_iterator_factory, device=str(cfg.device), logger=logger)
 
     # activation norm utils
     activation_norms = {}
@@ -294,8 +294,8 @@ def train_transformer_ddp(local_rank, args, cfg_dc):
         world_size=cfg.world_size,
         rank=global_rank,
     )
-    train_batcher = StreamingBatcher(train_iterator_factory, device=str(cfg.device))
-    val_batcher = StreamingBatcher(val_iterator_factory, device=str(cfg.device))
+    train_batcher = StreamingBatcher(train_iterator_factory, device=str(cfg.device), logger=logger)
+    val_batcher = StreamingBatcher(val_iterator_factory, device=str(cfg.device), logger=logger)
 
     # activation norm utils
     activation_norms = {}
