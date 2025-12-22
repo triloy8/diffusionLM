@@ -28,6 +28,7 @@ def train_loop(
     max_train_iteration: int | None,
     max_val_iteration: int | None,
     val_freq_iteration: int,
+    grad_accum_steps: int = 1,
     # regularization
     grad_clip_max_l2_norm: float,
     # checkpointing
@@ -77,6 +78,9 @@ def train_loop(
 
     train_iteration = start_iteration
     tokens_seen = 0
+    accum_steps = max(1, int(grad_accum_steps))
+    accum_count = 0
+    current_lr = None
     while True:
         model.train()
         raw_train_batch = get_batch(
@@ -93,6 +97,7 @@ def train_loop(
         # forward
         train_logits = model(train_inputs)
         train_loss = compute_loss(train_logits, train_batch)
+        scaled_loss = train_loss / accum_steps
         if logger is not None and device.startswith("cuda") and torch.cuda.is_available():
             logger.log(
                 {
@@ -169,8 +174,9 @@ def train_loop(
             }, step=train_iteration)
 
         # backward
-        optimizer.zero_grad()
-        train_loss.backward()
+        if accum_count == 0:
+            optimizer.zero_grad()
+        scaled_loss.backward()
         if logger is not None and device.startswith("cuda") and torch.cuda.is_available():
             logger.log(
                 {
@@ -181,21 +187,24 @@ def train_loop(
                 },
                 step=train_iteration,
             )
-        grads = [p.grad for p in model.parameters() if p.grad is not None]
-        l2_norm = torch.norm(torch.stack([g.detach().norm(2) for g in grads]))
-        l2_val = float(l2_norm.item())
-        if reduce_metric is not None:
-            l2_val = float(reduce_metric(l2_val))
-        if logger is not None:
-            logger.log({"phase": "train", "metrics.grad_l2_norm": l2_val}, step=train_iteration)
-        # Optional DDP gradient synchronization before optimizer step
-        if sync_gradients is not None:
-            sync_gradients()
-        gradient_clipping(parameters=model.parameters(), max_l2_norm=grad_clip_max_l2_norm)
-        optimizer.step()
+        accum_count += 1
+        if accum_count >= accum_steps:
+            grads = [p.grad for p in model.parameters() if p.grad is not None]
+            l2_norm = torch.norm(torch.stack([g.detach().norm(2) for g in grads]))
+            l2_val = float(l2_norm.item())
+            if reduce_metric is not None:
+                l2_val = float(reduce_metric(l2_val))
+            if logger is not None:
+                logger.log({"phase": "train", "metrics.grad_l2_norm": l2_val}, step=train_iteration)
+            # Optional DDP gradient synchronization before optimizer step
+            if sync_gradients is not None:
+                sync_gradients()
+            gradient_clipping(parameters=model.parameters(), max_l2_norm=grad_clip_max_l2_norm)
+            optimizer.step()
+            accum_count = 0
 
         # weight norms
-        if logger is not None and log_weight_norms:
+        if logger is not None and log_weight_norms and accum_count == 0:
             norms = {}
             for name, param in model.named_parameters():
                 if param.requires_grad:
@@ -224,17 +233,19 @@ def train_loop(
 
         # schedule
         logged_lr = None
-        for param_group in optimizer.param_groups:
-            group_max_lr = float(param_group.get("max_lr", max_learning_rate))
-            group_min_lr = float(param_group.get("min_lr", min_learning_rate))
-            group_warmup = int(param_group.get("warmup_iters", warmup_iters))
-            group_cosine = int(param_group.get("cosine_cycle_iters", cosine_cycle_iters))
-            new_lr = lr_cosine_schedule(train_iteration, group_max_lr, group_min_lr, group_warmup, group_cosine)
-            param_group["lr"] = new_lr
-            if logged_lr is None:
-                logged_lr = float(new_lr)
-        if logger is not None and logged_lr is not None:
-            logger.log({"phase": "train", "metrics.lr": logged_lr}, step=train_iteration)
+        if accum_count == 0:
+            for param_group in optimizer.param_groups:
+                group_max_lr = float(param_group.get("max_lr", max_learning_rate))
+                group_min_lr = float(param_group.get("min_lr", min_learning_rate))
+                group_warmup = int(param_group.get("warmup_iters", warmup_iters))
+                group_cosine = int(param_group.get("cosine_cycle_iters", cosine_cycle_iters))
+                new_lr = lr_cosine_schedule(train_iteration, group_max_lr, group_min_lr, group_warmup, group_cosine)
+                param_group["lr"] = new_lr
+                if logged_lr is None:
+                    logged_lr = float(new_lr)
+                    current_lr = float(new_lr)
+            if logger is not None and logged_lr is not None:
+                logger.log({"phase": "train", "metrics.lr": logged_lr}, step=train_iteration)
 
         # validation
         if (not skip_validation) and train_iteration % val_freq_iteration == 0:
@@ -292,7 +303,13 @@ def train_loop(
                     pass
 
         if step_callback is not None:
-            step_callback(train_iteration, model, optimizer, tloss_val, float(new_lr))
+            step_callback(
+                train_iteration,
+                model,
+                optimizer,
+                tloss_val,
+                float(current_lr) if current_lr is not None else float("nan"),
+            )
 
         # termination
         if max_train_iteration is not None and train_iteration >= max_train_iteration:

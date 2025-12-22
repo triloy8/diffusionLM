@@ -196,12 +196,15 @@ class TrainingConfig(_BaseConfig):
     ckpting_save_iter: int
     seed: Optional[int] = None
     skip_validation: bool = False
+    grad_accum_steps: int = 1
 
     @model_validator(mode="after")
     def _validate_training(self):
         for attr in ("batch_size", "max_train_iteration", "max_val_iteration", "val_freq_iteration", "ckpting_save_iter"):
             if getattr(self, attr) <= 0:
                 raise ValueError(f"{attr} must be > 0")
+        if self.grad_accum_steps <= 0:
+            raise ValueError("grad_accum_steps must be > 0")
         if self.seed is not None and self.seed < 0:
             raise ValueError("seed must be >= 0 when provided")
         return self

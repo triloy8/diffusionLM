@@ -191,6 +191,7 @@ def train_transformer(args, *, logger: Logger, run_name: str):
         max_train_iteration=cfg.max_train_iteration,
         max_val_iteration=cfg.max_val_iteration,
         val_freq_iteration=cfg.val_freq_iteration,
+        grad_accum_steps=int(getattr(cfg, "grad_accum_steps", 1)),
         grad_clip_max_l2_norm=cfg.grad_clip_max_l2_norm,
         ckpting_save_iter=cfg.ckpting_save_iter,
         ckpting_save_folder=ckpting_save_folder,
@@ -348,6 +349,7 @@ def train_transformer_ddp(local_rank, args, cfg_dc):
         max_train_iteration=cfg.max_train_iteration,
         max_val_iteration=cfg.max_val_iteration,
         val_freq_iteration=cfg.val_freq_iteration,
+        grad_accum_steps=int(getattr(cfg, "grad_accum_steps", 1)),
         grad_clip_max_l2_norm=cfg.grad_clip_max_l2_norm,
         ckpting_save_iter=cfg.ckpting_save_iter,
         ckpting_save_folder=ckpting_save_folder,
@@ -402,6 +404,7 @@ def build_run_config(cfg, cfg_dc):
         "device": cfg.device,
         "dtype": cfg.dtype,
         "ckpting_save_iter": cfg.ckpting_save_iter,
+        "grad_accum_steps": int(getattr(cfg, "grad_accum_steps", 1)),
     }
 
     seed_value = getattr(cfg, "rng_seed", getattr(cfg, "seed", None))

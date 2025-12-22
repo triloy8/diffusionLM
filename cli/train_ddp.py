@@ -57,6 +57,7 @@ def main():
         max_val_iteration=cfg_dc.training.max_val_iteration,
         val_freq_iteration=cfg_dc.training.val_freq_iteration,
         skip_validation=cfg_dc.training.skip_validation,
+        grad_accum_steps=cfg_dc.training.grad_accum_steps,
         # data/paths
         runs_path=cfg_dc.data.runs_path,
         dataset_name=cfg_dc.data.dataset_name,

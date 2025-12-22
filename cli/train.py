@@ -55,6 +55,7 @@ def main():
         max_val_iteration=cfg_dc.training.max_val_iteration,
         val_freq_iteration=cfg_dc.training.val_freq_iteration,
         skip_validation=cfg_dc.training.skip_validation,
+        grad_accum_steps=cfg_dc.training.grad_accum_steps,
         # data/paths
         runs_path=cfg_dc.data.runs_path,
         dataset_name=cfg_dc.data.dataset_name,
@@ -100,6 +101,7 @@ def main():
         "dtype": ns.dtype,
         "ckpting_save_iter": ns.ckpting_save_iter,
         "skip_validation": bool(ns.skip_validation),
+        "grad_accum_steps": int(getattr(ns, "grad_accum_steps", 1)),
     }
     if getattr(ns, "rng_seed", None) is not None:
         run_config["rng_seed"] = ns.rng_seed
