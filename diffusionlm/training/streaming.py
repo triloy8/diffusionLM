@@ -131,18 +131,18 @@ class StreamingBatcher:
             last_log = now
             self._logger.log(
                 {
-                    "phase": "data",
-                    "event": "streaming_stall",
-                    "metrics.elapsed_s": float(elapsed),
-                    "metrics.buffer_len": int(len(self._buffer)),
-                    "metrics.tokens_needed": int(count),
-                    "metrics.shuffle_buffer_size": int(self.iterator_factory.shuffle_buffer_size),
-                    "metrics.epoch": int(self.iterator_factory._epoch),
-                    "metrics.rank": int(self.iterator_factory.rank),
-                    "metrics.world_size": int(self.iterator_factory.world_size),
-                    "data.dataset_name": str(self.iterator_factory.dataset_name),
-                    "data.dataset_config": str(self.iterator_factory.dataset_config or ""),
-                    "data.split": str(self.iterator_factory.split),
+                    "metrics.streaming_stall/elapsed_s": float(elapsed),
+                    "metrics.streaming_stall/buffer_len": int(len(self._buffer)),
+                    "metrics.streaming_stall/tokens_needed": int(count),
+                    "metrics.streaming_stall/shuffle_buffer_size": int(
+                        self.iterator_factory.shuffle_buffer_size
+                    ),
+                    "metrics.streaming_stall/epoch": int(self.iterator_factory._epoch),
+                    "metrics.streaming_stall/rank": int(self.iterator_factory.rank),
+                    "metrics.streaming_stall/world_size": int(self.iterator_factory.world_size),
+                    "metrics.streaming_stall/dataset_name": str(self.iterator_factory.dataset_name),
+                    "metrics.streaming_stall/dataset_config": str(self.iterator_factory.dataset_config or ""),
+                    "metrics.streaming_stall/split": str(self.iterator_factory.split),
                 }
             )
 
