@@ -30,8 +30,8 @@ kill-train:
 
 fetch run_dir:
 	mkdir -p runs
-	echo "Fetching run directory ${run_dir} from {{prime_host}}"
-	scp -r {{prime_host}}:{{remote_root}}/runs/${run_dir} runs/
+	echo "Fetching run directory {{run_dir}} from {{prime_host}}"
+	scp -r {{prime_host}}:{{remote_root}}/runs/{{run_dir}} runs/
 
 list-runs:
 	ssh {{prime_host}} "ls -1 {{remote_root}}/runs"
