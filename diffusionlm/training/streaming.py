@@ -5,6 +5,7 @@ from typing import Deque, Iterable, Iterator, Optional
 import time
 
 from datasets import load_dataset
+from datasets.utils import logging as hf_logging
 import torch
 
 from diffusionlm.tokenizer.tokenizer import Tokenizer
@@ -27,6 +28,10 @@ class HFTokenIteratorFactory:
         world_size: int = 1,
         rank: int = 0,
         pad_newline: bool = True,
+        logger: Optional[Logger] = None,
+        hf_debug_logging: bool = False,
+        slow_row_s: float = 10.0,
+        slow_encode_s: float = 10.0,
     ) -> None:
         self.dataset_name = dataset_name
         self.dataset_config = dataset_config
@@ -39,6 +44,11 @@ class HFTokenIteratorFactory:
         self.rank = max(0, min(rank, self.world_size - 1))
         self.pad_newline = pad_newline
         self._epoch = 0
+        self._logger = logger
+        self._slow_row_s = float(slow_row_s)
+        self._slow_encode_s = float(slow_encode_s)
+        if hf_debug_logging:
+            hf_logging.set_verbosity_debug()
 
     def _load_dataset(self):
         if self.dataset_config:
@@ -72,9 +82,25 @@ class HFTokenIteratorFactory:
     def __call__(self) -> Iterator[int]:
         dataset = self._load_dataset()
         dataset = self._apply_shuffle(dataset)
-        rows = self._apply_shard(dataset)
+        rows = iter(self._apply_shard(dataset))
         self._epoch += 1
-        for row in rows:
+        while True:
+            row_fetch_start = time.monotonic()
+            try:
+                row = next(rows)
+            except StopIteration:
+                break
+            row_fetch_elapsed = time.monotonic() - row_fetch_start
+            if self._logger is not None and row_fetch_elapsed >= self._slow_row_s:
+                self._logger.log(
+                    {
+                        "metrics.streaming_row_fetch_s": float(row_fetch_elapsed),
+                        "metrics.streaming_row_fetch/epoch": int(self._epoch),
+                        "metrics.streaming_row_fetch/rank": int(self.rank),
+                        "metrics.streaming_row_fetch/world_size": int(self.world_size),
+                    }
+                )
+
             if row is None:
                 continue
             text_value = row.get(self.text_field) if isinstance(row, dict) else None
@@ -85,7 +111,18 @@ class HFTokenIteratorFactory:
             normalized = text_value
             if self.pad_newline and not normalized.endswith("\n"):
                 normalized = f"{normalized}\n"
+            encode_start = time.monotonic()
             token_ids = self.tokenizer.encode(normalized)
+            encode_elapsed = time.monotonic() - encode_start
+            if self._logger is not None and encode_elapsed >= self._slow_encode_s:
+                self._logger.log(
+                    {
+                        "metrics.streaming_encode_s": float(encode_elapsed),
+                        "metrics.streaming_encode/epoch": int(self._epoch),
+                        "metrics.streaming_encode/rank": int(self.rank),
+                        "metrics.streaming_encode/world_size": int(self.world_size),
+                    }
+                )
             for token_id in token_ids:
                 yield int(token_id)
 

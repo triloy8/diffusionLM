@@ -130,6 +130,8 @@ def train_transformer(args, *, logger: Logger, run_name: str):
         shuffle_seed=(int(shuffle_seed) if shuffle_seed is not None else None),
         world_size=1,
         rank=0,
+        logger=logger,
+        hf_debug_logging=True,
     )
     val_iterator_factory = HFTokenIteratorFactory(
         dataset_name=str(args.dataset_name),
@@ -141,6 +143,8 @@ def train_transformer(args, *, logger: Logger, run_name: str):
         shuffle_seed=None,
         world_size=1,
         rank=0,
+        logger=logger,
+        hf_debug_logging=True,
     )
     train_batcher = StreamingBatcher(train_iterator_factory, device=str(cfg.device), logger=logger)
     val_batcher = StreamingBatcher(val_iterator_factory, device=str(cfg.device), logger=logger)
@@ -282,6 +286,8 @@ def train_transformer_ddp(local_rank, args, cfg_dc):
         shuffle_seed=per_rank_seed,
         world_size=cfg.world_size,
         rank=global_rank,
+        logger=logger,
+        hf_debug_logging=True,
     )
     val_iterator_factory = HFTokenIteratorFactory(
         dataset_name=str(args.dataset_name),
@@ -293,6 +299,8 @@ def train_transformer_ddp(local_rank, args, cfg_dc):
         shuffle_seed=None,
         world_size=cfg.world_size,
         rank=global_rank,
+        logger=logger,
+        hf_debug_logging=True,
     )
     train_batcher = StreamingBatcher(train_iterator_factory, device=str(cfg.device), logger=logger)
     val_batcher = StreamingBatcher(val_iterator_factory, device=str(cfg.device), logger=logger)
