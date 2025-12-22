@@ -94,7 +94,7 @@ class HFTokenIteratorFactory:
             if self._logger is not None and row_fetch_elapsed >= self._slow_row_s:
                 self._logger.log(
                     {
-                        "metrics.streaming_row_fetch_s": float(row_fetch_elapsed),
+                        "metrics.streaming_row_fetch/elapsed_s": float(row_fetch_elapsed),
                         "metrics.streaming_row_fetch/epoch": int(self._epoch),
                         "metrics.streaming_row_fetch/rank": int(self.rank),
                         "metrics.streaming_row_fetch/world_size": int(self.world_size),
@@ -117,7 +117,7 @@ class HFTokenIteratorFactory:
             if self._logger is not None and encode_elapsed >= self._slow_encode_s:
                 self._logger.log(
                     {
-                        "metrics.streaming_encode_s": float(encode_elapsed),
+                        "metrics.streaming_encode/elapsed_s": float(encode_elapsed),
                         "metrics.streaming_encode/epoch": int(self._epoch),
                         "metrics.streaming_encode/rank": int(self.rank),
                         "metrics.streaming_encode/world_size": int(self.world_size),
