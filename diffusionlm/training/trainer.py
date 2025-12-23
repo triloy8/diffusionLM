@@ -464,17 +464,14 @@ def init_logging(rank: int, cfg, cfg_dc):
         run_name = info.get("run_name") or datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
 
     # ensure all ranks agree on run_name
-    # run_name = broadcast_string(run_name, src=0)
+    run_name = broadcast_string(run_name, src=0)
 
     # proxy so only rank 0 logs
     rz_logger: Logger = RankZeroLogger(rank, real_logger)
 
     # compute ckpt dir, create only on rank 0
-    if rank == 0:
-        ckpt_dir = cfg.runs_path / (run_name or datetime.now().strftime("%Y-%m-%d_%H-%M-%S"))
-        if not os.path.exists(ckpt_dir):
-            os.makedirs(ckpt_dir)
-    else:
-        ckpt_dir = cfg.runs_path
+    ckpt_dir = cfg.runs_path / run_name
+    if rank == 0 and not os.path.exists(ckpt_dir):
+        os.makedirs(ckpt_dir)
 
-    return rz_logger, run_name or "", ckpt_dir
+    return rz_logger, run_name, ckpt_dir
