@@ -18,11 +18,11 @@ noise_epsilon = 0.001
 random_trunc_prob = 0
 
 [checkpoint]
-ckpt_path = "./runs/2025-12-22_12-34-35/1000.ckpt"
+ckpt_path = "./runs/2025-12-22_19-01-59/6000.ckpt"
 
 [inference]
-prompt = "Oh wow, it's Judy!"
-steps = 64
+prompt = "Shipment has stalled in the country "
+steps = 256
 total_length = 512
 block_length = 64
 temperature = 0.01
