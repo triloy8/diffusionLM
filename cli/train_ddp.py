@@ -80,6 +80,7 @@ def main():
         master_addr=cfg_dc.ddp.master_addr,
         master_port=cfg_dc.ddp.master_port,
         bucket_size_mb=cfg_dc.ddp.bucket_size_mb,
+        nccl_p2p_disable=cfg_dc.ddp.nccl_p2p_disable,
     )
 
     nprocs = max(1, int(cfg_dc.ddp.num_gpus_per_node))

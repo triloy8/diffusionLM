@@ -97,3 +97,4 @@ node_rank = 0                  # index of this node
 master_addr = "127.0.0.1"      # rank 0 hostname/IP
 master_port = "29500"
 bucket_size_mb = 200           # 0 = single bucket
+nccl_p2p_disable = true

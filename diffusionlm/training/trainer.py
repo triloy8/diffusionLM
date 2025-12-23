@@ -224,6 +224,9 @@ def train_transformer_ddp(local_rank, args, cfg_dc):
     master_addr = getattr(cfg, "master_addr", "localhost")
     master_port = getattr(cfg, "master_port", "29500")
 
+    if getattr(cfg, "nccl_p2p_disable", None) is not None:
+        os.environ["NCCL_P2P_DISABLE"] = "1" if cfg.nccl_p2p_disable else "0"
+
     world_size = max(1, num_nodes * num_gpus_per_node)
     global_rank = node_rank * num_gpus_per_node + local_rank_int
     setattr(cfg, "world_size", world_size)

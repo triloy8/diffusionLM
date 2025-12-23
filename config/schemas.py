@@ -276,6 +276,7 @@ class DdpConfig(_BaseConfig):
     master_addr: str = "localhost"
     master_port: str = "29500"
     bucket_size_mb: int = 0
+    nccl_p2p_disable: Optional[bool] = None
 
 
 class TrainConfig(_BaseConfig):
