@@ -256,7 +256,13 @@ def train_transformer_ddp(local_rank, args, cfg_dc):
             load_dataset(str(args.dataset_name), split=str(args.train_split), streaming=True)
             if not bool(getattr(args, "skip_validation", False)):
                 load_dataset(str(args.dataset_name), split=str(args.val_split), streaming=True)
-    dist.barrier()
+    if global_rank == 0:
+        print("[ddp] rank0 finished dataset warmup,  waiting at barrier")
+    else:
+        print(f"[ddp] rank{global_rank} reaching barrier")
+    dist.barrier(device_ids=[local_rank_int])
+    if global_rank == 0:
+        print("[ddp] all ranks passed barrier")
 
     model = TransformerLM(
         vocab_size=cfg.vocab_size,
