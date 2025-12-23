@@ -247,7 +247,7 @@ def train_transformer_ddp(local_rank, args, cfg_dc):
 
     logger, run_name, ckpting_save_folder = init_logging(global_rank, cfg, cfg_dc)
 
-    print(f"[ddp] rank{global_rank} starting dataset warmup")
+    print(f"[ddp] rank{global_rank} starting dataset warmup", flush=True)
     if global_rank == 0:
         if args.dataset_config is not None:
             load_dataset(str(args.dataset_name), str(args.dataset_config), split=str(args.train_split), streaming=True)
@@ -258,12 +258,12 @@ def train_transformer_ddp(local_rank, args, cfg_dc):
             if not bool(getattr(args, "skip_validation", False)):
                 load_dataset(str(args.dataset_name), split=str(args.val_split), streaming=True)
     if global_rank == 0:
-        print("[ddp] rank0 finished dataset warmup,  waiting at barrier")
+        print("[ddp] rank0 finished dataset warmup,  waiting at barrier", flush=True)
     else:
-        print(f"[ddp] rank{global_rank} reaching barrier")
+        print(f"[ddp] rank{global_rank} reaching barrier", flush=True)
     dist.barrier(device_ids=[local_rank_int])
     if global_rank == 0:
-        print("[ddp] all ranks passed barrier")
+        print("[ddp] all ranks passed barrier", flush=True)
 
     model = TransformerLM(
         vocab_size=cfg.vocab_size,
