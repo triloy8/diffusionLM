@@ -247,6 +247,7 @@ def train_transformer_ddp(local_rank, args, cfg_dc):
 
     logger, run_name, ckpting_save_folder = init_logging(global_rank, cfg, cfg_dc)
 
+    print(f"[ddp] rank{global_rank} starting dataset warmup")
     if global_rank == 0:
         if args.dataset_config is not None:
             load_dataset(str(args.dataset_name), str(args.dataset_config), split=str(args.train_split), streaming=True)
