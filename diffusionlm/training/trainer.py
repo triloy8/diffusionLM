@@ -487,7 +487,9 @@ def init_logging(rank: int, cfg, cfg_dc):
         run_name = info.get("run_name") or datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
 
     # ensure all ranks agree on run_name
+    print(f"[ddp] rank{rank} entering broadcast_string", flush=True)
     run_name = broadcast_string(run_name, src=0)
+    print(f"[ddp] rank{rank} finished broadcast_string", flush=True)
 
     # proxy so only rank 0 logs
     rz_logger: Logger = RankZeroLogger(rank, real_logger)
