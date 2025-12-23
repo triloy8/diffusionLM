@@ -229,7 +229,6 @@ def train_transformer_ddp(local_rank, args, cfg_dc):
     setattr(cfg, "world_size", world_size)
     setattr(cfg, "global_rank", global_rank)
 
-    print(f"[ddp] rank{global_rank} entering setup_process_group", flush=True)
     setup_process_group(
         backend=cfg.backend,
         local_rank=local_rank_int,
@@ -239,7 +238,6 @@ def train_transformer_ddp(local_rank, args, cfg_dc):
         master_addr=master_addr,
         master_port=master_port,
     )
-    print(f"[ddp] rank{global_rank} finished setup_process_group", flush=True)
 
     seed = getattr(cfg, "rng_seed", getattr(cfg, "seed", None))
     torch_generator = None
@@ -247,28 +245,7 @@ def train_transformer_ddp(local_rank, args, cfg_dc):
         torch_generator = _seed_everything(int(seed), cfg.device, rank=global_rank)
     setattr(cfg, "torch_generator", torch_generator)
 
-    print(f"[ddp] rank{global_rank} entering init_logging", flush=True)
     logger, run_name, ckpting_save_folder = init_logging(global_rank, cfg, cfg_dc)
-    print(f"[ddp] rank{global_rank} finished init_logging", flush=True)
-
-    # print(f"[ddp] rank{global_rank} starting dataset warmup", flush=True)
-    # if global_rank == 0:
-    #     if args.dataset_config is not None:
-    #         load_dataset(str(args.dataset_name), str(args.dataset_config), split=str(args.train_split), streaming=True)
-    #         if not bool(getattr(args, "skip_validation", False)):
-    #             load_dataset(str(args.dataset_name), str(args.dataset_config), split=str(args.val_split), streaming=True)
-    #     else:
-    #         load_dataset(str(args.dataset_name), split=str(args.train_split), streaming=True)
-    #         if not bool(getattr(args, "skip_validation", False)):
-    #             load_dataset(str(args.dataset_name), split=str(args.val_split), streaming=True)
-    # if global_rank == 0:
-    #     print("[ddp] rank0 finished dataset warmup, waiting at barrier", flush=True)
-    # else:
-    #     print(f"[ddp] rank{global_rank} reaching barrier", flush=True)
-    # torch.cuda.set_device(local_rank_int)
-    # dist.barrier(device_ids=[local_rank_int])
-    # if global_rank == 0:
-    #     print("[ddp] all ranks passed barrier", flush=True)
 
     model = TransformerLM(
         vocab_size=cfg.vocab_size,
@@ -487,9 +464,7 @@ def init_logging(rank: int, cfg, cfg_dc):
         run_name = info.get("run_name") or datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
 
     # ensure all ranks agree on run_name
-    print(f"[ddp] rank{rank} entering broadcast_string", flush=True)
     # run_name = broadcast_string(run_name, src=0)
-    print(f"[ddp] rank{rank} finished broadcast_string", flush=True)
 
     # proxy so only rank 0 logs
     rz_logger: Logger = RankZeroLogger(rank, real_logger)
