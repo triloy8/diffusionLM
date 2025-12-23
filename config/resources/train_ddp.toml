@@ -90,7 +90,7 @@ entity = "yiltro8-org"
 project = "diffusion_lm"
 
 [ddp]
-backend = "nccl"               # gloo/nccl
+backend = "gloo"               # gloo/nccl
 num_nodes = 1                  # total nodes participating
 num_gpus_per_node = 2          # processes launched per node (mp.spawn uses this)
 node_rank = 0                  # index of this node
