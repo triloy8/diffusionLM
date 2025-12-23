@@ -19,9 +19,9 @@ import numpy as np
 import os
 import random
 import torch
-import torch.distributed as dist
+# import torch.distributed as dist
 from functools import partial
-from datasets import load_dataset
+# from datasets import load_dataset
 
 from diffusionlm.utils.dtypes import DTYPES
 from logger import Logger
@@ -251,24 +251,24 @@ def train_transformer_ddp(local_rank, args, cfg_dc):
     logger, run_name, ckpting_save_folder = init_logging(global_rank, cfg, cfg_dc)
     print(f"[ddp] rank{global_rank} finished init_logging", flush=True)
 
-    print(f"[ddp] rank{global_rank} starting dataset warmup", flush=True)
-    if global_rank == 0:
-        if args.dataset_config is not None:
-            load_dataset(str(args.dataset_name), str(args.dataset_config), split=str(args.train_split), streaming=True)
-            if not bool(getattr(args, "skip_validation", False)):
-                load_dataset(str(args.dataset_name), str(args.dataset_config), split=str(args.val_split), streaming=True)
-        else:
-            load_dataset(str(args.dataset_name), split=str(args.train_split), streaming=True)
-            if not bool(getattr(args, "skip_validation", False)):
-                load_dataset(str(args.dataset_name), split=str(args.val_split), streaming=True)
-    if global_rank == 0:
-        print("[ddp] rank0 finished dataset warmup, waiting at barrier", flush=True)
-    else:
-        print(f"[ddp] rank{global_rank} reaching barrier", flush=True)
-    torch.cuda.set_device(local_rank_int)
-    dist.barrier(device_ids=[local_rank_int])
-    if global_rank == 0:
-        print("[ddp] all ranks passed barrier", flush=True)
+    # print(f"[ddp] rank{global_rank} starting dataset warmup", flush=True)
+    # if global_rank == 0:
+    #     if args.dataset_config is not None:
+    #         load_dataset(str(args.dataset_name), str(args.dataset_config), split=str(args.train_split), streaming=True)
+    #         if not bool(getattr(args, "skip_validation", False)):
+    #             load_dataset(str(args.dataset_name), str(args.dataset_config), split=str(args.val_split), streaming=True)
+    #     else:
+    #         load_dataset(str(args.dataset_name), split=str(args.train_split), streaming=True)
+    #         if not bool(getattr(args, "skip_validation", False)):
+    #             load_dataset(str(args.dataset_name), split=str(args.val_split), streaming=True)
+    # if global_rank == 0:
+    #     print("[ddp] rank0 finished dataset warmup, waiting at barrier", flush=True)
+    # else:
+    #     print(f"[ddp] rank{global_rank} reaching barrier", flush=True)
+    # torch.cuda.set_device(local_rank_int)
+    # dist.barrier(device_ids=[local_rank_int])
+    # if global_rank == 0:
+    #     print("[ddp] all ranks passed barrier", flush=True)
 
     model = TransformerLM(
         vocab_size=cfg.vocab_size,
