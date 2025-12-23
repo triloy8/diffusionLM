@@ -83,6 +83,7 @@ def infer_transformer(args, *, logger: Optional[Logger] = None, artifact_path: O
                 "metrics.latency_ms": float(elapsed * 1000.0),
             }
         )
+        print(output_string)
 
     # Optional artifact logging of full predictions
     if logger is not None and artifact_path:

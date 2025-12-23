@@ -86,6 +86,7 @@ class MultiheadSelfAttentionRoPE(nn.Module):
         self.output_proj = Linear(self.d_model, self.d_model, device=device, dtype=dtype)
 
         self.rope = RotaryPositionalEmbedding(self.theta, self.d_k, self.max_seq_len, device)
+
     def forward(self, x: torch.Tensor, token_positions: torch.Tensor) -> torch.Tensor:
         with nvtx.range("attn/q_proj"):
             wqx = self.q_proj(x)

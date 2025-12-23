@@ -67,7 +67,7 @@ grad_accum_steps = 2
 
 [data]
 runs_path = "./runs"
-dataset_name = "karpathy/fineweb-edu-100b-shuffle"
+dataset_name = "roneneldan/TinyStories"
 dataset_config = ""
 train_split = "train"
 val_split = "validation"

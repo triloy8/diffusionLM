@@ -18,10 +18,10 @@ noise_epsilon = 0.001
 random_trunc_prob = 0
 
 [checkpoint]
-ckpt_path = "./runs/2025-12-22_19-01-59/6000.ckpt"
+ckpt_path = "./runs/2025-12-23_17-23-58/10000.ckpt"
 
 [inference]
-prompt = "Shipment has stalled in the country "
+prompt = "10 years"
 steps = 256
 total_length = 512
 block_length = 64
