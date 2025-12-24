@@ -59,10 +59,14 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-      - name: Mirror to Docker Hub
+      - name: Build and push (Docker Hub)
         if: github.event_name != 'pull_request'
-        run: |
-          repo_lower=$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')
-          docker pull ghcr.io/${repo_lower}:main
-          docker tag ghcr.io/${repo_lower}:main docker.io/triloy8/diffusionlm:main
-          docker push docker.io/triloy8/diffusionlm:main
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: docker.io/triloy8/diffusionlm:main
+          provenance: false
+          sbom: false
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
