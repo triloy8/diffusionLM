@@ -105,6 +105,7 @@ The `Justfile` plus helper scripts under `scripts/` provide a thin remote contro
 - `just attach-train` attaches your terminal to the `diffusionlm-train` tmux session, while `just kill-train` tears it down if you need to restart.
 - `just fetch run_dir=<name>` pulls a run directory from `${REMOTE_ROOT}/runs/<name>` back to the local `runs/` folder; `just list-runs` prints the remote run directory names.
 - `just sync-env` uploads your local `env/wandb.env` (copy `env/wandb.env.example` and populate `WANDB_API_KEY`) so the remote training session can authenticate with W&B.
+- `just auto-train` runs the full bootstrap + data + env sync + training workflow (`bootstrap-remote`, `data-remote`, `sync-env`, `train`) in one shot.
 
 ## Modules
 
