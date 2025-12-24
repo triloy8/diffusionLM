@@ -56,7 +56,7 @@ eps = 1e-10
 weight_decay = 0.02
 
 [training]
-batch_size = 32
+batch_size = 128
 max_train_iteration = 50000
 max_val_iteration = 10
 val_freq_iteration = 125
