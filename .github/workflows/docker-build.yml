@@ -38,18 +38,16 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - name: Extract Docker metadata
+      - name: Extract GHCR metadata
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: |
-            ghcr.io/${{ github.repository }}
-            docker.io/triloy8/diffusionlm
+          images: ghcr.io/${{ github.repository }}
           tags: |
             type=ref,event=branch
             type=sha
 
-      - name: Build and push
+      - name: Build and push (GHCR)
         uses: docker/build-push-action@v6
         with:
           context: .
@@ -60,3 +58,10 @@ jobs:
           sbom: false
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+      - name: Mirror to Docker Hub
+        if: github.event_name != 'pull_request'
+        run: |
+          docker pull ghcr.io/${{ github.repository }}:main
+          docker tag ghcr.io/${{ github.repository }}:main docker.io/triloy8/diffusionlm:main
+          docker push docker.io/triloy8/diffusionlm:main
