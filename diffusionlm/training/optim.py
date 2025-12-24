@@ -222,12 +222,13 @@ def build_optimizer_param_groups(
     scalar_params = _deduplicate(scalar_params)
     hidden_matrix_params = _deduplicate(hidden_matrix_params)
 
-    def _adam_group(params: List[Parameter], group_cfg: Any) -> Dict[str, object]:
+    def _adam_group(params: List[Parameter], group_cfg: Any, name: str) -> Dict[str, object]:
         if not params:
             return {}
         betas = getattr(group_cfg, "betas")
         return {
             "params": params,
+            "name": name,
             "lr": float(group_cfg.initial_learning_rate),
             "initial_lr": float(group_cfg.initial_learning_rate),
             "max_lr": float(group_cfg.max_learning_rate),
@@ -243,15 +244,16 @@ def build_optimizer_param_groups(
     scalar_cfg = getattr(muon_cfg, "scalar")
 
     adam_groups = [
-        _adam_group(head_params, head_cfg),
-        _adam_group(embed_params, embed_cfg),
-        _adam_group(scalar_params, scalar_cfg),
+        _adam_group(head_params, head_cfg, "head"),
+        _adam_group(embed_params, embed_cfg, "embed"),
+        _adam_group(scalar_params, scalar_cfg, "scalar"),
     ]
     adam_groups = [group for group in adam_groups if group]
 
     hidden_cfg = getattr(muon_cfg, "hidden")
     muon_group = {
         "params": hidden_matrix_params,
+        "name": "hidden",
         "lr": float(hidden_cfg.initial_learning_rate),
         "initial_lr": float(hidden_cfg.initial_learning_rate),
         "max_lr": float(hidden_cfg.max_learning_rate),
