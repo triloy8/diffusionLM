@@ -39,3 +39,5 @@ list-runs:
 sync-env:
 	if [ ! -f env/wandb.env ]; then echo "Missing env/wandb.env; copy env/wandb.env.example and fill WANDB_API_KEY" >&2; exit 1; fi
 	scp env/wandb.env {{prime_host}}:{{remote_root}}/env/wandb.env
+
+auto-train: bootstrap-remote data-remote sync-env train
