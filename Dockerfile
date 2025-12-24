@@ -33,7 +33,4 @@ RUN mkdir -p /root/.ssh \
   && chmod 700 /root/.ssh
 
 COPY pyproject.toml uv.lock ./
-RUN uv sync --no-install-project
-
 COPY . .
-RUN uv sync
