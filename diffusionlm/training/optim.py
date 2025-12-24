@@ -95,13 +95,13 @@ class Muon(torch.optim.Optimizer):
                 group.setdefault("lr", lr)
                 group.setdefault("momentum", momentum)
                 group.setdefault("weight_decay", weight_decay)
-                allowed = {"params", "lr", "momentum", "weight_decay", "use_muon", *extra_keys}
+                allowed = {"params", "lr", "momentum", "weight_decay", "use_muon", "name", *extra_keys}
             else:
                 group.setdefault("lr", lr)
                 group.setdefault("betas", betas)
                 group.setdefault("eps", eps)
                 group.setdefault("weight_decay", weight_decay)
-                allowed = {"params", "lr", "betas", "eps", "weight_decay", "use_muon", *extra_keys}
+                allowed = {"params", "lr", "betas", "eps", "weight_decay", "use_muon", "name", *extra_keys}
             unexpected = set(group.keys()) - allowed
             if unexpected:
                 raise ValueError(f"Unexpected keys {unexpected} in Muon param group")
