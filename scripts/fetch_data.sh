@@ -24,6 +24,6 @@ download() {
     mv "${tmp}" "${dest}"
 }
 
-download "https://huggingface.co/trixyL/LLaDA-8B-Instruct-merged/resolve/main/merges.txt"
-download "https://huggingface.co/trixyL/LLaDA-8B-Instruct-merged/resolve/main/vocab.json"
-download "https://huggingface.co/trixyL/LLaDA-8B-Instruct-merged/resolve/main/special_tokens.json"
+download "https://huggingface.co/trixyL/diffusionLM/resolve/main/merges.txt"
+download "https://huggingface.co/trixyL/diffusionLM/resolve/main/vocab.json"
+download "https://huggingface.co/trixyL/diffusionLM/resolve/main/special_tokens.json"

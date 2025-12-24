@@ -21,9 +21,9 @@ random_trunc_prob = 0
 ckpt_path = "./runs/2025-12-23_17-23-58/10000.ckpt"
 
 [inference]
-prompt = "10 years"
+prompt = "The shipment "
 steps = 256
-total_length = 512
+total_length = 256
 block_length = 64
-temperature = 0.01
+temperature = 0.8
 mask_id = 126336

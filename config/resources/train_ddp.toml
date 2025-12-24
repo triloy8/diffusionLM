@@ -1,14 +1,14 @@
 [model]
-vocab_size = 126464
-context_length = 512
-d_model = 1024
-num_layers = 16
+vocab_size = 50258
+context_length = 256
+d_model = 768
+num_layers = 4
 num_heads = 16
-d_ff = 4096
+d_ff = 3072
 rope_theta = 10000.0
 device = "cuda"
 dtype = "bfloat16"
-mask_token_id = 126336
+mask_token_id = 50258
 noise_epsilon = 0.001
 random_trunc_prob = 0 # 0.01
 
@@ -56,7 +56,7 @@ eps = 1e-10
 weight_decay = 0.02
 
 [training]
-batch_size = 26
+batch_size = 32
 max_train_iteration = 50000
 max_val_iteration = 10
 val_freq_iteration = 125
@@ -92,7 +92,7 @@ project = "diffusion_lm"
 [ddp]
 backend = "nccl"               # gloo/nccl
 num_nodes = 1                  # total nodes participating
-num_gpus_per_node = 2          # processes launched per node (mp.spawn uses this)
+num_gpus_per_node = 1          # processes launched per node (mp.spawn uses this)
 node_rank = 0                  # index of this node
 master_addr = "127.0.0.1"      # rank 0 hostname/IP
 master_port = "29500"
