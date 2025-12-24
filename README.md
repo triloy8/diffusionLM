@@ -211,6 +211,8 @@ project = "your-project"
 
 - Inference logs include sampling params and truncated text:
   - Keys: `params.temperature`, `params.p`, `params.eos_token_id`, `text.prompt`, `text.output`, `metrics.latency_ms`.
+- Training logs now include per-parameter-group learning rates (in addition to `metrics.lr`):
+  - Keys: `metrics.lr/head`, `metrics.lr/embed`, `metrics.lr/scalar`, `metrics.lr/hidden`.
 - Tip (console backend): Pipe to `jq` for readability:
   - `uv run diffusionlm-train --config config/resources/train.toml | jq -r "."`
 
