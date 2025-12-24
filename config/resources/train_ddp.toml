@@ -1,5 +1,5 @@
 [model]
-vocab_size = 50258
+vocab_size = 50259
 context_length = 256
 d_model = 768
 num_layers = 4
