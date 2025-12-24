@@ -62,6 +62,7 @@ jobs:
       - name: Mirror to Docker Hub
         if: github.event_name != 'pull_request'
         run: |
-          docker pull ghcr.io/${{ github.repository }}:main
-          docker tag ghcr.io/${{ github.repository }}:main docker.io/triloy8/diffusionlm:main
+          repo_lower=$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')
+          docker pull ghcr.io/${repo_lower}:main
+          docker tag ghcr.io/${repo_lower}:main docker.io/triloy8/diffusionlm:main
           docker push docker.io/triloy8/diffusionlm:main
