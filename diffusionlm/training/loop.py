@@ -125,8 +125,8 @@ def train_loop(
             logger.log(
                 {
                     "phase": "train",
-                    "metrics.tokens_batch": int(token_count),
-                    "metrics.tokens_seen": int(tokens_seen),
+                    "metrics.tokens_batch_rank0": int(token_count),
+                    "metrics.tokens_seen_rank0": int(tokens_seen),
                     "metrics.inputs_shape/batch": int(train_inputs.shape[0]),
                     "metrics.inputs_shape/seq_len": int(train_inputs.shape[1]),
                 },
