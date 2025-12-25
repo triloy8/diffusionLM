@@ -121,12 +121,20 @@ def train_transformer(args, *, logger: Logger, run_name: str):
     shuffle_seed = getattr(args, "shuffle_seed", None)
     if shuffle_seed is None:
         shuffle_seed = getattr(args, "rng_seed", getattr(cfg, "seed", None))
+    eot_token_id = getattr(cfg, "eot_token_id", None)
+    if eot_token_id is None:
+        raise ValueError("eot_token_id must be set for streaming datasets")
+    pad_token_id = getattr(cfg, "pad_token_id", eot_token_id)
+    setattr(cfg, "pad_token_id", pad_token_id)
     train_iterator_factory = HFTokenIteratorFactory(
         dataset_name=str(args.dataset_name),
         dataset_config=(str(args.dataset_config) if args.dataset_config is not None else None),
         split=str(args.train_split),
         text_field=str(args.text_field),
         tokenizer=tokenizer,
+        context_length=int(cfg.context_length),
+        eot_token_id=int(eot_token_id),
+        pad_token_id=int(pad_token_id),
         shuffle_buffer_size=int(getattr(args, "shuffle_buffer_size", 0)),
         shuffle_seed=(int(shuffle_seed) if shuffle_seed is not None else None),
         world_size=1,
@@ -140,6 +148,9 @@ def train_transformer(args, *, logger: Logger, run_name: str):
         split=str(args.val_split),
         text_field=str(args.text_field),
         tokenizer=tokenizer,
+        context_length=int(cfg.context_length),
+        eot_token_id=int(eot_token_id),
+        pad_token_id=int(pad_token_id),
         shuffle_buffer_size=0,
         shuffle_seed=None,
         world_size=1,
@@ -279,6 +290,11 @@ def train_transformer_ddp(local_rank, args, cfg_dc):
     shuffle_seed = getattr(args, "shuffle_seed", None)
     if shuffle_seed is None:
         shuffle_seed = getattr(args, "rng_seed", getattr(cfg, "seed", None))
+    eot_token_id = getattr(cfg, "eot_token_id", None)
+    if eot_token_id is None:
+        raise ValueError("eot_token_id must be set for streaming datasets")
+    pad_token_id = getattr(cfg, "pad_token_id", eot_token_id)
+    setattr(cfg, "pad_token_id", pad_token_id)
     per_rank_seed = (int(shuffle_seed) if shuffle_seed is not None else 0) + global_rank
     train_iterator_factory = HFTokenIteratorFactory(
         dataset_name=str(args.dataset_name),
@@ -286,6 +302,9 @@ def train_transformer_ddp(local_rank, args, cfg_dc):
         split=str(args.train_split),
         text_field=str(args.text_field),
         tokenizer=tokenizer,
+        context_length=int(cfg.context_length),
+        eot_token_id=int(eot_token_id),
+        pad_token_id=int(pad_token_id),
         shuffle_buffer_size=int(getattr(args, "shuffle_buffer_size", 0)),
         shuffle_seed=per_rank_seed,
         world_size=cfg.world_size,
@@ -299,6 +318,9 @@ def train_transformer_ddp(local_rank, args, cfg_dc):
         split=str(args.val_split),
         text_field=str(args.text_field),
         tokenizer=tokenizer,
+        context_length=int(cfg.context_length),
+        eot_token_id=int(eot_token_id),
+        pad_token_id=int(pad_token_id),
         shuffle_buffer_size=0,
         shuffle_seed=None,
         world_size=cfg.world_size,

@@ -1,7 +1,6 @@
 from __future__ import annotations
 
-from collections import deque
-from typing import Deque, Iterable, Iterator, Optional
+from typing import Iterable, Iterator, Optional
 import time
 
 from datasets import load_dataset
@@ -10,6 +9,24 @@ import torch
 
 from diffusionlm.tokenizer.tokenizer import Tokenizer
 from logger import Logger
+
+
+def apply_eot_padding(
+    token_ids: list[int],
+    *,
+    context_length: int,
+    eot_token_id: int,
+    pad_token_id: int,
+) -> list[int]:
+    if context_length <= 0:
+        raise ValueError("context_length must be > 0")
+    tokens = list(token_ids)
+    if len(tokens) >= context_length:
+        tokens = tokens[: context_length - 1]
+    tokens.append(eot_token_id)
+    if len(tokens) < context_length:
+        tokens.extend([pad_token_id] * (context_length - len(tokens)))
+    return tokens
 
 
 class HFTokenIteratorFactory:
@@ -23,6 +40,9 @@ class HFTokenIteratorFactory:
         split: str,
         text_field: str,
         tokenizer: Tokenizer,
+        context_length: int,
+        eot_token_id: int,
+        pad_token_id: Optional[int] = None,
         shuffle_buffer_size: int = 0,
         shuffle_seed: Optional[int] = None,
         world_size: int = 1,
@@ -38,6 +58,9 @@ class HFTokenIteratorFactory:
         self.split = split
         self.text_field = text_field
         self.tokenizer = tokenizer
+        self.context_length = int(context_length)
+        self.eot_token_id = int(eot_token_id)
+        self.pad_token_id = int(pad_token_id) if pad_token_id is not None else int(eot_token_id)
         self.shuffle_buffer_size = max(0, shuffle_buffer_size)
         self.shuffle_seed = shuffle_seed if shuffle_seed is not None else 0
         self.world_size = max(1, world_size)
@@ -79,7 +102,7 @@ class HFTokenIteratorFactory:
         except Exception:
             return self._manual_shard(iter(dataset))
 
-    def __call__(self) -> Iterator[int]:
+    def __call__(self) -> Iterator[list[int]]:
         dataset = self._load_dataset()
         dataset = self._apply_shuffle(dataset)
         rows = iter(self._apply_shard(dataset))
@@ -123,12 +146,16 @@ class HFTokenIteratorFactory:
                         "metrics.streaming_encode/world_size": int(self.world_size),
                     }
                 )
-            for token_id in token_ids:
-                yield int(token_id)
+            yield apply_eot_padding(
+                list(token_ids),
+                context_length=self.context_length,
+                eot_token_id=self.eot_token_id,
+                pad_token_id=self.pad_token_id,
+            )
 
 
 class StreamingBatcher:
-    """Rolling token buffer that emits fixed-length sequences for batching."""
+    """Row-wise batcher that emits fixed-length sequences for batching."""
 
     def __init__(
         self,
@@ -136,59 +163,25 @@ class StreamingBatcher:
         *,
         device: str | torch.device,
         logger: Optional[Logger] = None,
-        stall_warn_s: float = 10.0,
-        stall_repeat_s: float = 30.0,
     ) -> None:
         self.iterator_factory = iterator_factory
         self.device = torch.device(device)
-        self._buffer: Deque[int] = deque()
-        self._iterator: Iterator[int] = self.iterator_factory()
+        self._iterator: Iterator[list[int]] = self.iterator_factory()
         self._logger = logger
-        self._stall_warn_s = float(stall_warn_s)
-        self._stall_repeat_s = float(stall_repeat_s)
 
-    def _next_token(self) -> int:
+    def _next_sequence(self) -> list[int]:
         while True:
             try:
                 return next(self._iterator)
             except StopIteration:
                 self._iterator = self.iterator_factory()
 
-    def _ensure_tokens(self, count: int) -> None:
-        start = time.monotonic()
-        last_log = start
-        while len(self._buffer) < count:
-            self._buffer.append(self._next_token())
-            if self._logger is None:
-                continue
-            now = time.monotonic()
-            elapsed = now - start
-            if elapsed < self._stall_warn_s or (now - last_log) < self._stall_repeat_s:
-                continue
-            last_log = now
-            self._logger.log(
-                {
-                    "metrics.streaming_stall/elapsed_s": float(elapsed),
-                    "metrics.streaming_stall/buffer_len": int(len(self._buffer)),
-                    "metrics.streaming_stall/tokens_needed": int(count),
-                    "metrics.streaming_stall/shuffle_buffer_size": int(
-                        self.iterator_factory.shuffle_buffer_size
-                    ),
-                    "metrics.streaming_stall/epoch": int(self.iterator_factory._epoch),
-                    "metrics.streaming_stall/rank": int(self.iterator_factory.rank),
-                    "metrics.streaming_stall/world_size": int(self.iterator_factory.world_size),
-                    "metrics.streaming_stall/dataset_name": str(self.iterator_factory.dataset_name),
-                    "metrics.streaming_stall/dataset_config": str(self.iterator_factory.dataset_config or ""),
-                    "metrics.streaming_stall/split": str(self.iterator_factory.split),
-                }
-            )
-
     def draw(self, batch_size: int, context_length: int) -> torch.Tensor:
-        tokens_needed = batch_size * context_length
-        self._ensure_tokens(tokens_needed)
         sequences = []
         for _ in range(batch_size):
-            seq = [self._buffer.popleft() for _ in range(context_length)]
+            seq = self._next_sequence()
+            if len(seq) != context_length:
+                raise ValueError("streaming sequence length does not match context_length")
             sequences.append(seq)
         clean_targets = torch.tensor(sequences, dtype=torch.long, device=self.device)
         return clean_targets

@@ -4,26 +4,26 @@ vocab_path = "./data/vocab.json"
 special_tokens_path = "./data/special_tokens.json"
 
 [model]
-vocab_size = 126464
-context_length = 512
-d_model = 1024
-num_layers = 16
+vocab_size = 50258
+context_length = 256
+d_model = 768
+num_layers = 4
 num_heads = 16
-d_ff = 4096
+d_ff = 3072
 rope_theta = 10000.0
 device = "cuda"
 dtype = "bfloat16"
-mask_token_id = 126336
+mask_token_id = 50257
 noise_epsilon = 0.001
 random_trunc_prob = 0
 
 [checkpoint]
-ckpt_path = "./runs/2025-12-23_17-23-58/10000.ckpt"
+ckpt_path = "./runs/2025-12-25_11-32-25/2000.ckpt"
 
 [inference]
-prompt = "The shipment "
+prompt = "Once upon a time,"
 steps = 256
 total_length = 256
 block_length = 64
 temperature = 0.8
-mask_id = 126336
+mask_id = 50257
