@@ -219,8 +219,8 @@ def train_transformer(args, *, logger: Logger, run_name: str):
         batch_generator=torch_generator,
         logger=logger,
         activation_norms=activation_norms,
-        log_activation_norms=False,
-        log_weight_norms=False,
+        log_activation_norms=bool(getattr(cfg, "log_activation_norms", False)),
+        log_weight_norms=bool(getattr(cfg, "log_weight_norms", False)),
         skip_validation=bool(getattr(cfg, "skip_validation", False)),
     )
 
@@ -395,8 +395,8 @@ def train_transformer_ddp(local_rank, args, cfg_dc):
         batch_generator=torch_generator,
         logger=logger,
         activation_norms=activation_norms,
-        log_activation_norms=True,
-        log_weight_norms=True,
+        log_activation_norms=bool(getattr(cfg, "log_activation_norms", False)),
+        log_weight_norms=bool(getattr(cfg, "log_weight_norms", False)),
         sync_gradients=_sync,
         reduce_metric=allreduce_mean,
         is_rank_zero=(global_rank == 0),

@@ -210,6 +210,9 @@ entity = "your-entity"
 project = "your-project"
 ```
 
+- Training logs can optionally include activation/weight norms via `[logging]`:
+  - Keys: `log_activation_norms`, `log_weight_norms`.
+
 - Inference logs include sampling params and truncated text:
   - Keys: `params.temperature`, `params.p`, `params.eos_token_id`, `text.prompt`, `text.output`, `metrics.latency_ms`.
 - Training logs now include per-parameter-group learning rates (in addition to `metrics.lr`):

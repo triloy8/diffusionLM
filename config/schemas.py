@@ -277,6 +277,8 @@ class LoggingConfig(_BaseConfig):
     run_name: Optional[str] = None
     architecture: Optional[str] = None
     dataset: Optional[str] = None
+    log_activation_norms: bool = False
+    log_weight_norms: bool = False
 
 
 class DdpConfig(_BaseConfig):

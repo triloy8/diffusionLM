@@ -49,6 +49,8 @@ def main():
         pad_token_id=cfg_dc.model.pad_token_id,
         noise_epsilon=cfg_dc.model.noise_epsilon,
         random_trunc_prob=cfg_dc.model.random_trunc_prob,
+        log_activation_norms=bool(getattr(cfg_dc.logging, "log_activation_norms", False)) if cfg_dc.logging else False,
+        log_weight_norms=bool(getattr(cfg_dc.logging, "log_weight_norms", False)) if cfg_dc.logging else False,
         # global
         device=cfg_dc.model.device,
         dtype=cfg_dc.model.dtype,
