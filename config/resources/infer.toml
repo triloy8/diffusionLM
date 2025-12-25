@@ -18,12 +18,12 @@ noise_epsilon = 0.001
 random_trunc_prob = 0
 
 [checkpoint]
-ckpt_path = "./runs/2025-12-25_11-32-25/4000.ckpt"
+ckpt_path = "./runs/2025-12-25_13-31-53/5000.ckpt"
 
 [inference]
-prompt = "Once upon a time,"
+prompt = "Oh wow, it's Judy!"
 steps = 256
 total_length = 256
-block_length = 64
-temperature = 0.8
+block_length = 128
+temperature = 0.1
 mask_id = 50257
