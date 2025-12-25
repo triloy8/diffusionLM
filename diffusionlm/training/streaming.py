@@ -22,10 +22,9 @@ def apply_eot_padding(
         raise ValueError("context_length must be > 0")
     tokens = list(token_ids)
     if len(tokens) >= context_length:
-        tokens = tokens[: context_length - 1]
+        return tokens[:context_length]
     tokens.append(eot_token_id)
-    if len(tokens) < context_length:
-        tokens.extend([pad_token_id] * (context_length - len(tokens)))
+    tokens.extend([pad_token_id] * (context_length - len(tokens)))
     return tokens
 
 
