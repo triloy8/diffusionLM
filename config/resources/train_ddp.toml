@@ -23,7 +23,7 @@ initial_learning_rate = 1e-4 # adamw
 max_learning_rate = 0.0015 # adamw
 min_learning_rate = 0.00015 # adamw
 warmup_iters = 0
-cosine_cycle_iters = 45000
+cosine_cycle_iters = 30000
 grad_clip_max_l2_norm = 1.0
 
 [optimizer.muon.hidden]
