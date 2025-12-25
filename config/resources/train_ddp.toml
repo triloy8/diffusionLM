@@ -23,7 +23,7 @@ initial_learning_rate = 1e-4 # adamw
 max_learning_rate = 0.0015 # adamw
 min_learning_rate = 0.00015 # adamw
 warmup_iters = 0
-cosine_cycle_iters = 10000
+cosine_cycle_iters = 5000
 grad_clip_max_l2_norm = 1.0
 
 [optimizer.muon.hidden]
@@ -59,7 +59,7 @@ weight_decay = 0.02
 
 [training]
 batch_size = 216
-max_train_iteration = 10000
+max_train_iteration = 5000
 max_val_iteration = 10
 val_freq_iteration = 125
 ckpting_save_iter = 1000
