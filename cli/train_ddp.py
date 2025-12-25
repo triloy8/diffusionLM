@@ -45,6 +45,8 @@ def main():
         d_ff=cfg_dc.model.d_ff,
         rope_theta=cfg_dc.model.rope_theta,
         mask_token_id=cfg_dc.model.mask_token_id,
+        eot_token_id=cfg_dc.model.eot_token_id,
+        pad_token_id=cfg_dc.model.pad_token_id,
         noise_epsilon=cfg_dc.model.noise_epsilon,
         random_trunc_prob=cfg_dc.model.random_trunc_prob,
         # global

@@ -43,6 +43,8 @@ def main():
         d_ff=cfg_dc.model.d_ff,
         rope_theta=cfg_dc.model.rope_theta,
         mask_token_id=cfg_dc.model.mask_token_id,
+        eot_token_id=cfg_dc.model.eot_token_id,
+        pad_token_id=cfg_dc.model.pad_token_id,
         noise_epsilon=cfg_dc.model.noise_epsilon,
         random_trunc_prob=cfg_dc.model.random_trunc_prob,
         # global
@@ -81,6 +83,8 @@ def main():
         "d_ff": ns.d_ff,
         "rope_theta": ns.rope_theta,
         "mask_token_id": ns.mask_token_id,
+        "eot_token_id": ns.eot_token_id,
+        "pad_token_id": ns.pad_token_id,
         "noise_epsilon": ns.noise_epsilon,
         "random_trunc_prob": ns.random_trunc_prob,
         "optimizer_name": ns.optimizer_name,

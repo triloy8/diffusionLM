@@ -18,7 +18,7 @@ noise_epsilon = 0.001
 random_trunc_prob = 0
 
 [checkpoint]
-ckpt_path = "./runs/2025-12-25_11-32-25/2000.ckpt"
+ckpt_path = "./runs/2025-12-25_11-32-25/4000.ckpt"
 
 [inference]
 prompt = "Once upon a time,"
