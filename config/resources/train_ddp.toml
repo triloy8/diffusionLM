@@ -65,7 +65,7 @@ val_freq_iteration = 125
 ckpting_save_iter = 1000
 seed = 3407
 skip_validation = false
-grad_accum_steps = 2
+grad_accum_steps = 1
 
 [data]
 runs_path = "./runs"
