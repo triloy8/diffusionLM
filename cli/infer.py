@@ -46,6 +46,12 @@ def main():
         block_length=cfg_dc.inference.block_length,
         temperature=cfg_dc.inference.temperature,
         mask_id=cfg_dc.inference.mask_id,
+        seed=cfg_dc.inference.seed,
+        eos_token_id=cfg_dc.inference.eos_token_id,
+        cfg_scale=cfg_dc.inference.cfg_scale,
+        remasking=cfg_dc.inference.remasking,
+        logits_eos_inf=cfg_dc.inference.logits_eos_inf,
+        confidence_eos_eot_inf=cfg_dc.inference.confidence_eos_eot_inf,
     )
     logger = ConsoleLogger()
     _ = infer_transformer(ns, logger=logger)

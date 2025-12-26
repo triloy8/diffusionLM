@@ -160,10 +160,10 @@ def test_infer_config_happy_and_errors(tmp_path: Path):
 
     # Invalid temperature
     bad_t = tmp_path / "infer_bad_t.toml"
-    write(bad_t, cfg_path.read_text().replace("temperature = 1.0", "temperature = 0.0"))
+    write(bad_t, cfg_path.read_text().replace("temperature = 1.0", "temperature = -0.1"))
     with pytest.raises(ValidationError) as exc:
         load_infer_config(bad_t)
-    assert "temperature must be > 0" in str(exc.value)
+    assert "temperature must be >= 0" in str(exc.value)
 
     # Extra key should be rejected
     bad_extra = tmp_path / "infer_extra.toml"

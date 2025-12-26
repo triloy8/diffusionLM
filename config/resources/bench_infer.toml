@@ -27,6 +27,11 @@ total_length = 256
 block_length = 128
 temperature = 0.01
 mask_id = 50257
+eos_token_id = 50256
+cfg_scale = 0.0
+remasking = "random"
+logits_eos_inf = false
+confidence_eos_eot_inf = false
 
 [data]
 dataset_name = "HuggingFaceFW/fineweb"

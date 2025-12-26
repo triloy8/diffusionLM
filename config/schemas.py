@@ -319,6 +319,12 @@ class InferenceConfig(_BaseConfig):
     block_length: int
     temperature: float = 1.0
     mask_id: Optional[int] = None
+    seed: Optional[int] = None
+    eos_token_id: Optional[int] = None
+    cfg_scale: float = 0.0
+    remasking: str = "random"
+    logits_eos_inf: bool = False
+    confidence_eos_eot_inf: bool = False
 
     @model_validator(mode="after")
     def _validate_inference(self):
@@ -328,12 +334,22 @@ class InferenceConfig(_BaseConfig):
             raise ValueError("steps must be > 0")
         if self.block_length <= 0:
             raise ValueError("block_length must be > 0")
-        if self.temperature <= 0:
-            raise ValueError("temperature must be > 0")
+        if self.temperature < 0:
+            raise ValueError("temperature must be >= 0")
         if self.mask_id is not None and self.mask_id < 0:
             raise ValueError("mask_id must be >= 0")
+        if self.seed is not None and self.seed < 0:
+            raise ValueError("seed must be >= 0")
+        if self.eos_token_id is not None and self.eos_token_id < 0:
+            raise ValueError("eos_token_id must be >= 0")
         if self.total_length is not None and self.total_length <= 0:
             raise ValueError("total_length must be > 0 when provided")
+        if self.cfg_scale < 0:
+            raise ValueError("cfg_scale must be >= 0")
+        if self.remasking not in {"low_confidence", "random"}:
+            raise ValueError("remasking must be one of: low_confidence, random")
+        if (self.logits_eos_inf or self.confidence_eos_eot_inf) and self.eos_token_id is None:
+            raise ValueError("eos_token_id must be set when EOS suppression is enabled")
         return self
 
 

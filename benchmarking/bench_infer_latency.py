@@ -144,6 +144,12 @@ def main():
         "gen_length": gen_length,
         "block_length": cfg.inference.block_length,
         "mask_id": cfg.inference.mask_id,
+        "seed": cfg.inference.seed,
+        "eos_token_id": cfg.inference.eos_token_id,
+        "cfg_scale": cfg.inference.cfg_scale,
+        "remasking": cfg.inference.remasking,
+        "logits_eos_inf": cfg.inference.logits_eos_inf,
+        "confidence_eos_eot_inf": cfg.inference.confidence_eos_eot_inf,
         # bench
         "warmup": cfg.benchmark.warmup,
         "repeats": cfg.benchmark.repeats,
@@ -196,6 +202,10 @@ def main():
 
     processed_tokens_last: int = 0
     mask_ratio_last: Optional[float] = None
+    generator = None
+    if cfg.inference.seed is not None:
+        generator = torch.Generator(device=cfg.model.device)
+        generator.manual_seed(int(cfg.inference.seed))
 
     def _run_workload():
         nonlocal processed_tokens_last, mask_ratio_last, optimizer
@@ -213,20 +223,32 @@ def main():
                                 model,
                                 in_indices,
                                 mask_id=int(cfg.inference.mask_id),
+                                eos_token_id=cfg.inference.eos_token_id,
                                 steps=int(cfg.inference.steps),
                                 gen_length=int(gen_length),
                                 block_length=int(cfg.inference.block_length),
                                 temperature=float(cfg.inference.temperature),
+                                cfg_scale=float(cfg.inference.cfg_scale),
+                                remasking=str(cfg.inference.remasking),
+                                logits_eos_inf=bool(cfg.inference.logits_eos_inf),
+                                confidence_eos_eot_inf=bool(cfg.inference.confidence_eos_eot_inf),
+                                generator=generator,
                             )
                     else:
                         output = diffusion_generate(
                             model,
                             in_indices,
                             mask_id=int(cfg.inference.mask_id),
+                            eos_token_id=cfg.inference.eos_token_id,
                             steps=int(cfg.inference.steps),
                             gen_length=int(gen_length),
                             block_length=int(cfg.inference.block_length),
                             temperature=float(cfg.inference.temperature),
+                            cfg_scale=float(cfg.inference.cfg_scale),
+                            remasking=str(cfg.inference.remasking),
+                            logits_eos_inf=bool(cfg.inference.logits_eos_inf),
+                            confidence_eos_eot_inf=bool(cfg.inference.confidence_eos_eot_inf),
+                            generator=generator,
                         )
             processed_tokens = int(gen_length) * batch_size * int(cfg.benchmark.steps)
             processed_tokens_last = processed_tokens

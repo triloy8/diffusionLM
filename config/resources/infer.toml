@@ -18,12 +18,18 @@ noise_epsilon = 0.001
 random_trunc_prob = 0
 
 [checkpoint]
-ckpt_path = "./runs/2025-12-25_19-54-02/4000.ckpt"
+ckpt_path = "./runs/2025-12-25_21-59-11/5000.ckpt"
 
 [inference]
-prompt = "Once upon a time,"
+prompt = "Once upon a time, in the desert,"
 steps = 256
 total_length = 256
 block_length = 128
-temperature = 0.5
+temperature = 0.1
 mask_id = 50257
+seed = 3408
+eos_token_id = 50256
+cfg_scale = 0.0
+remasking = "low_confidence"
+logits_eos_inf = false
+confidence_eos_eot_inf = false

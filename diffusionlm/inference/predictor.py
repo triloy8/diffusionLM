@@ -40,6 +40,16 @@ def infer_transformer(args, *, logger: Optional[Logger] = None, artifact_path: O
     model.load_state_dict(ckpt_dict["model_state_dict"])
 
     in_indices = torch.tensor(ids, device=args.device)
+    eos_token_id = getattr(args, "eos_token_id", None)
+    cfg_scale = float(getattr(args, "cfg_scale", 0.0))
+    remasking = getattr(args, "remasking", "random")
+    logits_eos_inf = bool(getattr(args, "logits_eos_inf", False))
+    confidence_eos_eot_inf = bool(getattr(args, "confidence_eos_eot_inf", False))
+    seed = getattr(args, "seed", None)
+    generator = None
+    if seed is not None:
+        generator = torch.Generator(device=args.device)
+        generator.manual_seed(int(seed))
 
     # Log static sampling parameters once
     if logger is not None:
@@ -52,6 +62,12 @@ def infer_transformer(args, *, logger: Optional[Logger] = None, artifact_path: O
                 "params.gen_length": int(gen_length),
                 "params.block_length": int(args.block_length),
                 "params.mask_id": int(args.mask_id),
+                "params.seed": (None if seed is None else int(seed)),
+                "params.eos_token_id": (None if eos_token_id is None else int(eos_token_id)),
+                "params.cfg_scale": float(cfg_scale),
+                "params.remasking": str(remasking),
+                "params.logits_eos_inf": bool(logits_eos_inf),
+                "params.confidence_eos_eot_inf": bool(confidence_eos_eot_inf),
             }
         )
 
@@ -61,10 +77,16 @@ def infer_transformer(args, *, logger: Optional[Logger] = None, artifact_path: O
             model,
             in_indices,
             mask_id=int(args.mask_id),
+            eos_token_id=(None if eos_token_id is None else int(eos_token_id)),
             steps=int(args.steps),
             gen_length=int(gen_length),
             block_length=int(args.block_length),
             temperature=float(args.temperature),
+            cfg_scale=float(cfg_scale),
+            remasking=str(remasking),
+            logits_eos_inf=bool(logits_eos_inf),
+            confidence_eos_eot_inf=bool(confidence_eos_eot_inf),
+            generator=generator,
         )
     else:
         out_indices = in_indices
@@ -99,6 +121,12 @@ def infer_transformer(args, *, logger: Optional[Logger] = None, artifact_path: O
                     "gen_length": gen_length,
                     "block_length": args.block_length,
                     "mask_id": args.mask_id,
+                    "seed": seed,
+                    "eos_token_id": eos_token_id,
+                    "cfg_scale": cfg_scale,
+                    "remasking": remasking,
+                    "logits_eos_inf": logits_eos_inf,
+                    "confidence_eos_eot_inf": confidence_eos_eot_inf,
                 }
                 f.write(json.dumps(rec, ensure_ascii=False) + "\n")
             logger.log_artifact(artifact_path, name=artifact_path, type_="inference_outputs")

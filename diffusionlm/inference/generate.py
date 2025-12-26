@@ -3,6 +3,7 @@ from __future__ import annotations
 import math
 
 import torch
+import torch.nn.functional as F
 from diffusionlm.inference.sampling import add_gumbel_noise, compute_transfer_schedule
 
 
@@ -12,10 +13,15 @@ def diffusion_generate(
     prompt_indices: torch.Tensor,
     *,
     mask_id: int,
+    eos_token_id: int | None = None,
     steps: int,
     gen_length: int,
     block_length: int,
     temperature: float = 0.0,
+    cfg_scale: float = 0.0,
+    remasking: str = "random",
+    logits_eos_inf: bool = False,
+    confidence_eos_eot_inf: bool = False,
     generator: torch.Generator | None = None,
 ) -> torch.Tensor:
     """Generate sequences via the diffusion reverse process."""
@@ -51,6 +57,7 @@ def diffusion_generate(
         dtype=prompt_indices.dtype,
     )
     x[:, :prompt_len] = prompt_indices
+    prompt_index = (x != mask_id)
 
     for block_idx in range(blocks):
         block_start = prompt_len + block_idx * block_length
@@ -63,17 +70,45 @@ def diffusion_generate(
 
         for step_idx in range(block_steps):
             mask_index = (x == mask_id)
-            logits = model(x)
-            logits = add_gumbel_noise(logits, temperature, generator=generator)
-            predictions = torch.argmax(logits, dim=-1)
+            if cfg_scale > 0.0:
+                un_x = x.clone()
+                un_x[prompt_index] = mask_id
+                logits = model(torch.cat([x, un_x], dim=0))
+                logits, un_logits = torch.chunk(logits, 2, dim=0)
+                logits = un_logits + (cfg_scale + 1.0) * (logits - un_logits)
+            else:
+                logits = model(x)
+
+            if logits_eos_inf and eos_token_id is not None:
+                logits[:, :, eos_token_id] = float("-inf")
+
+            logits_with_noise = add_gumbel_noise(logits, temperature, generator=generator)
+            predictions = torch.argmax(logits_with_noise, dim=-1)
             predictions = torch.where(mask_index, predictions, x)
 
-            confidence = torch.rand(
-                (batch_size, total_len),
-                device=device,
-                dtype=torch.float32,
-                generator=generator,
-            )
+            if remasking == "low_confidence":
+                probs = F.softmax(logits, dim=-1)
+                confidence = torch.squeeze(
+                    torch.gather(probs, dim=-1, index=torch.unsqueeze(predictions, -1)),
+                    -1,
+                )
+            elif remasking == "random":
+                confidence = torch.rand(
+                    (batch_size, total_len),
+                    device=device,
+                    dtype=torch.float32,
+                    generator=generator,
+                )
+            else:
+                raise ValueError(f"Unsupported remasking strategy: {remasking}")
+
+            if confidence_eos_eot_inf and eos_token_id is not None:
+                confidence = torch.where(
+                    predictions == eos_token_id,
+                    torch.full_like(confidence, float("-inf")),
+                    confidence,
+                )
+
             confidence[:, block_end:] = float("-inf")
             confidence = torch.where(mask_index, confidence, torch.full_like(confidence, float("-inf")))
 
