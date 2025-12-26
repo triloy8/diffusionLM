@@ -54,6 +54,16 @@ def _seed_everything(seed: int, device: str | torch.device, *, rank: int = 0) ->
     return generator
 
 
+def _trim_at_pad(token_ids: list[int], pad_token_id: int | None) -> list[int]:
+    if pad_token_id is None:
+        return token_ids
+    try:
+        pad_index = token_ids.index(int(pad_token_id))
+    except ValueError:
+        return token_ids
+    return token_ids[:pad_index]
+
+
 def _prepare_optimizer_setup(cfg, model):
     optimizer_name = str(getattr(cfg, "optimizer_name", "adamw")).lower()
     setattr(cfg, "optimizer_name", optimizer_name)
@@ -126,6 +136,8 @@ def train_transformer(args, *, logger: Logger, run_name: str):
         raise ValueError("eot_token_id must be set for streaming datasets")
     pad_token_id = getattr(cfg, "pad_token_id", eot_token_id)
     setattr(cfg, "pad_token_id", pad_token_id)
+    val_log_every = int(getattr(cfg, "val_log_every", 0))
+    val_log_samples = int(getattr(cfg, "val_log_samples", 0))
     train_iterator_factory = HFTokenIteratorFactory(
         dataset_name=str(args.dataset_name),
         dataset_config=(str(args.dataset_config) if args.dataset_config is not None else None),
@@ -192,6 +204,38 @@ def train_transformer(args, *, logger: Logger, run_name: str):
     def _compute_loss(logits: torch.Tensor, batch) -> torch.Tensor:
         return diffusion_cross_entropy(logits, batch.clean_targets, batch.mask, batch.p_mask)
 
+    def _log_val_samples(payload: dict, step: int) -> None:
+        if logger is None:
+            return
+        inner_logger = getattr(logger, "_inner", None)
+        use_wandb = isinstance(inner_logger, WandbLogger) or isinstance(logger, WandbLogger)
+
+        rows = []
+        for inputs, preds, targets in zip(
+            payload["inputs"],
+            payload["predictions"],
+            payload["targets"],
+        ):
+            rows.append(
+                {
+                    "noisy_input": tokenizer.decode(_trim_at_pad(list(inputs), pad_token_id)),
+                    "prediction": tokenizer.decode(_trim_at_pad(list(preds), pad_token_id)),
+                    "target": tokenizer.decode(_trim_at_pad(list(targets), pad_token_id)),
+                }
+            )
+        if use_wandb:
+            try:
+                import wandb  # type: ignore
+
+                table = wandb.Table(columns=["noisy_input", "prediction", "target"])
+                for row in rows:
+                    table.add_data(row["noisy_input"], row["prediction"], row["target"])
+                logger.log({"phase": "val", "samples": table}, step=step)
+                return
+            except Exception:
+                pass
+        logger.log({"phase": "val", "samples": rows}, step=step)
+
     train_loop(
         model,
         optimizer,
@@ -221,6 +265,9 @@ def train_transformer(args, *, logger: Logger, run_name: str):
         activation_norms=activation_norms,
         log_activation_norms=bool(getattr(cfg, "log_activation_norms", False)),
         log_weight_norms=bool(getattr(cfg, "log_weight_norms", False)),
+        val_log_every=val_log_every,
+        val_log_samples=val_log_samples,
+        log_val_samples=_log_val_samples,
         skip_validation=bool(getattr(cfg, "skip_validation", False)),
     )
 
@@ -295,6 +342,8 @@ def train_transformer_ddp(local_rank, args, cfg_dc):
         raise ValueError("eot_token_id must be set for streaming datasets")
     pad_token_id = getattr(cfg, "pad_token_id", eot_token_id)
     setattr(cfg, "pad_token_id", pad_token_id)
+    val_log_every = int(getattr(cfg, "val_log_every", 0))
+    val_log_samples = int(getattr(cfg, "val_log_samples", 0))
     per_rank_seed = (int(shuffle_seed) if shuffle_seed is not None else 0) + global_rank
     train_iterator_factory = HFTokenIteratorFactory(
         dataset_name=str(args.dataset_name),
@@ -368,6 +417,38 @@ def train_transformer_ddp(local_rank, args, cfg_dc):
     def _sync():
         ddp_model.finish_gradient_synchronization()
 
+    def _log_val_samples(payload: dict, step: int) -> None:
+        if logger is None:
+            return
+        inner_logger = getattr(logger, "_inner", None)
+        use_wandb = isinstance(inner_logger, WandbLogger) or isinstance(logger, WandbLogger)
+
+        rows = []
+        for inputs, preds, targets in zip(
+            payload["inputs"],
+            payload["predictions"],
+            payload["targets"],
+        ):
+            rows.append(
+                {
+                    "noisy_input": tokenizer.decode(_trim_at_pad(list(inputs), pad_token_id)),
+                    "prediction": tokenizer.decode(_trim_at_pad(list(preds), pad_token_id)),
+                    "target": tokenizer.decode(_trim_at_pad(list(targets), pad_token_id)),
+                }
+            )
+        if use_wandb:
+            try:
+                import wandb  # type: ignore
+
+                table = wandb.Table(columns=["noisy_input", "prediction", "target"])
+                for row in rows:
+                    table.add_data(row["noisy_input"], row["prediction"], row["target"])
+                logger.log({"phase": "val", "samples": table}, step=step)
+                return
+            except Exception:
+                pass
+        logger.log({"phase": "val", "samples": rows}, step=step)
+
     train_loop(
         ddp_model,
         optimizer,
@@ -397,6 +478,9 @@ def train_transformer_ddp(local_rank, args, cfg_dc):
         activation_norms=activation_norms,
         log_activation_norms=bool(getattr(cfg, "log_activation_norms", False)),
         log_weight_norms=bool(getattr(cfg, "log_weight_norms", False)),
+        val_log_every=val_log_every,
+        val_log_samples=val_log_samples,
+        log_val_samples=_log_val_samples,
         sync_gradients=_sync,
         reduce_metric=allreduce_mean,
         is_rank_zero=(global_rank == 0),
@@ -439,6 +523,8 @@ def build_run_config(cfg, cfg_dc):
         "dtype": cfg.dtype,
         "ckpting_save_iter": cfg.ckpting_save_iter,
         "grad_accum_steps": int(getattr(cfg, "grad_accum_steps", 1)),
+        "val_log_every": int(getattr(cfg, "val_log_every", 0)),
+        "val_log_samples": int(getattr(cfg, "val_log_samples", 0)),
     }
 
     seed_value = getattr(cfg, "rng_seed", getattr(cfg, "seed", None))

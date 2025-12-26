@@ -279,6 +279,18 @@ class LoggingConfig(_BaseConfig):
     dataset: Optional[str] = None
     log_activation_norms: bool = False
     log_weight_norms: bool = False
+    val_log_every: int = 0
+    val_log_samples: int = 0
+
+    @model_validator(mode="after")
+    def _validate_logging(self):
+        if self.val_log_every < 0:
+            raise ValueError("val_log_every must be >= 0")
+        if self.val_log_samples < 0:
+            raise ValueError("val_log_samples must be >= 0")
+        if self.val_log_samples > 0 and self.val_log_every == 0:
+            raise ValueError("val_log_every must be > 0 when val_log_samples > 0")
+        return self
 
 
 class DdpConfig(_BaseConfig):

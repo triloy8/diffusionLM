@@ -49,6 +49,8 @@ def main():
         random_trunc_prob=cfg_dc.model.random_trunc_prob,
         log_activation_norms=bool(getattr(cfg_dc.logging, "log_activation_norms", False)) if cfg_dc.logging else False,
         log_weight_norms=bool(getattr(cfg_dc.logging, "log_weight_norms", False)) if cfg_dc.logging else False,
+        val_log_every=int(getattr(cfg_dc.logging, "val_log_every", 0)) if cfg_dc.logging else 0,
+        val_log_samples=int(getattr(cfg_dc.logging, "val_log_samples", 0)) if cfg_dc.logging else 0,
         # global
         device=cfg_dc.model.device,
         dtype=cfg_dc.model.dtype,
@@ -110,6 +112,8 @@ def main():
         "ckpting_save_iter": ns.ckpting_save_iter,
         "skip_validation": bool(ns.skip_validation),
         "grad_accum_steps": int(getattr(ns, "grad_accum_steps", 1)),
+        "val_log_every": int(getattr(ns, "val_log_every", 0)),
+        "val_log_samples": int(getattr(ns, "val_log_samples", 0)),
     }
     if getattr(ns, "rng_seed", None) is not None:
         run_config["rng_seed"] = ns.rng_seed

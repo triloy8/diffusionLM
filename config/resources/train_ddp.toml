@@ -83,11 +83,13 @@ merges_path = "./data/merges.txt"
 special_tokens_path = "./data/special_tokens.json"
 
 [logging]
-log_activation_norms = true
-log_weight_norms = true
 backend = "wandb"
 architecture = "DiffusionLM"
 dataset = "TinyStories"
+log_activation_norms = true
+log_weight_norms = true
+val_log_every = 1
+val_log_samples = 16
 
 [wandb]
 entity = "yiltro8-org"

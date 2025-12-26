@@ -49,6 +49,9 @@ def train_loop(
     activation_norms: dict | None = None,
     log_activation_norms: bool = False,
     log_weight_norms: bool = False,
+    val_log_every: int = 0,
+    val_log_samples: int = 0,
+    log_val_samples: Optional[Callable[[dict, int], None]] = None,
     # DDP/unified-loop hooks (optional)
     sync_gradients: Optional[Callable[[], None]] = None,
     reduce_metric: Optional[Callable[[float], float]] = None,
@@ -81,6 +84,27 @@ def train_loop(
     accum_steps = max(1, int(grad_accum_steps))
     accum_count = 0
     current_lr = None
+    val_pass_count = 0
+
+    def _extract_sample_payload(val_inputs, val_logits, val_batch, max_samples: int) -> Optional[dict]:
+        if max_samples <= 0:
+            return None
+        count = min(int(max_samples), int(val_inputs.shape[0]))
+        if count <= 0:
+            return None
+        targets = getattr(val_batch, "clean_targets", None)
+        if targets is None and isinstance(val_batch, dict):
+            targets = val_batch.get("clean_targets")
+        if targets is None:
+            return None
+        inputs_list = val_inputs[:count].detach().cpu().tolist()
+        preds_list = val_logits[:count].argmax(dim=-1).detach().cpu().tolist()
+        targets_list = targets[:count].detach().cpu().tolist()
+        return {
+            "inputs": inputs_list,
+            "predictions": preds_list,
+            "targets": targets_list,
+        }
     while True:
         model.train()
         raw_train_batch = get_batch(
@@ -260,9 +284,19 @@ def train_loop(
         # validation
         if (not skip_validation) and train_iteration % val_freq_iteration == 0:
             model.eval()
+            val_pass_count += 1
+            log_samples_now = (
+                is_rank_zero
+                and logger is not None
+                and log_val_samples is not None
+                and val_log_every > 0
+                and val_log_samples > 0
+                and (val_pass_count % val_log_every == 0)
+            )
             val_iteration = 0
             running_val_loss = 0.0
             val_tokens = 0
+            sample_payload = None
             while True:
                 with torch.no_grad():
                     raw_val_batch = get_batch(
@@ -278,6 +312,13 @@ def train_loop(
                     val_loss = compute_loss(val_logits, val_batch)
                     running_val_loss += float(val_loss.item())
                     val_tokens += int(val_inputs.numel())
+                    if log_samples_now and sample_payload is None:
+                        sample_payload = _extract_sample_payload(
+                            val_inputs,
+                            val_logits,
+                            val_batch,
+                            val_log_samples,
+                        )
                 val_iteration += 1
                 if max_val_iteration is not None and val_iteration >= max_val_iteration:
                     break
@@ -294,6 +335,8 @@ def train_loop(
                     },
                     step=train_iteration,
                 )
+            if log_samples_now and sample_payload is not None:
+                log_val_samples(sample_payload, train_iteration)
 
         # checkpoints
         if (
