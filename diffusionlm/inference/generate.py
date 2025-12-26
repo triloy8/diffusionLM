@@ -3,8 +3,7 @@ from __future__ import annotations
 import math
 
 import torch
-import torch.nn.functional as F
-from diffusionlm.inference.sampling import add_gumbel_noise, compute_transfer_schedule
+from diffusionlm.inference.sampling import add_gumbel_noise, compute_transfer_schedule, softmax
 
 
 @torch.no_grad()
@@ -87,7 +86,7 @@ def diffusion_generate(
             predictions = torch.where(mask_index, predictions, x)
 
             if remasking == "low_confidence":
-                probs = F.softmax(logits, dim=-1)
+                probs = softmax(logits, dim=-1)
                 confidence = torch.squeeze(
                     torch.gather(probs, dim=-1, index=torch.unsqueeze(predictions, -1)),
                     -1,
