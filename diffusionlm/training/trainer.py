@@ -54,16 +54,6 @@ def _seed_everything(seed: int, device: str | torch.device, *, rank: int = 0) ->
     return generator
 
 
-def _trim_at_pad(token_ids: list[int], pad_token_id: int | None) -> list[int]:
-    if pad_token_id is None:
-        return token_ids
-    try:
-        pad_index = token_ids.index(int(pad_token_id))
-    except ValueError:
-        return token_ids
-    return token_ids[:pad_index]
-
-
 def _prepare_optimizer_setup(cfg, model):
     optimizer_name = str(getattr(cfg, "optimizer_name", "adamw")).lower()
     setattr(cfg, "optimizer_name", optimizer_name)
@@ -218,9 +208,9 @@ def train_transformer(args, *, logger: Logger, run_name: str):
         ):
             rows.append(
                 {
-                    "noisy_input": tokenizer.decode(_trim_at_pad(list(inputs), pad_token_id)),
-                    "prediction": tokenizer.decode(_trim_at_pad(list(preds), pad_token_id)),
-                    "target": tokenizer.decode(_trim_at_pad(list(targets), pad_token_id)),
+                    "noisy_input": tokenizer.decode(list(inputs)),
+                    "prediction": tokenizer.decode(list(preds)),
+                    "target": tokenizer.decode(list(targets)),
                 }
             )
         if use_wandb:
@@ -431,9 +421,9 @@ def train_transformer_ddp(local_rank, args, cfg_dc):
         ):
             rows.append(
                 {
-                    "noisy_input": tokenizer.decode(_trim_at_pad(list(inputs), pad_token_id)),
-                    "prediction": tokenizer.decode(_trim_at_pad(list(preds), pad_token_id)),
-                    "target": tokenizer.decode(_trim_at_pad(list(targets), pad_token_id)),
+                    "noisy_input": tokenizer.decode(list(inputs)),
+                    "prediction": tokenizer.decode(list(preds)),
+                    "target": tokenizer.decode(list(targets)),
                 }
             )
         if use_wandb:
