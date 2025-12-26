@@ -1,8 +1,8 @@
 [model]
 vocab_size = 50258
-context_length = 256
+context_length = 512
 d_model = 768
-num_layers = 4
+num_layers = 8
 num_heads = 16
 d_ff = 3072
 rope_theta = 10000.0
@@ -58,14 +58,14 @@ eps = 1e-10
 weight_decay = 0.02
 
 [training]
-batch_size = 216
-max_train_iteration = 5000
+batch_size = 128
+max_train_iteration = 50000
 max_val_iteration = 10
 val_freq_iteration = 125
 ckpting_save_iter = 1000
 seed = 3407
 skip_validation = false
-grad_accum_steps = 1
+grad_accum_steps = 2
 
 [data]
 runs_path = "./runs"
