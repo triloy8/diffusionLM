@@ -194,14 +194,9 @@ def train_transformer(args, *, logger: Logger, run_name: str):
     def _compute_loss(logits: torch.Tensor, batch) -> torch.Tensor:
         return diffusion_cross_entropy(logits, batch.clean_targets, batch.mask, batch.p_mask)
 
-    val_samples_rows: list[list[str]] = []
-
     def _log_val_samples(payload: dict, step: int) -> None:
         if logger is None:
             return
-        inner_logger = getattr(logger, "_inner", None)
-        use_wandb = isinstance(inner_logger, WandbLogger) or isinstance(logger, WandbLogger)
-
         rows = []
         for inputs, preds, targets in zip(
             payload["inputs"],
@@ -215,18 +210,7 @@ def train_transformer(args, *, logger: Logger, run_name: str):
                     "target": tokenizer.decode(list(targets)),
                 }
             )
-        if use_wandb:
-            try:
-                import wandb  # type: ignore
-
-                for row in rows:
-                    val_samples_rows.append([row["noisy_input"], row["prediction"], row["target"]])
-                table = wandb.Table(columns=["noisy_input", "prediction", "target"], data=val_samples_rows)
-                logger.log({"val/samples": table}, step=step)
-                return
-            except Exception:
-                pass
-        logger.log({"val/samples": rows}, step=step)
+        logger.log_table("val/samples", rows, step=step)
 
     train_loop(
         model,
@@ -409,14 +393,9 @@ def train_transformer_ddp(local_rank, args, cfg_dc):
     def _sync():
         ddp_model.finish_gradient_synchronization()
 
-    val_samples_rows: list[list[str]] = []
-
     def _log_val_samples(payload: dict, step: int) -> None:
         if logger is None:
             return
-        inner_logger = getattr(logger, "_inner", None)
-        use_wandb = isinstance(inner_logger, WandbLogger) or isinstance(logger, WandbLogger)
-
         rows = []
         for inputs, preds, targets in zip(
             payload["inputs"],
@@ -430,18 +409,7 @@ def train_transformer_ddp(local_rank, args, cfg_dc):
                     "target": tokenizer.decode(list(targets)),
                 }
             )
-        if use_wandb:
-            try:
-                import wandb  # type: ignore
-
-                for row in rows:
-                    val_samples_rows.append([row["noisy_input"], row["prediction"], row["target"]])
-                table = wandb.Table(columns=["noisy_input", "prediction", "target"], data=val_samples_rows)
-                logger.log({"val/samples": table}, step=step)
-                return
-            except Exception:
-                pass
-        logger.log({"val/samples": rows}, step=step)
+        logger.log_table("val/samples", rows, step=step)
 
     train_loop(
         ddp_model,

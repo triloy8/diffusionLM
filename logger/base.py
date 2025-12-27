@@ -12,6 +12,10 @@ class Logger:
         """Log a dictionary of metrics/events. 'step' is optional."""
         raise NotImplementedError
 
+    def log_table(self, key: str, rows: list, step: Optional[int] = None) -> None:
+        """Log a table-like payload under a key."""
+        self.log({key: rows}, step=step)
+
     def log_artifact(self, path: str, name: Optional[str] = None, type_: Optional[str] = None) -> None:
         """Optionally log a file artifact (noop by default)."""
         return None
@@ -19,4 +23,3 @@ class Logger:
     def finish(self) -> None:
         """Close out the run (flush/cleanup)."""
         raise NotImplementedError
-

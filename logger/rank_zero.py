@@ -22,9 +22,11 @@ class RankZeroLogger(Logger):
     def log(self, data: Dict[str, Any], step: Optional[int] = None) -> None:
         self._inner.log(data, step=step)
 
+    def log_table(self, key: str, rows: list, step: Optional[int] = None) -> None:
+        self._inner.log_table(key, rows, step=step)
+
     def log_artifact(self, path: str, name: Optional[str] = None, type_: Optional[str] = None) -> None:
         self._inner.log_artifact(path, name=name, type_=type_)
 
     def finish(self) -> None:
         self._inner.finish()
-

@@ -12,6 +12,8 @@ class NoOpLogger(Logger):
     def log(self, data: Dict[str, Any], step: Optional[int] = None) -> None:
         return None
 
-    def finish(self) -> None:
+    def log_table(self, key: str, rows: list, step: Optional[int] = None) -> None:
         return None
 
+    def finish(self) -> None:
+        return None

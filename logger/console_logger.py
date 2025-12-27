@@ -30,6 +30,9 @@ class ConsoleLogger(Logger):
             line["step"] = int(step)
         print(f"{self._prefix} " + json.dumps(line, ensure_ascii=False))
 
+    def log_table(self, key: str, rows: list, step: Optional[int] = None) -> None:
+        self.log({key: rows}, step=step)
+
     def log_artifact(self, path: str, name: Optional[str] = None, type_: Optional[str] = None) -> None:
         line = {
             "ts": datetime.utcnow().isoformat() + "Z",
@@ -47,4 +50,3 @@ class ConsoleLogger(Logger):
             "ts": datetime.utcnow().isoformat() + "Z",
         }
         print(f"{self._prefix} " + json.dumps(line, ensure_ascii=False))
-
