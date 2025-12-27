@@ -12,6 +12,7 @@ class WandbLogger(Logger):
         self._name = name
         self._run = None
         self._tables: Dict[str, Any] = {}
+        self._table_rows: Dict[str, list[list[Any]]] = {}
 
     def start_run(self, config: Dict[str, Any]) -> Dict[str, str]:
         # Import lazily to keep core free of wandb dependency
@@ -41,11 +42,16 @@ class WandbLogger(Logger):
                 columns = ["noisy_input", "prediction", "target"]
             table = wandb.Table(columns=columns)
             self._tables[key] = table
+
+        row_cache = self._table_rows.setdefault(key, [])
         for row in rows:
             if isinstance(row, dict):
-                table.add_data(*(row.get(col, "") for col in table.columns))
+                row_cache.append([row.get(col, "") for col in table.columns])
             elif isinstance(row, (list, tuple)):
-                table.add_data(*row)
+                row_cache.append(list(row))
+
+        table = wandb.Table(columns=table.columns, data=row_cache)
+        self._tables[key] = table
         wandb.log({key: table}, step=step)
 
     def log_artifact(self, path: str, name: Optional[str] = None, type_: Optional[str] = None) -> None:
