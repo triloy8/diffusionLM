@@ -1,5 +1,5 @@
 [model]
-vocab_size = 50258
+vocab_size = 50259
 context_length = 512
 d_model = 768
 num_layers = 8
@@ -8,8 +8,8 @@ d_ff = 3072
 rope_theta = 10000.0
 device = "cuda"
 dtype = "bfloat16"
-mask_token_id = 50257
-eot_token_id = 50256
+mask_token_id = 50258
+eot_token_id = 50257
 pad_token_id = 50256
 noise_epsilon = 0.001
 random_trunc_prob = 0 # 0.01

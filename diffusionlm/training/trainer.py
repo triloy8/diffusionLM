@@ -187,6 +187,7 @@ def train_transformer(args, *, logger: Logger, run_name: str):
     batch_getter = partial(
         get_batch,
         mask_token_id=mask_token_id,
+        pad_token_id=pad_token_id,
         noise_epsilon=noise_epsilon,
         random_trunc_prob=random_trunc_prob,
     )
@@ -365,6 +366,7 @@ def train_transformer_ddp(local_rank, args, cfg_dc):
     batch_getter = partial(
         get_batch,
         mask_token_id=mask_token_id,
+        pad_token_id=pad_token_id,
         noise_epsilon=noise_epsilon,
         random_trunc_prob=random_trunc_prob,
     )
