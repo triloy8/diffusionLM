@@ -433,7 +433,7 @@ def train_transformer_ddp(local_rank, args, cfg_dc):
                 table = wandb.Table(columns=["noisy_input", "prediction", "target"])
                 for row in rows:
                     table.add_data(row["noisy_input"], row["prediction"], row["target"])
-                logger.log({"phase": "val", "samples": table}, step=step)
+                logger.log({"val/samples": table}, step=step)
                 return
             except Exception:
                 pass
