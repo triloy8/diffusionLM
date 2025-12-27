@@ -194,24 +194,6 @@ def train_transformer(args, *, logger: Logger, run_name: str):
     def _compute_loss(logits: torch.Tensor, batch) -> torch.Tensor:
         return diffusion_cross_entropy(logits, batch.clean_targets, batch.mask, batch.p_mask)
 
-    def _log_val_samples(payload: dict, step: int) -> None:
-        if logger is None:
-            return
-        rows = []
-        for inputs, preds, targets in zip(
-            payload["inputs"],
-            payload["predictions"],
-            payload["targets"],
-        ):
-            rows.append(
-                {
-                    "noisy_input": tokenizer.decode(list(inputs)),
-                    "prediction": tokenizer.decode(list(preds)),
-                    "target": tokenizer.decode(list(targets)),
-                }
-            )
-        logger.log_table("val/samples", rows, step=step)
-
     train_loop(
         model,
         optimizer,
@@ -243,7 +225,7 @@ def train_transformer(args, *, logger: Logger, run_name: str):
         log_weight_norms=bool(getattr(cfg, "log_weight_norms", False)),
         val_log_every=val_log_every,
         val_log_samples=val_log_samples,
-        log_val_samples=_log_val_samples,
+        val_sample_decode=tokenizer.decode,
         skip_validation=bool(getattr(cfg, "skip_validation", False)),
     )
 
@@ -393,24 +375,6 @@ def train_transformer_ddp(local_rank, args, cfg_dc):
     def _sync():
         ddp_model.finish_gradient_synchronization()
 
-    def _log_val_samples(payload: dict, step: int) -> None:
-        if logger is None:
-            return
-        rows = []
-        for inputs, preds, targets in zip(
-            payload["inputs"],
-            payload["predictions"],
-            payload["targets"],
-        ):
-            rows.append(
-                {
-                    "noisy_input": tokenizer.decode(list(inputs)),
-                    "prediction": tokenizer.decode(list(preds)),
-                    "target": tokenizer.decode(list(targets)),
-                }
-            )
-        logger.log_table("val/samples", rows, step=step)
-
     train_loop(
         ddp_model,
         optimizer,
@@ -442,7 +406,7 @@ def train_transformer_ddp(local_rank, args, cfg_dc):
         log_weight_norms=bool(getattr(cfg, "log_weight_norms", False)),
         val_log_every=val_log_every,
         val_log_samples=val_log_samples,
-        log_val_samples=_log_val_samples,
+        val_sample_decode=tokenizer.decode,
         sync_gradients=_sync,
         reduce_metric=allreduce_mean,
         is_rank_zero=(global_rank == 0),

@@ -51,7 +51,7 @@ def train_loop(
     log_weight_norms: bool = False,
     val_log_every: int = 0,
     val_log_samples: int = 0,
-    log_val_samples: Optional[Callable[[dict, int], None]] = None,
+    val_sample_decode: Optional[Callable[[list[int]], str]] = None,
     # DDP/unified-loop hooks (optional)
     sync_gradients: Optional[Callable[[], None]] = None,
     reduce_metric: Optional[Callable[[float], float]] = None,
@@ -85,6 +85,11 @@ def train_loop(
     accum_count = 0
     current_lr = None
     val_pass_count = 0
+
+    def _format_sample_tokens(tokens: list[int]) -> object:
+        if val_sample_decode is None:
+            return tokens
+        return val_sample_decode(tokens)
 
     def _extract_sample_payload(val_inputs, val_logits, val_batch, max_samples: int) -> Optional[dict]:
         if max_samples <= 0:
@@ -288,7 +293,6 @@ def train_loop(
             log_samples_now = (
                 is_rank_zero
                 and logger is not None
-                and log_val_samples is not None
                 and val_log_every > 0
                 and val_log_samples > 0
                 and (val_pass_count % val_log_every == 0)
@@ -335,8 +339,21 @@ def train_loop(
                     },
                     step=train_iteration,
                 )
-            if log_samples_now and sample_payload is not None:
-                log_val_samples(sample_payload, train_iteration)
+            if log_samples_now and sample_payload is not None and logger is not None:
+                rows = []
+                for inputs, preds, targets in zip(
+                    sample_payload["inputs"],
+                    sample_payload["predictions"],
+                    sample_payload["targets"],
+                ):
+                    rows.append(
+                        {
+                            "noisy_input": _format_sample_tokens(list(inputs)),
+                            "prediction": _format_sample_tokens(list(preds)),
+                            "target": _format_sample_tokens(list(targets)),
+                        }
+                    )
+                logger.log_table("val/samples", rows, step=train_iteration)
 
         # checkpoints
         if (
