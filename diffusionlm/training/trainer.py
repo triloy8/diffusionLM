@@ -194,7 +194,7 @@ def train_transformer(args, *, logger: Logger, run_name: str):
     def _compute_loss(logits: torch.Tensor, batch) -> torch.Tensor:
         return diffusion_cross_entropy(logits, batch.clean_targets, batch.mask, batch.p_mask)
 
-    val_samples_table = None
+    val_samples_rows: list[list[str]] = []
 
     def _log_val_samples(payload: dict, step: int) -> None:
         if logger is None:
@@ -219,12 +219,10 @@ def train_transformer(args, *, logger: Logger, run_name: str):
             try:
                 import wandb  # type: ignore
 
-                nonlocal val_samples_table
-                if val_samples_table is None:
-                    val_samples_table = wandb.Table(columns=["noisy_input", "prediction", "target"])
                 for row in rows:
-                    val_samples_table.add_data(row["noisy_input"], row["prediction"], row["target"])
-                logger.log({"val/samples": val_samples_table}, step=step)
+                    val_samples_rows.append([row["noisy_input"], row["prediction"], row["target"]])
+                table = wandb.Table(columns=["noisy_input", "prediction", "target"], data=val_samples_rows)
+                logger.log({"val/samples": table}, step=step)
                 return
             except Exception:
                 pass
@@ -411,7 +409,7 @@ def train_transformer_ddp(local_rank, args, cfg_dc):
     def _sync():
         ddp_model.finish_gradient_synchronization()
 
-    val_samples_table = None
+    val_samples_rows: list[list[str]] = []
 
     def _log_val_samples(payload: dict, step: int) -> None:
         if logger is None:
@@ -436,12 +434,10 @@ def train_transformer_ddp(local_rank, args, cfg_dc):
             try:
                 import wandb  # type: ignore
 
-                nonlocal val_samples_table
-                if val_samples_table is None:
-                    val_samples_table = wandb.Table(columns=["noisy_input", "prediction", "target"])
                 for row in rows:
-                    val_samples_table.add_data(row["noisy_input"], row["prediction"], row["target"])
-                logger.log({"val/samples": val_samples_table}, step=step)
+                    val_samples_rows.append([row["noisy_input"], row["prediction"], row["target"]])
+                table = wandb.Table(columns=["noisy_input", "prediction", "target"], data=val_samples_rows)
+                logger.log({"val/samples": table}, step=step)
                 return
             except Exception:
                 pass
