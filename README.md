@@ -82,7 +82,7 @@ Training now streams data directly from Hugging Face Datasets. To prepare your e
 2. **Choose a dataset** available via `datasets.load_dataset`. Configure `[data]` with `dataset_name`, optional `dataset_config`, `train_split`, `val_split`, and the text field to tokenize. Streaming supports both public Hub datasets and local files (e.g., `load_dataset("json", data_files=...)`).
 3. **Cache for offline runs**: set `HF_DATASETS_CACHE=/path/to/cache` and run training/benchmarking once with network access (or use `huggingface-cli download ...`). After the cache is populated, set `HF_DATASETS_OFFLINE=1` to force offline mode. Private datasets require `huggingface-cli login` or an `HF_TOKEN` in the environment.
 4. **Shuffling**: `[data].shuffle_buffer_size` controls the streaming shuffle window; bump it up (e.g., 10_000) for better randomization, or leave at 0 to read the dataset order as-is. `shuffle_seed` seeds the buffer RNG; DDP adds the rank to keep shards deterministic and independent.
-5. **Row boundaries**: each streamed row is tokenized, appended with `eot_token_id`, truncated if needed, and padded to `context_length` (using `pad_token_id` when set, otherwise `eot_token_id`).
+5. **Row boundaries**: each streamed row is tokenized, appended with `eot_token_id`, truncated if needed, and padded to `context_length` (using `eot_token_id`).
 
 ### Legacy memmap pipeline
 

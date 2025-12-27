@@ -124,8 +124,6 @@ def train_transformer(args, *, logger: Logger, run_name: str):
     eot_token_id = getattr(cfg, "eot_token_id", None)
     if eot_token_id is None:
         raise ValueError("eot_token_id must be set for streaming datasets")
-    pad_token_id = getattr(cfg, "pad_token_id", eot_token_id)
-    setattr(cfg, "pad_token_id", pad_token_id)
     val_log_every = int(getattr(cfg, "val_log_every", 0))
     val_log_samples = int(getattr(cfg, "val_log_samples", 0))
     train_iterator_factory = HFTokenIteratorFactory(
@@ -136,7 +134,6 @@ def train_transformer(args, *, logger: Logger, run_name: str):
         tokenizer=tokenizer,
         context_length=int(cfg.context_length),
         eot_token_id=int(eot_token_id),
-        pad_token_id=int(pad_token_id),
         shuffle_buffer_size=int(getattr(args, "shuffle_buffer_size", 0)),
         shuffle_seed=(int(shuffle_seed) if shuffle_seed is not None else None),
         world_size=1,
@@ -152,7 +149,6 @@ def train_transformer(args, *, logger: Logger, run_name: str):
         tokenizer=tokenizer,
         context_length=int(cfg.context_length),
         eot_token_id=int(eot_token_id),
-        pad_token_id=int(pad_token_id),
         shuffle_buffer_size=0,
         shuffle_seed=None,
         world_size=1,
@@ -187,7 +183,6 @@ def train_transformer(args, *, logger: Logger, run_name: str):
     batch_getter = partial(
         get_batch,
         mask_token_id=mask_token_id,
-        pad_token_id=pad_token_id,
         noise_epsilon=noise_epsilon,
         random_trunc_prob=random_trunc_prob,
     )
@@ -299,8 +294,6 @@ def train_transformer_ddp(local_rank, args, cfg_dc):
     eot_token_id = getattr(cfg, "eot_token_id", None)
     if eot_token_id is None:
         raise ValueError("eot_token_id must be set for streaming datasets")
-    pad_token_id = getattr(cfg, "pad_token_id", eot_token_id)
-    setattr(cfg, "pad_token_id", pad_token_id)
     val_log_every = int(getattr(cfg, "val_log_every", 0))
     val_log_samples = int(getattr(cfg, "val_log_samples", 0))
     per_rank_seed = (int(shuffle_seed) if shuffle_seed is not None else 0) + global_rank
@@ -312,7 +305,6 @@ def train_transformer_ddp(local_rank, args, cfg_dc):
         tokenizer=tokenizer,
         context_length=int(cfg.context_length),
         eot_token_id=int(eot_token_id),
-        pad_token_id=int(pad_token_id),
         shuffle_buffer_size=int(getattr(args, "shuffle_buffer_size", 0)),
         shuffle_seed=per_rank_seed,
         world_size=cfg.world_size,
@@ -328,7 +320,6 @@ def train_transformer_ddp(local_rank, args, cfg_dc):
         tokenizer=tokenizer,
         context_length=int(cfg.context_length),
         eot_token_id=int(eot_token_id),
-        pad_token_id=int(pad_token_id),
         shuffle_buffer_size=0,
         shuffle_seed=None,
         world_size=cfg.world_size,
@@ -366,7 +357,6 @@ def train_transformer_ddp(local_rank, args, cfg_dc):
     batch_getter = partial(
         get_batch,
         mask_token_id=mask_token_id,
-        pad_token_id=pad_token_id,
         noise_epsilon=noise_epsilon,
         random_trunc_prob=random_trunc_prob,
     )

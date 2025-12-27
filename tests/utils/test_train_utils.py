@@ -129,14 +129,14 @@ def test_get_batch_shapes_and_targets(tmp_path, device):
 
 def test_apply_eot_padding_short():
     tokens = [1, 2, 3]
-    out = apply_eot_padding(tokens, context_length=6, eot_token_id=9, pad_token_id=0)
-    assert out == [1, 2, 3, 9, 0, 0]
+    out = apply_eot_padding(tokens, context_length=6, eot_token_id=9)
+    assert out == [1, 2, 3, 9, 9, 9]
 
 
 def test_apply_eot_padding_truncates_and_keeps_eot():
     tokens = list(range(10))
-    out = apply_eot_padding(tokens, context_length=4, eot_token_id=9, pad_token_id=0)
-    assert out == [0, 1, 2, 9]
+    out = apply_eot_padding(tokens, context_length=4, eot_token_id=9)
+    assert out == [0, 1, 2, 3]
 
 def test_get_batch_raises_on_too_small_dataset(device):
     import random

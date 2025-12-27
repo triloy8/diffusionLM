@@ -16,7 +16,6 @@ def apply_eot_padding(
     *,
     context_length: int,
     eot_token_id: int,
-    pad_token_id: int,
 ) -> list[int]:
     if context_length <= 0:
         raise ValueError("context_length must be > 0")
@@ -24,7 +23,7 @@ def apply_eot_padding(
     if len(tokens) >= context_length:
         return tokens[:context_length]
     tokens.append(eot_token_id)
-    tokens.extend([pad_token_id] * (context_length - len(tokens)))
+    tokens.extend([eot_token_id] * (context_length - len(tokens)))
     return tokens
 
 
@@ -41,7 +40,6 @@ class HFTokenIteratorFactory:
         tokenizer: Tokenizer,
         context_length: int,
         eot_token_id: int,
-        pad_token_id: Optional[int] = None,
         shuffle_buffer_size: int = 0,
         shuffle_seed: Optional[int] = None,
         world_size: int = 1,
@@ -59,7 +57,6 @@ class HFTokenIteratorFactory:
         self.tokenizer = tokenizer
         self.context_length = int(context_length)
         self.eot_token_id = int(eot_token_id)
-        self.pad_token_id = int(pad_token_id) if pad_token_id is not None else int(eot_token_id)
         self.shuffle_buffer_size = max(0, shuffle_buffer_size)
         self.shuffle_seed = shuffle_seed if shuffle_seed is not None else 0
         self.world_size = max(1, world_size)
@@ -149,7 +146,6 @@ class HFTokenIteratorFactory:
                 list(token_ids),
                 context_length=self.context_length,
                 eot_token_id=self.eot_token_id,
-                pad_token_id=self.pad_token_id,
             )
 
 

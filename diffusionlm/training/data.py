@@ -34,7 +34,6 @@ def get_batch(
     device: str,
     *,
     mask_token_id: int,
-    pad_token_id: int | None = None,
     noise_epsilon: float = 1e-3,
     random_trunc_prob: float = 0.01,
     generator: torch.Generator | None = None,
@@ -59,9 +58,6 @@ def get_batch(
     p_mask = (1.0 - noise_epsilon) * t[:, None] + noise_epsilon
     mask_rand = _rand_uniform((batch_size, seq_len), device=device_obj, generator=generator)
     mask = mask_rand < p_mask
-    if pad_token_id is not None:
-        pad_mask = clean_targets != int(pad_token_id)
-        mask = mask & pad_mask
 
     mask_token_tensor = torch.full_like(clean_targets, fill_value=mask_token_id)
     noisy_inputs = torch.where(mask, mask_token_tensor, clean_targets)

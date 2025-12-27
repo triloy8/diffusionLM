@@ -152,7 +152,6 @@ class ModelConfig(_BaseConfig):
     dtype: str
     mask_token_id: Optional[int] = None
     eot_token_id: Optional[int] = None
-    pad_token_id: Optional[int] = None
     noise_epsilon: float = 1e-3
     random_trunc_prob: float = 0.01
 
@@ -186,12 +185,6 @@ class ModelConfig(_BaseConfig):
         if self.eot_token_id is not None:
             if not (0 <= self.eot_token_id < self.vocab_size):
                 raise ValueError("eot_token_id must be in [0, vocab_size)")
-        if self.pad_token_id is None:
-            if self.eot_token_id is not None:
-                self.pad_token_id = self.eot_token_id
-        else:
-            if not (0 <= self.pad_token_id < self.vocab_size):
-                raise ValueError("pad_token_id must be in [0, vocab_size)")
         if not (0 < self.noise_epsilon <= 1):
             raise ValueError("noise_epsilon must be in (0, 1]")
         if not (0 <= self.random_trunc_prob <= 1):
