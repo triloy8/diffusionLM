@@ -1,4 +1,4 @@
-program: train_transformer.py
+program: cli/train_ddp.py
 method: bayes
 metric:
   goal: minimize

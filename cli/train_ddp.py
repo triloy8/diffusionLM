@@ -21,7 +21,7 @@ def main():
     if cfg_dc is None:
         return
     if cfg_dc.ddp is None:
-        raise ValueError("DDP config is required when using train_ddp.py")
+        raise ValueError("DDP config is required when using diffusionlm-train")
 
     # Build an argparse-like namespace expected by existing code
     ns = argparse.Namespace(

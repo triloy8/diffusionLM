@@ -23,4 +23,4 @@ else
     bash /app/scripts/fetch_data.sh /app/data
 fi
 
-exec uv run diffusionlm-train-ddp --config config/resources/train_ddp.toml
+exec uv run diffusionlm-train --config config/resources/train.toml

@@ -319,7 +319,6 @@ def _patch_bench_tokenizer(cfg: dict, tmp_path: Path) -> dict:
 
 RESOURCE_CASES = [
     ("train.toml", TrainConfig, _patch_train_like),
-    ("train_ddp.toml", TrainConfig, _patch_train_like),
     ("infer.toml", InferConfig, _patch_infer_like),
     ("bench_infer.toml", BenchInferConfig, _patch_bench_infer),
     ("bench_tokenizer.toml", BenchTokenizerConfig, _patch_bench_tokenizer),

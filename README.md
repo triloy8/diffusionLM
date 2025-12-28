@@ -38,22 +38,16 @@ Entry points live in `cli/` and are driven by TOML configs in `config/resources/
 uv run diffusionlm-train-tokenizer --config config/resources/train_tokenizer.toml
 ```
 
-- Start model training:
+- Start model training (DDP works for single GPU too):
 
 ```bash
 uv run diffusionlm-train --config config/resources/train.toml
 ```
 
-- Train with DDP:
-
-```bash
-uv run diffusionlm-train-ddp --config config/resources/train_ddp.toml
-```
-
 Notes:
 - CPU uses `gloo`; CUDA uses `nccl`. Set `[model].device` and `[ddp].backend` accordingly.
 - Prefer `[logging].backend = "console"` for local runs.
-- Optimizer state sharding is enabled by default in the DDP entry point to reduce per-rank optimizer memory.
+- Optimizer state sharding is enabled by default in the training entry point to reduce per-rank optimizer memory.
 - Choose the optimizer via `[optimizer].optimizer_name` (`"adamw"` default, `"muon"` experimental) while keeping the rest of the `[optimizer]` schedule knobs unchanged.
 - When using Muon, configure per-group hyperparameters under `[optimizer.muon.*]` (hidden, head, embed, scalar) so each param group carries its own learning-rate range and optimizer settings; AdamW ignores those subtables.
 - To fully skip validation (e.g., when no separate split exists), set `[training].skip_validation = true`; otherwise the loop will run `max_val_iteration` batches every `val_freq_iteration` steps.
@@ -138,7 +132,7 @@ The `Justfile` plus helper scripts under `scripts/` provide a thin remote contro
 
 - cli
   - Purpose: Command‑line entry points wrapping configs and orchestration.
-  - Key files: `cli/train.py`, `cli/infer.py`, `cli/make_data.py`, `cli/train_tokenizer.py`, `cli/utils.py`.
+  - Key files: `cli/train_ddp.py`, `cli/infer.py`, `cli/make_data.py`, `cli/train_tokenizer.py`, `cli/utils.py`.
   - Scripts: exposed in `pyproject.toml` under `[project.scripts]`.
 
 - logger

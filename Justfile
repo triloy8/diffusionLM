@@ -13,7 +13,7 @@ data-remote:
 build-remote:
 	ssh {{prime_host}} "cd {{remote_root}} && export PATH=\"\\$HOME/.local/bin:\\$PATH\" && (uv sync --frozen || uv sync)"
 
-train config="config/resources/train_ddp.toml" extra="":
+train config="config/resources/train.toml" extra="":
 	ssh {{prime_host}} "cd {{remote_root}} && bash scripts/run_train_remote.sh $(printf '%q' '{{config}}') $(printf '%q' '{{extra}}')"
 
 infer command="{{infer_command_default}}" args="":

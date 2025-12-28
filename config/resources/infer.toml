@@ -18,16 +18,16 @@ noise_epsilon = 0.001
 random_trunc_prob = 0
 
 [checkpoint]
-ckpt_path = "./runs/2025-12-27_20-27-57/17000.ckpt"
+ckpt_path = "./runs/2025-12-28_13-47-52/10000.ckpt"
 
 [inference]
 prompt = "Once upon a time,"
 steps = 256
 total_length = 512
 block_length = 64
-temperature = 0.2
+temperature = 0.4
 mask_id = 50257
-seed = 3407
+seed = 34078
 eos_token_id = 50256
 cfg_scale = 0.0
 remasking = "low_confidence"

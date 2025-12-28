@@ -2,7 +2,7 @@
 set -euo pipefail
 
 # shellcheck disable=SC2034
-CONFIG="${1:-${CONFIG:-config/resources/train_ddp.toml}}"
+CONFIG="${1:-${CONFIG:-config/resources/train.toml}}"
 # shellcheck disable=SC2034
 EXTRA_ARGS="${2:-${EXTRA_ARGS:-}}"
 
@@ -34,6 +34,6 @@ if tmux has-session -t "${SESSION}" 2>/dev/null; then
 	tmux kill-session -t "${SESSION}"
 fi
 
-CMD="uv run diffusionlm-train-ddp --config \"${CONFIG}\" ${EXTRA_ARGS}"
+CMD="uv run diffusionlm-train --config \"${CONFIG}\" ${EXTRA_ARGS}"
 tmux new -d -s "${SESSION}" "WANDB_API_KEY=${WANDB_API_KEY} ${CMD}"
 echo "Started tmux session ${SESSION}"

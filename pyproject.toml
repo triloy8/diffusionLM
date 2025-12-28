@@ -30,8 +30,7 @@ ignore = [
 ]
 
 [project.scripts]
-diffusionlm-train = "cli.train:main"
-diffusionlm-train-ddp = "cli.train_ddp:main"
+diffusionlm-train = "cli.train_ddp:main"
 diffusionlm-infer = "cli.infer:main"
 diffusionlm-make-data = "cli.make_data:main"
 diffusionlm-train-tokenizer = "cli.train_tokenizer:main"
