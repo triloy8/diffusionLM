@@ -4,7 +4,7 @@ vocab_path = "./data/vocab.json"
 special_tokens_path = "./data/special_tokens.json"
 
 [model]
-vocab_size = 50259
+vocab_size = 50258
 context_length = 512
 d_model = 768
 num_layers = 8
@@ -18,18 +18,18 @@ noise_epsilon = 0.001
 random_trunc_prob = 0
 
 [checkpoint]
-ckpt_path = "./runs/2025-12-27_17-41-19/6000.ckpt"
+ckpt_path = "./runs/2025-12-27_20-27-57/17000.ckpt"
 
 [inference]
 prompt = "Once upon a time,"
 steps = 256
 total_length = 512
 block_length = 64
-temperature = 0.7
-mask_id = 50258
+temperature = 0.2
+mask_id = 50257
 seed = 3407
-eos_token_id = 50257
+eos_token_id = 50256
 cfg_scale = 0.0
-remasking = "random"
+remasking = "low_confidence"
 logits_eos_inf = false
 confidence_eos_eot_inf = false

@@ -13,7 +13,7 @@ from diffusionlm.training import (
     save_checkpoint,
     load_checkpoint,
 )
-from diffusionlm.training.streaming import apply_eot_padding
+from diffusionlm.training.streaming import StreamingBatcher
 
 
 
@@ -127,16 +127,27 @@ def test_get_batch_shapes_and_targets(tmp_path, device):
 
 
 
-def test_apply_eot_padding_short():
-    tokens = [1, 2, 3]
-    out = apply_eot_padding(tokens, context_length=6, eot_token_id=9)
-    assert out == [1, 2, 3, 9, 9, 9]
+class _ListIteratorFactory:
+    def __init__(self, sequences):
+        self._sequences = [list(seq) for seq in sequences]
+        self._index = 0
+
+    def __call__(self):
+        while True:
+            if self._index >= len(self._sequences):
+                self._index = 0
+            seq = self._sequences[self._index]
+            self._index += 1
+            yield seq
 
 
-def test_apply_eot_padding_truncates_and_keeps_eot():
-    tokens = list(range(10))
-    out = apply_eot_padding(tokens, context_length=4, eot_token_id=9)
-    assert out == [0, 1, 2, 3]
+def test_streaming_batcher_packs_sequences(device):
+    factory = _ListIteratorFactory([[1, 2, 9], [3, 4, 9], [5, 9]])
+    batcher = StreamingBatcher(factory, device=str(device))
+    batch = batcher.draw(batch_size=2, context_length=4)
+    assert batch.shape == (2, 4)
+    assert batch[0].tolist() == [1, 2, 9, 3]
+    assert batch[1].tolist() == [4, 9, 5, 9]
 
 def test_get_batch_raises_on_too_small_dataset(device):
     import random

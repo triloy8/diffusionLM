@@ -11,22 +11,6 @@ from diffusionlm.tokenizer.tokenizer import Tokenizer
 from logger import Logger
 
 
-def apply_eot_padding(
-    token_ids: list[int],
-    *,
-    context_length: int,
-    eot_token_id: int,
-) -> list[int]:
-    if context_length <= 0:
-        raise ValueError("context_length must be > 0")
-    tokens = list(token_ids)
-    if len(tokens) >= context_length:
-        return tokens[:context_length]
-    tokens.append(eot_token_id)
-    tokens.extend([eot_token_id] * (context_length - len(tokens)))
-    return tokens
-
-
 class HFTokenIteratorFactory:
     """Constructs token streams from Hugging Face streaming datasets."""
 
@@ -142,15 +126,13 @@ class HFTokenIteratorFactory:
                         "metrics.streaming_encode/world_size": int(self.world_size),
                     }
                 )
-            yield apply_eot_padding(
-                list(token_ids),
-                context_length=self.context_length,
-                eot_token_id=self.eot_token_id,
-            )
+            tokens = list(token_ids)
+            tokens.append(self.eot_token_id)
+            yield tokens
 
 
 class StreamingBatcher:
-    """Row-wise batcher that emits fixed-length sequences for batching."""
+    """Packed-stream batcher that emits fixed-length sequences for batching."""
 
     def __init__(
         self,
@@ -162,21 +144,26 @@ class StreamingBatcher:
         self.iterator_factory = iterator_factory
         self.device = torch.device(device)
         self._iterator: Iterator[list[int]] = self.iterator_factory()
+        self._buffer: list[int] = []
         self._logger = logger
 
-    def _next_sequence(self) -> list[int]:
+    def _extend_buffer(self) -> None:
         while True:
             try:
-                return next(self._iterator)
+                self._buffer.extend(next(self._iterator))
+                return
             except StopIteration:
                 self._iterator = self.iterator_factory()
 
     def draw(self, batch_size: int, context_length: int) -> torch.Tensor:
-        sequences = []
+        if context_length <= 0:
+            raise ValueError("context_length must be > 0")
+        sequences: list[list[int]] = []
         for _ in range(batch_size):
-            seq = self._next_sequence()
-            if len(seq) != context_length:
-                raise ValueError("streaming sequence length does not match context_length")
+            while len(self._buffer) < context_length:
+                self._extend_buffer()
+            seq = self._buffer[:context_length]
+            self._buffer = self._buffer[context_length:]
             sequences.append(seq)
         clean_targets = torch.tensor(sequences, dtype=torch.long, device=self.device)
         return clean_targets
