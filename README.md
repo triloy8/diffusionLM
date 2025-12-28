@@ -132,7 +132,7 @@ The `Justfile` plus helper scripts under `scripts/` provide a thin remote contro
 
 - cli
   - Purpose: Command‑line entry points wrapping configs and orchestration.
-  - Key files: `cli/train_ddp.py`, `cli/infer.py`, `cli/make_data.py`, `cli/train_tokenizer.py`, `cli/utils.py`.
+  - Key files: `cli/train.py`, `cli/infer.py`, `cli/make_data.py`, `cli/train_tokenizer.py`, `cli/utils.py`.
   - Scripts: exposed in `pyproject.toml` under `[project.scripts]`.
 
 - logger
