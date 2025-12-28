@@ -32,6 +32,7 @@ ignore = [
 [project.scripts]
 diffusionlm-train = "cli.train:main"
 diffusionlm-infer = "cli.infer:main"
+diffusionlm-sweep-infer = "cli.sweep_infer:main"
 diffusionlm-make-data = "cli.make_data:main"
 diffusionlm-train-tokenizer = "cli.train_tokenizer:main"
 diffusionlm-bench-infer = "benchmarking.bench_infer_latency:main"

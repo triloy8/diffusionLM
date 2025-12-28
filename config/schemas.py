@@ -358,11 +358,74 @@ class InferenceConfig(_BaseConfig):
         return self
 
 
+class SweepConfig(_BaseConfig):
+    prompts: Optional[List[str]] = None
+    temperatures: Optional[List[float]] = None
+    steps: Optional[List[int]] = None
+    total_lengths: Optional[List[int]] = None
+    block_lengths: Optional[List[int]] = None
+    cfg_scales: Optional[List[float]] = None
+    remasking: Optional[List[str]] = None
+    seeds: Optional[List[int]] = None
+    output_path: Path = Path("runs/sweep_infer.jsonl")
+    html_output_path: Optional[Path] = None
+    print_every: int = 1
+    limit: Optional[int] = None
+
+    @model_validator(mode="after")
+    def _validate_sweep(self):
+        if self.prompts is not None and any(not p for p in self.prompts):
+            raise ValueError("sweep.prompts must not contain empty strings")
+        if self.temperatures is not None and any(t < 0 for t in self.temperatures):
+            raise ValueError("sweep.temperatures must be >= 0")
+        if self.steps is not None and any(s <= 0 for s in self.steps):
+            raise ValueError("sweep.steps must be > 0")
+        if self.total_lengths is not None and any(t <= 0 for t in self.total_lengths):
+            raise ValueError("sweep.total_lengths must be > 0")
+        if self.block_lengths is not None and any(b <= 0 for b in self.block_lengths):
+            raise ValueError("sweep.block_lengths must be > 0")
+        if self.cfg_scales is not None and any(c < 0 for c in self.cfg_scales):
+            raise ValueError("sweep.cfg_scales must be >= 0")
+        if self.remasking is not None:
+            for r in self.remasking:
+                if r not in {"low_confidence", "random"}:
+                    raise ValueError("sweep.remasking must be one of: low_confidence, random")
+        if self.seeds is not None and any(s < 0 for s in self.seeds):
+            raise ValueError("sweep.seeds must be >= 0")
+        if self.print_every < 0:
+            raise ValueError("sweep.print_every must be >= 0")
+        if self.limit is not None and self.limit <= 0:
+            raise ValueError("sweep.limit must be > 0 when provided")
+        return self
+
+
 class InferConfig(_BaseConfig):
     tokenizer: TokenizerConfig
     model: ModelConfig
     checkpoint: CheckpointConfig
     inference: InferenceConfig
+    logging: Optional[LoggingConfig] = None
+
+    @model_validator(mode="after")
+    def _finalize_inference(self):
+        inf = self.inference
+        updates = {}
+        if inf.total_length is None:
+            updates["total_length"] = self.model.context_length
+        if inf.mask_id is None:
+            updates["mask_id"] = self.model.mask_token_id
+        if updates:
+            inf = inf.model_copy(update=updates)
+        self.inference = inf
+        return self
+
+
+class SweepInferConfig(_BaseConfig):
+    tokenizer: TokenizerConfig
+    model: ModelConfig
+    checkpoint: CheckpointConfig
+    inference: InferenceConfig
+    sweep: SweepConfig
     logging: Optional[LoggingConfig] = None
 
     @model_validator(mode="after")

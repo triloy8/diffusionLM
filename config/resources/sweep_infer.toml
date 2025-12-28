@@ -25,11 +25,27 @@ prompt = "Once upon a time,"
 steps = 256
 total_length = 512
 block_length = 128
-temperature = 0.2
+temperature = 0.7
 mask_id = 50257
-seed = 3407555
+seed = 3407
 eos_token_id = 50256
 cfg_scale = 0.0
-remasking = "low_confidence"
+remasking = "random"
 logits_eos_inf = false
 confidence_eos_eot_inf = false
+
+[sweep]
+output_path = "./runs/2025-12-28_13-47-52/sweep_infer.jsonl"
+html_output_path = "./runs/2025-12-28_13-47-52/sweep_infer.html"
+print_every = 1
+# limit = 12
+
+# Parameter grids, any omitted list falls back to [inference.*]
+temperatures = [0.3, 0.7, 1.0]
+remasking = ["random", "low_confidence"]
+seeds = [3407, 3408, 3409]
+# cfg_scales = [0.0, 1.5, 3.0]
+# prompts = ["Once upon a time,", "In a distant future,"]
+# steps = [64, 128]
+# total_lengths = [256]
+# block_lengths = [128]
