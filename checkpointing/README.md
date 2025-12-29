@@ -1,39 +1,122 @@
-# Checkpointing Module Overview
+# Checkpointing System Specification
 
-## Purpose
-This package provides a manifest-driven checkpointing system with deterministic per-rank state capture, local/S3 storage, and resumable training.
+## Scope
+This document specifies the checkpointing module, its on-disk layout, manifest schema, resume semantics, and design choices. The module targets distributed training with per-rank artifacts, local storage, and optional S3-compatible object storage.
 
-## Key Concepts
-- **Run**: A training session with a unique `run_id`, containing many checkpoint versions.
-- **Version**: A snapshot at a specific step, stored under `runs/<run_id>/versions/vXXXXXX/`.
-- **Manifest**: JSON metadata describing a version (per-version manifest) and run index (run manifest).
-- **Aliases**: `latest` and `best` pointers for convenience.
+## Goals
+- Deterministic, manifest-driven checkpointing.
+- Per-rank artifacts (no forced gathering) for scalability.
+- Safe resumption with explicit exactness signaling.
+- Storage-agnostic keys for local and S3 backends.
+- No overwrite of existing runs by default.
 
-## Module Layout
-- `storage.py`: Local/S3 helpers, hashing, and path/key normalization.
-- `state.py`: RNG and batcher state capture/restore.
-- `manifest.py`: Manifest/alias creation, persistence, and resolution.
-- `manager.py`: High-level orchestration for prepare, resume, and checkpoint callback creation.
+## Non-goals
+- Perfect determinism for streaming datasets without explicit iterator state.
+- Automatic optimizer conversion across optimizer types.
+- Tight coupling between filesystem run IDs and logger run IDs.
 
-## Typical Flow
-1. `CheckpointManager` is created with config + run name.
-2. `prepare_run()` writes run config snapshots and initializes run manifest.
-3. `maybe_resume()` loads model/optimizer/RNG/batcher state if configured.
-4. `make_checkpoint_callback()` is passed to the training loop and saves versions.
+## Directory Layout
+```
+runs/
+  <run_id>/
+    config/
+      train.toml
+      config.json
+    aliases/
+      latest.json
+      best.json
+    versions/
+      v000001/
+        model.safetensors
+        opt_shard_rank0000.bin
+        opt_shard_rank0001.bin
+        rng_rank0000.json
+        rng_rank0001.json
+        manifest.json
+      v000002/
+        ...
+```
 
-## Storage Backends
-- Local filesystem is always supported.
-- Optional S3-compatible storage is supported via `S3ConfigData` and `S3Uploader`.
+## Artifacts Per Version
+- `model.safetensors`: model weights (rank 0 writes).
+- `opt_shard_rankXXXX.bin`: optimizer shard for each rank.
+- `rng_rankXXXX.json`: RNG + batcher state per rank.
+- `manifest.json`: version manifest describing the snapshot.
 
-## Manifest Artifacts
-Each checkpoint version contains:
-- `model.safetensors`
-- `opt_shard_rankXXXX.bin`
-- `rng_rankXXXX.json`
-- `manifest.json`
+## Manifest Keys and Resolution
+- Manifest `key` fields are repo-root relative (e.g., `runs/<run_id>/versions/v000420/model.safetensors`).
+- These keys are used for local paths and S3 object keys.
+- Alias files contain `manifest_key` for direct resolution.
 
-Aliases live at `runs/<run_id>/aliases/latest.json` and `runs/<run_id>/aliases/best.json`.
+## Version Manifest Schema (Summary)
+Required fields (simplified):
+- `schema_version`: integer
+- `run_id`, `version_id`, `created_at`, `step`
+- `paths`: `{layout_version, root_local, root_remote?}`
+- `config`: `{key, sha256, bytes}`
+- `model`: `{key, sha256, bytes}`
+- `optimizer`: `{sharding, shards: [{rank, key, sha256, bytes}]}`
+- `rng`: `{per_rank: true, keys: [{rank, key}]}`
+- `resume`: `{base_step, exact}`
+- `metrics`: arbitrary dict
+
+## Run Manifest Schema (Summary)
+- `schema_version`, `run_id`, `created_at`
+- `paths`, `config`
+- `aliases`: `latest` + `best`
+- `versions`: list of `{version_id, step, created_at, model_key, metrics}`
+
+## Aliases
+- `aliases/latest.json` always points to the most recent version.
+- `aliases/best.json` always exists; `status` is `pending` until the first usable metric appears.
+- `manifest_key` is stored for fast resolution without scanning directories.
 
 ## Resume Semantics
-- Resume is driven by a version manifest or alias.
-- Exact resume is possible when RNG/batcher state is present for all ranks.
+- Resume is driven by a manifest path or an alias (`latest`/`best`).
+- `resume.exact = true` only when RNG + batcher state is exact across all ranks.
+- If `resume.exact = false`, training is best-effort and loss curves may diverge.
+- `checkpointing.resume_optimizer = false` skips optimizer state load (useful for optimizer changes).
+
+## Best-Effort Streaming
+- `StreamingBatcher.get_state()` saves the internal buffer.
+- The underlying iterator is not fully resumable, so exact replay is not guaranteed.
+- The manifest `resume.exact` flag is derived from batcher state fields.
+
+## Storage Backends
+- Local filesystem always supported.
+- Optional S3-compatible storage via `checkpointing.remote`.
+
+Example TOML:
+```toml
+[checkpointing]
+ckpting_save_iter = 1000
+resume_optimizer = true
+best_metric_name = "val_loss"
+best_mode = "min"
+
+[checkpointing.remote]
+bucket = "my-bucket"
+prefix = "diffusionlm/runs"
+endpoint_url = "https://<accountid>.r2.cloudflarestorage.com"
+region_name = "auto"
+```
+
+Credentials can be supplied via environment variables (`AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`).
+
+## Design Choices
+- **Manifest-first**: Every snapshot is self-describing for reproducibility and remote sync.
+- **Per-rank shards**: Avoids synchronization overhead and preserves sharded optimizer state.
+- **Fresh run IDs**: New runs always write to a new `runs/<run_id>` directory.
+- **Decoupled logging**: Filesystem run ID is not forced to match logger run name.
+- **Schema-driven safety**: Fields required for resume are explicit and validated.
+
+## Caveats
+- Streaming datasets are not fully deterministic without iterator state support.
+- Changing optimizer type while resuming will fail unless `resume_optimizer = false`.
+- If `runs_path` changes between save and resume, repo-relative keys must still resolve correctly.
+
+## Module Layout
+- `storage.py`: S3 client, hashing, and key/path helpers.
+- `state.py`: RNG capture and restore helpers.
+- `manifest.py`: Manifest creation and alias management.
+- `manager.py`: High-level orchestration and training-loop callback factory.
