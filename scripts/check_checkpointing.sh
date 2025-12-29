@@ -38,7 +38,7 @@ latest_path = Path(sys.argv[2])
 best_path = Path(sys.argv[3])
 version_id = sys.argv[4] or None
 run_dir = manifest_path.parent
-root_parent = run_dir.parent
+root_parent = run_dir.parent.parent
 
 manifest = json.loads(manifest_path.read_text())
 latest = json.loads(latest_path.read_text())
