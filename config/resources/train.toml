@@ -75,6 +75,7 @@ nccl_p2p_disable = true
 [checkpointing]
 enabled = true
 ckpting_save_iter = 1000
+resume_optimizer = true
 best_metric_name = "val_loss"
 best_mode = "min"
 resume_from = "latest" # or "best" or path to manifest.json

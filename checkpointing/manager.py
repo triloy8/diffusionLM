@@ -40,6 +40,7 @@ class CheckpointManager:
         self.enabled = bool(getattr(checkpointing_cfg, "enabled", True)) if checkpointing_cfg else False
         self.resume_from = getattr(checkpointing_cfg, "resume_from", None) if checkpointing_cfg else None
         self.resume_run_id = getattr(checkpointing_cfg, "run_id", None) if checkpointing_cfg else None
+        self.resume_optimizer = bool(getattr(checkpointing_cfg, "resume_optimizer", True)) if checkpointing_cfg else True
         self.best_metric_name = getattr(checkpointing_cfg, "best_metric_name", "val_loss") if checkpointing_cfg else "val_loss"
         self.best_mode = getattr(checkpointing_cfg, "best_mode", "min") if checkpointing_cfg else "min"
 
@@ -146,15 +147,16 @@ class CheckpointManager:
             ddp_model.load_state_dict(model_state)
         ddp_model.broadcast_parameters(src=0)
 
-        optimizer_state = load_optimizer_shard(
-            manifest,
-            self.resume_run_dir,
-            self._rank,
-            map_location=device,
-            root_parent=self._runs_path.parent,
-            s3=self._s3_uploader,
-        )
-        optimizer.load_state_dict(optimizer_state)
+        if self.resume_optimizer:
+            optimizer_state = load_optimizer_shard(
+                manifest,
+                self.resume_run_dir,
+                self._rank,
+                map_location=device,
+                root_parent=self._runs_path.parent,
+                s3=self._s3_uploader,
+            )
+            optimizer.load_state_dict(optimizer_state)
 
         rng_state = load_rng_state(
             manifest,

@@ -315,6 +315,7 @@ class S3Config(_BaseConfig):
 class CheckpointingConfig(_BaseConfig):
     enabled: bool = True
     ckpting_save_iter: int
+    resume_optimizer: bool = True
     resume_from: Optional[str] = None
     best_metric_name: str = "val_loss"
     best_mode: str = "min"
