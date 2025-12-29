@@ -152,11 +152,15 @@ class CheckpointCoordinator:
         batchers: Dict[str, Any] = {}
         exact = True
         if train_batcher is not None and hasattr(train_batcher, "get_state"):
-            batchers["train"] = jsonable(train_batcher.get_state())
+            train_state = train_batcher.get_state()
+            batchers["train"] = jsonable(train_state)
+            exact = exact and bool(getattr(train_state, "get", lambda _k, _d=None: False)("exact", False))
         else:
             exact = False
         if val_batcher is not None and hasattr(val_batcher, "get_state"):
-            batchers["val"] = jsonable(val_batcher.get_state())
+            val_state = val_batcher.get_state()
+            batchers["val"] = jsonable(val_state)
+            exact = exact and bool(getattr(val_state, "get", lambda _k, _d=None: False)("exact", False))
         else:
             exact = False
         if batchers:
