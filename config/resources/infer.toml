@@ -22,14 +22,14 @@ ckpt_path = "./runs/2025-12-28_13-47-52/20000.ckpt"
 
 [inference]
 prompt = "Once upon a time,"
-steps = 256
-total_length = 512
-block_length = 128
-temperature = 0.2
+steps = 128
+total_length = 128
+block_length = 32
+temperature = 0.3
 mask_id = 50257
 seed = 3407555
 eos_token_id = 50256
 cfg_scale = 0.0
-remasking = "low_confidence"
+remasking = "random"
 logits_eos_inf = false
 confidence_eos_eot_inf = false

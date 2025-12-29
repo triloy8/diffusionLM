@@ -22,7 +22,7 @@ ckpt_path = "./runs/2025-12-28_13-47-52/20000.ckpt"
 
 [inference]
 prompt = "Once upon a time,"
-steps = 256
+steps = 128
 total_length = 512
 block_length = 128
 temperature = 0.7
@@ -41,11 +41,11 @@ print_every = 1
 # limit = 12
 
 # Parameter grids, any omitted list falls back to [inference.*]
-temperatures = [0.3, 0.7, 1.0]
+# steps = [256, 512]
+temperatures = [0.15, 0.3, 0.6]
 remasking = ["random", "low_confidence"]
 seeds = [3407, 3408, 3409]
 # cfg_scales = [0.0, 1.5, 3.0]
 # prompts = ["Once upon a time,", "In a distant future,"]
-# steps = [64, 128]
 # total_lengths = [256]
 # block_lengths = [128]
