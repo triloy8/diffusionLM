@@ -66,7 +66,7 @@ project = "diffusion_lm"
 [ddp]
 backend = "nccl"               # gloo/nccl
 num_nodes = 1                  # total nodes participating
-num_gpus_per_node = 1          # processes launched per node (mp.spawn uses this)
+num_gpus_per_node = 2          # processes launched per node (mp.spawn uses this)
 node_rank = 0                  # index of this node
 master_addr = "127.0.0.1"      # rank 0 hostname/IP
 master_port = "29500"
