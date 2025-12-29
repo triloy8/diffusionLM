@@ -73,18 +73,33 @@ for key in ("model", "optimizer", "rng", "resume"):
 def _resolve(key: str) -> Path:
     return root_parent / key
 
-model_key = v["model"]["key"]
-model_path = _resolve(model_key)
-if not model_path.exists():
-    raise SystemExit(f"missing model artifact: {model_path}")
+def _sha256(path: Path) -> str:
+    hasher = hashlib.sha256()
+    with path.open("rb") as f:
+        for chunk in iter(lambda: f.read(1024 * 1024), b""):
+            hasher.update(chunk)
+    return hasher.hexdigest()
+
+def _check_artifact(label: str, info: dict) -> None:
+    key = info.get("key")
+    if not key:
+        raise SystemExit(f"{label} missing key")
+    path = _resolve(key)
+    if not path.exists():
+        raise SystemExit(f"missing {label}: {path}")
+    if "bytes" in info:
+        size = int(path.stat().st_size)
+        if int(info["bytes"]) != size:
+            raise SystemExit(f"{label} bytes mismatch: {path} ({size} != {info['bytes']})")
+    if "sha256" in info:
+        digest = _sha256(path)
+        if info["sha256"] != digest:
+            raise SystemExit(f"{label} sha256 mismatch: {path}")
+
+_check_artifact("model artifact", v["model"])
 
 for shard in v["optimizer"]["shards"]:
-    shard_key = shard.get("key")
-    if not shard_key:
-        raise SystemExit("optimizer shard missing key")
-    shard_path = _resolve(shard_key)
-    if not shard_path.exists():
-        raise SystemExit(f"missing optimizer shard: {shard_path}")
+    _check_artifact("optimizer shard", shard)
 
 for entry in v["rng"]["keys"]:
     rng_key = entry.get("key")
@@ -98,3 +113,4 @@ print(f"ok: run_id={manifest['run_id']} version_id={version_id}")
 PY
 
 echo "checkpointing looks sane for run_id=$RUN_ID"
+import hashlib
