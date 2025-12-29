@@ -72,7 +72,7 @@ Required fields (simplified):
 - `manifest_key` is stored for fast resolution without scanning directories.
 
 ## Resume Semantics
-- Resume is driven by a manifest path or an alias (`latest`/`best`).
+- Resume is driven by a manifest path or alias (`latest`/`best`).
 - `resume.exact = true` only when RNG + batcher state is exact across all ranks.
 - If `resume.exact = false`, training is best-effort and loss curves may diverge.
 - `checkpointing.resume_optimizer = false` skips optimizer state load (useful for optimizer changes).
@@ -84,24 +84,20 @@ Required fields (simplified):
 
 ## Storage Backends
 - Local filesystem always supported.
-- Optional S3-compatible storage via `checkpointing.remote`.
+- Optional S3-compatible storage is enabled via environment variables only.
 
-Example TOML:
-```toml
-[checkpointing]
-ckpting_save_iter = 1000
-resume_optimizer = true
-best_metric_name = "val_loss"
-best_mode = "min"
-
-[checkpointing.remote]
-bucket = "my-bucket"
-prefix = "diffusionlm/runs"
-endpoint_url = "https://<accountid>.r2.cloudflarestorage.com"
-region_name = "auto"
+Env vars:
+```
+CHECKPOINTING_S3_BUCKET
+CHECKPOINTING_S3_PREFIX
+CHECKPOINTING_S3_ENDPOINT_URL
+CHECKPOINTING_S3_REGION
+CHECKPOINTING_S3_ACCESS_KEY_ID
+CHECKPOINTING_S3_SECRET_ACCESS_KEY
+CHECKPOINTING_S3_SESSION_TOKEN
 ```
 
-Credentials can be supplied via environment variables (`AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`).
+See `env/checkpointing.env.example` for a template.
 
 ## Design Choices
 - **Manifest-first**: Every snapshot is self-describing for reproducibility and remote sync.
@@ -114,9 +110,3 @@ Credentials can be supplied via environment variables (`AWS_ACCESS_KEY_ID`, `AWS
 - Streaming datasets are not fully deterministic without iterator state support.
 - Changing optimizer type while resuming will fail unless `resume_optimizer = false`.
 - If `runs_path` changes between save and resume, repo-relative keys must still resolve correctly.
-
-## Module Layout
-- `storage.py`: S3 client, hashing, and key/path helpers.
-- `state.py`: RNG capture and restore helpers.
-- `manifest.py`: Manifest creation and alias management.
-- `manager.py`: High-level orchestration and training-loop callback factory.

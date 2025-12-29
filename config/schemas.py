@@ -296,22 +296,6 @@ class DdpConfig(_BaseConfig):
     nccl_p2p_disable: Optional[bool] = None
 
 
-class S3Config(_BaseConfig):
-    bucket: str
-    prefix: str = ""
-    endpoint_url: Optional[str] = None
-    region_name: Optional[str] = None
-    access_key_id: Optional[str] = None
-    secret_access_key: Optional[str] = None
-    session_token: Optional[str] = None
-
-    @model_validator(mode="after")
-    def _validate_s3(self):
-        if not self.bucket:
-            raise ValueError("s3.bucket must not be empty")
-        return self
-
-
 class CheckpointingConfig(_BaseConfig):
     enabled: bool = True
     ckpting_save_iter: int
@@ -320,7 +304,6 @@ class CheckpointingConfig(_BaseConfig):
     best_metric_name: str = "val_loss"
     best_mode: str = "min"
     run_id: Optional[str] = None
-    remote: Optional[S3Config] = None
 
     @model_validator(mode="after")
     def _validate_checkpointing(self):

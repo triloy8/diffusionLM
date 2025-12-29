@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+import os
 from typing import Any, Optional
 
 import torch
@@ -65,17 +66,33 @@ class CheckpointManager:
         )
 
     def _build_s3_config(self) -> Optional[S3ConfigData]:
-        if self._cfg is None or getattr(self._cfg, "remote", None) is None:
+        def _env(name: str) -> Optional[str]:
+            value = os.environ.get(name)
+            if value is None:
+                return None
+            value = value.strip()
+            return value or None
+
+        env_bucket = _env("CHECKPOINTING_S3_BUCKET")
+        env_prefix = _env("CHECKPOINTING_S3_PREFIX")
+        env_endpoint = _env("CHECKPOINTING_S3_ENDPOINT_URL")
+        env_region = _env("CHECKPOINTING_S3_REGION")
+        env_access = _env("CHECKPOINTING_S3_ACCESS_KEY_ID")
+        env_secret = _env("CHECKPOINTING_S3_SECRET_ACCESS_KEY")
+        env_token = _env("CHECKPOINTING_S3_SESSION_TOKEN")
+
+        bucket = env_bucket
+        if bucket is None:
             return None
-        remote = self._cfg.remote
+
         return S3ConfigData(
-            bucket=remote.bucket,
-            prefix=remote.prefix,
-            endpoint_url=remote.endpoint_url,
-            region_name=remote.region_name,
-            access_key_id=remote.access_key_id,
-            secret_access_key=remote.secret_access_key,
-            session_token=remote.session_token,
+            bucket=bucket,
+            prefix=env_prefix if env_prefix is not None else "",
+            endpoint_url=env_endpoint,
+            region_name=env_region,
+            access_key_id=env_access,
+            secret_access_key=env_secret,
+            session_token=env_token,
         )
 
     def _resolve_resume_run_dir(self) -> Path:

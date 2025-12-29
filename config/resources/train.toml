@@ -80,3 +80,5 @@ best_metric_name = "val_loss"
 best_mode = "min"
 resume_from = "latest" # or "best" or path to manifest.json
 run_id = "2025-12-29_16-00-44"
+
+# Remote storage is configured via env vars (see env/checkpointing.env.example).

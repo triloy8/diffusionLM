@@ -227,3 +227,4 @@ todo/
 !env/
 env/*
 !env/wandb.env.example
+!env/checkpointing.env.example
