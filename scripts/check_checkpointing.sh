@@ -114,4 +114,3 @@ print(f"ok: run_id={manifest['run_id']} version_id={version_id}")
 PY
 
 echo "checkpointing looks sane for run_id=$RUN_ID"
-import hashlib
