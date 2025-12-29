@@ -358,7 +358,13 @@ class CheckpointCoordinator:
         self._best_alias = best_alias
 
 
-def resolve_checkpoint_reference(run_dir: Path, ref: str, *, s3: Optional[S3Uploader] = None) -> Path:
+def resolve_checkpoint_reference(
+    run_dir: Path,
+    ref: str,
+    *,
+    s3: Optional[S3Uploader] = None,
+    root_parent: Optional[Path] = None,
+) -> Path:
     if ref in {"latest", "best"}:
         alias_path = run_dir / "aliases" / f"{ref}.json"
         if not alias_path.exists() and s3 is not None:
@@ -368,7 +374,8 @@ def resolve_checkpoint_reference(run_dir: Path, ref: str, *, s3: Optional[S3Uplo
         data = json.loads(alias_path.read_text(encoding="utf-8"))
         manifest_key = data.get("manifest_key")
         if manifest_key:
-            manifest_path = run_dir.parent / manifest_key
+            base = root_parent if root_parent is not None else run_dir.parent
+            manifest_path = base / manifest_key
             if not manifest_path.exists() and s3 is not None:
                 s3.download(manifest_path, manifest_key)
             return manifest_path

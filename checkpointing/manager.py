@@ -128,7 +128,12 @@ class CheckpointManager:
             ddp_model.broadcast_parameters(src=0)
             return 0
 
-        manifest_path = resolve_checkpoint_reference(self.resume_run_dir, self.resume_from, s3=self._s3_uploader)
+        manifest_path = resolve_checkpoint_reference(
+            self.resume_run_dir,
+            self.resume_from,
+            s3=self._s3_uploader,
+            root_parent=self._runs_path.parent,
+        )
         manifest = load_manifest(manifest_path, root_parent=self._runs_path.parent, s3=self._s3_uploader)
 
         if self._rank == 0:
