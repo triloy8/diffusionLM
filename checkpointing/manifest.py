@@ -413,7 +413,8 @@ def load_model_from_manifest(
     from safetensors.torch import load_file
 
     model_key = manifest["model"]["key"]
-    model_path = run_dir.parent / model_key
+    base = root_parent if root_parent is not None else run_dir.parent
+    model_path = base / model_key
     if root_parent is not None:
         ensure_local(model_path, root_parent, s3)
     return load_file(str(model_path))
@@ -436,7 +437,8 @@ def load_optimizer_shard(
             break
     if match is None:
         raise FileNotFoundError(f"optimizer shard for rank {rank} not found in manifest")
-    shard_path = run_dir.parent / match["key"]
+    base = root_parent if root_parent is not None else run_dir.parent
+    shard_path = base / match["key"]
     if root_parent is not None:
         ensure_local(shard_path, root_parent, s3)
     return torch.load(shard_path, map_location=map_location)
@@ -458,7 +460,8 @@ def load_rng_state(
             break
     if match is None:
         raise FileNotFoundError(f"rng state for rank {rank} not found in manifest")
-    rng_path = run_dir.parent / match["key"]
+    base = root_parent if root_parent is not None else run_dir.parent
+    rng_path = base / match["key"]
     if root_parent is not None:
         ensure_local(rng_path, root_parent, s3)
     return json.loads(rng_path.read_text(encoding="utf-8"))
