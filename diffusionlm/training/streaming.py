@@ -167,3 +167,18 @@ class StreamingBatcher:
             sequences.append(seq)
         clean_targets = torch.tensor(sequences, dtype=torch.long, device=self.device)
         return clean_targets
+
+    def get_state(self) -> dict:
+        state = {
+            "buffer": list(self._buffer),
+            "exact": False,
+        }
+        if hasattr(self.iterator_factory, "get_state"):
+            state["iterator_factory"] = self.iterator_factory.get_state()
+        return state
+
+    def set_state(self, state: dict) -> None:
+        self._buffer = list(state.get("buffer", []))
+        self._iterator = self.iterator_factory()
+        if hasattr(self.iterator_factory, "set_state") and "iterator_factory" in state:
+            self.iterator_factory.set_state(state["iterator_factory"])

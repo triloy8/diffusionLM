@@ -8,7 +8,7 @@ parameters:
     value: Transformer LM
   batch_size:
     value: 4
-  ckpting_save_iter:
+  checkpointing.ckpting_save_iter:
     value: 125
   context_length:
     value: 256

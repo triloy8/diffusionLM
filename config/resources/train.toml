@@ -30,7 +30,6 @@ batch_size = 70
 max_train_iteration = 50000
 max_val_iteration = 10
 val_freq_iteration = 125
-ckpting_save_iter = 1000
 seed = 3407
 skip_validation = false
 grad_accum_steps = 2
@@ -72,3 +71,11 @@ master_addr = "127.0.0.1"      # rank 0 hostname/IP
 master_port = "29500"
 bucket_size_mb = 200           # 0 = single bucket
 nccl_p2p_disable = true
+
+[checkpointing]
+enabled = true
+ckpting_save_iter = 1000
+best_metric_name = "val_loss"
+best_mode = "min"
+# resume_from = "latest" # or "best" or path to manifest.json
+# run_id = "my_run_id"

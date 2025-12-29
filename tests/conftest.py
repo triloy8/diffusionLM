@@ -18,6 +18,7 @@ from config import (
     OptimizerConfig,
     TokenizerConfig,
     TrainingConfig as RuntimeTrainingConfig,
+    CheckpointingConfig as RuntimeCheckpointingConfig,
     TrainConfig as RuntimeTrainConfig,
 )
 
@@ -85,8 +86,16 @@ def toy_training_bundle(device) -> TrainingBundle:
         max_train_iteration=4,
         max_val_iteration=1,
         val_freq_iteration=1,
-        ckpting_save_iter=10,
         seed=123,
+    )
+
+    checkpointing_cfg = RuntimeCheckpointingConfig(
+        enabled=True,
+        ckpting_save_iter=10,
+        best_metric_name="val_loss",
+        best_mode="min",
+        run_id="test_run",
+        remote=None,
     )
 
     tokenizer_cfg = TokenizerConfig(
@@ -110,6 +119,7 @@ def toy_training_bundle(device) -> TrainingBundle:
         model=model_cfg,
         optimizer=optimizer_cfg,
         training=training_cfg,
+        checkpointing=checkpointing_cfg,
         data=data_cfg,
         wandb=None,
         logging=None,

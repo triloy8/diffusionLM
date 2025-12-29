@@ -40,6 +40,7 @@ def train_loop(
     gradient_clipping,
     save_checkpoint,
     compute_loss,
+    checkpoint_callback: Optional[Callable[[int, torch.nn.Module, torch.optim.Optimizer, Optional[dict]], None]] = None,
     prepare_batch: Optional[Callable[[object], object]] = None,
     extract_model_inputs: Optional[Callable[[object], torch.Tensor]] = None,
     batch_generator: torch.Generator | None = None,
@@ -85,6 +86,7 @@ def train_loop(
     accum_count = 0
     current_lr = None
     val_pass_count = 0
+    last_val_metrics: Optional[dict] = None
 
     def _format_sample_tokens(tokens: list[int]) -> object:
         if val_sample_decode is None:
@@ -339,6 +341,7 @@ def train_loop(
                     },
                     step=train_iteration,
                 )
+            last_val_metrics = {"val_loss": vloss_val}
             if log_samples_now and sample_payload is not None and logger is not None:
                 rows = []
                 for inputs, preds, targets in zip(
@@ -357,20 +360,22 @@ def train_loop(
 
         # checkpoints
         if (
-            is_rank_zero
-            and train_iteration > 0
+            train_iteration > 0
             and train_iteration % ckpting_save_iter == 0
             and ckpting_save_folder is not None
         ):
-            ckpting_save_folder = Path(ckpting_save_folder)
-            ckpting_save_folder.mkdir(parents=True, exist_ok=True)
-            ckpt_file_iter = ckpting_save_folder / f"{train_iteration}.ckpt"
-            save_checkpoint(model, optimizer, train_iteration, ckpt_file_iter)
-            if logger is not None:
-                try:
-                    logger.log_artifact(str(ckpt_file_iter), name=str(ckpt_file_iter), type_="checkpoint")
-                except Exception:
-                    pass
+            if checkpoint_callback is not None:
+                checkpoint_callback(train_iteration, model, optimizer, last_val_metrics)
+            elif is_rank_zero:
+                ckpting_save_folder = Path(ckpting_save_folder)
+                ckpting_save_folder.mkdir(parents=True, exist_ok=True)
+                ckpt_file_iter = ckpting_save_folder / f"{train_iteration}.ckpt"
+                save_checkpoint(model, optimizer, train_iteration, ckpt_file_iter)
+                if logger is not None:
+                    try:
+                        logger.log_artifact(str(ckpt_file_iter), name=str(ckpt_file_iter), type_="checkpoint")
+                    except Exception:
+                        pass
 
         if step_callback is not None:
             step_callback(

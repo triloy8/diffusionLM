@@ -9,12 +9,14 @@ from diffusionlm.training.optim import (
 from diffusionlm.training.data import get_batch, DiffusionBatch
 from diffusionlm.training.loss import diffusion_cross_entropy
 from diffusionlm.training.checkpoint import save_checkpoint
+from checkpointing import CheckpointManager
 from diffusionlm.training.schedule import lr_cosine_schedule
 from diffusionlm.training.grad import gradient_clipping
 from diffusionlm.training.loop import train_loop
 from diffusionlm.training.streaming import HFTokenIteratorFactory, StreamingBatcher
 
 from datetime import datetime
+from pathlib import Path
 import numpy as np
 import os
 import random
@@ -24,6 +26,7 @@ from functools import partial
 # from datasets import load_dataset
 
 from diffusionlm.utils.dtypes import DTYPES
+from config import asdict_pretty
 from logger import Logger
 from logger import ConsoleLogger, WandbLogger, RankZeroLogger
 from ddp import DDP, OptimizerStateSharding
@@ -121,6 +124,19 @@ def train_transformer_ddp(local_rank, args, cfg_dc):
     setattr(cfg, "torch_generator", torch_generator)
 
     logger, run_name, ckpting_save_folder = init_logging(global_rank, cfg, cfg_dc)
+    config_path = Path(getattr(cfg, "config_path", ""))
+    config_snapshot = asdict_pretty(cfg_dc)
+    checkpoint_manager = CheckpointManager(
+        checkpointing_cfg=getattr(cfg_dc, "checkpointing", None),
+        runs_path=cfg.runs_path,
+        run_name=run_name,
+        rank=global_rank,
+        world_size=cfg.world_size,
+        config_path=config_path,
+        config_snapshot=config_snapshot,
+    )
+    checkpoint_manager.prepare_run(torch_generator)
+    ckpting_save_folder = checkpoint_manager.run_dir
 
     model = TransformerLM(
         vocab_size=cfg.vocab_size,
@@ -189,6 +205,11 @@ def train_transformer_ddp(local_rank, args, cfg_dc):
     )
     train_batcher = StreamingBatcher(train_iterator_factory, device=str(cfg.device), logger=logger)
     val_batcher = StreamingBatcher(val_iterator_factory, device=str(cfg.device), logger=logger)
+    checkpoint_manager.attach_batchers(
+        generator=torch_generator,
+        train_batcher=train_batcher,
+        val_batcher=val_batcher,
+    )
 
     # activation norm utils
     activation_norms = {}
@@ -203,8 +224,14 @@ def train_transformer_ddp(local_rank, args, cfg_dc):
         if isinstance(module, Linear):
             module.register_forward_hook(get_activation_norm_hook(name))
 
-    # broadcast model params/buffers from rank 0 via DDP helper
-    ddp_model.broadcast_parameters(src=0)
+    start_iteration = checkpoint_manager.maybe_resume(
+        ddp_model=ddp_model,
+        optimizer=optimizer,
+        train_batcher=train_batcher,
+        val_batcher=val_batcher,
+        generator=torch_generator,
+        device=str(cfg.device),
+    )
 
     mask_token_id = getattr(cfg, "mask_token_id", cfg.vocab_size - 1)
     noise_epsilon = getattr(cfg, "noise_epsilon", 1e-3)
@@ -226,6 +253,8 @@ def train_transformer_ddp(local_rank, args, cfg_dc):
 
     def _sync():
         ddp_model.finish_gradient_synchronization()
+
+    checkpoint_callback = checkpoint_manager.make_checkpoint_callback()
 
     train_loop(
         ddp_model,
@@ -250,6 +279,7 @@ def train_transformer_ddp(local_rank, args, cfg_dc):
         lr_cosine_schedule=lr_cosine_schedule,
         gradient_clipping=gradient_clipping,
         save_checkpoint=save_checkpoint,
+        checkpoint_callback=checkpoint_callback,
         compute_loss=_compute_loss,
         batch_generator=torch_generator,
         logger=logger,
@@ -263,6 +293,7 @@ def train_transformer_ddp(local_rank, args, cfg_dc):
         reduce_metric=allreduce_mean,
         is_rank_zero=(global_rank == 0),
         skip_validation=bool(getattr(cfg, "skip_validation", False)),
+        start_iteration=start_iteration,
     )
 
     cleanup_process_group()
@@ -346,7 +377,10 @@ def init_logging(rank: int, cfg, cfg_dc):
             elif backend == "wandb":
                 entity = getattr(cfg_dc.wandb, "entity", None) if getattr(cfg_dc, "wandb", None) else None
                 project = getattr(cfg_dc.wandb, "project", None) if getattr(cfg_dc, "wandb", None) else None
-                default_name = (getattr(cfg_dc.logging, "run_name", None) or datetime.now().strftime("%Y-%m-%d_%H-%M-%S"))
+                default_name = (
+                    getattr(cfg_dc.logging, "run_name", None)
+                    or datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+                )
                 real_logger = WandbLogger(entity=entity, project=project, name=default_name)
 
         info = real_logger.start_run(run_config)

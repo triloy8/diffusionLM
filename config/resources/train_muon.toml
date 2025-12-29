@@ -61,10 +61,15 @@ batch_size = 72
 max_train_iteration = 50000
 max_val_iteration = 10
 val_freq_iteration = 125
-ckpting_save_iter = 1000
 seed = 3407
 skip_validation = false
 grad_accum_steps = 1
+
+[checkpointing]
+enabled = true
+ckpting_save_iter = 1000
+best_metric_name = "val_loss"
+best_mode = "min"
 
 [data]
 runs_path = "./runs"

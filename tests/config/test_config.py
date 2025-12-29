@@ -69,7 +69,6 @@ def test_train_config_happy_and_validation(tmp_path: Path):
     max_train_iteration = 2
     max_val_iteration = 1
     val_freq_iteration = 1
-    ckpting_save_iter = 2
     seed = 42
 
     [data]
@@ -86,6 +85,12 @@ def test_train_config_happy_and_validation(tmp_path: Path):
     vocab_path = "{vocab.as_posix()}"
     merges_path = "{merges.as_posix()}"
     special_tokens_path = "{special_tokens.as_posix()}"
+
+    [checkpointing]
+    enabled = true
+    ckpting_save_iter = 2
+    best_metric_name = "val_loss"
+    best_mode = "min"
     """)
 
     cfg = load_train_config(cfg_path)
@@ -251,6 +256,8 @@ def test_optimizer_initial_lr_defaults_to_max(tmp_path: Path):
     max_train_iteration = 2
     max_val_iteration = 1
     val_freq_iteration = 1
+
+    [checkpointing]
     ckpting_save_iter = 2
 
     [data]

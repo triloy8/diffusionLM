@@ -25,6 +25,7 @@ def main():
 
     # Build an argparse-like namespace expected by existing code
     ns = argparse.Namespace(
+        config_path=str(args_cfg.config),
         # optimizer
         optimizer_name=cfg_dc.optimizer.optimizer_name,
         betas=(cfg_dc.optimizer.betas[0], cfg_dc.optimizer.betas[1]),
@@ -56,7 +57,7 @@ def main():
         device=cfg_dc.model.device,
         dtype=cfg_dc.model.dtype,
         max_iteration=None,
-        ckpting_save_iter=cfg_dc.training.ckpting_save_iter,
+        ckpting_save_iter=cfg_dc.checkpointing.ckpting_save_iter,
         batch_size=cfg_dc.training.batch_size,
         max_train_iteration=cfg_dc.training.max_train_iteration,
         max_val_iteration=cfg_dc.training.max_val_iteration,

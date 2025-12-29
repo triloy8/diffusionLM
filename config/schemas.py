@@ -197,14 +197,13 @@ class TrainingConfig(_BaseConfig):
     max_train_iteration: int
     max_val_iteration: int
     val_freq_iteration: int
-    ckpting_save_iter: int
     seed: Optional[int] = None
     skip_validation: bool = False
     grad_accum_steps: int = 1
 
     @model_validator(mode="after")
     def _validate_training(self):
-        for attr in ("batch_size", "max_train_iteration", "max_val_iteration", "val_freq_iteration", "ckpting_save_iter"):
+        for attr in ("batch_size", "max_train_iteration", "max_val_iteration", "val_freq_iteration"):
             if getattr(self, attr) <= 0:
                 raise ValueError(f"{attr} must be > 0")
         if self.grad_accum_steps <= 0:
@@ -297,6 +296,42 @@ class DdpConfig(_BaseConfig):
     nccl_p2p_disable: Optional[bool] = None
 
 
+class S3Config(_BaseConfig):
+    bucket: str
+    prefix: str = ""
+    endpoint_url: Optional[str] = None
+    region_name: Optional[str] = None
+    access_key_id: Optional[str] = None
+    secret_access_key: Optional[str] = None
+    session_token: Optional[str] = None
+
+    @model_validator(mode="after")
+    def _validate_s3(self):
+        if not self.bucket:
+            raise ValueError("s3.bucket must not be empty")
+        return self
+
+
+class CheckpointingConfig(_BaseConfig):
+    enabled: bool = True
+    ckpting_save_iter: int
+    resume_from: Optional[str] = None
+    best_metric_name: str = "val_loss"
+    best_mode: str = "min"
+    run_id: Optional[str] = None
+    remote: Optional[S3Config] = None
+
+    @model_validator(mode="after")
+    def _validate_checkpointing(self):
+        if self.ckpting_save_iter <= 0:
+            raise ValueError("checkpointing.ckpting_save_iter must be > 0")
+        if self.best_mode not in {"min", "max"}:
+            raise ValueError("checkpointing.best_mode must be 'min' or 'max'")
+        if not self.best_metric_name:
+            raise ValueError("checkpointing.best_metric_name must not be empty")
+        return self
+
+
 class TrainConfig(_BaseConfig):
     model: ModelConfig
     optimizer: OptimizerConfig
@@ -305,6 +340,7 @@ class TrainConfig(_BaseConfig):
     wandb: Optional[WandbConfig] = None
     logging: Optional[LoggingConfig] = None
     ddp: Optional[DdpConfig] = None
+    checkpointing: CheckpointingConfig
 
 
 class CheckpointConfig(_BaseConfig):

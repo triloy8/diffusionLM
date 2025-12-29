@@ -205,7 +205,7 @@ def _run_loop(
         max_val_iteration=training_cfg.max_val_iteration,
         val_freq_iteration=training_cfg.val_freq_iteration,
         grad_clip_max_l2_norm=optimizer_cfg.grad_clip_max_l2_norm,
-        ckpting_save_iter=training_cfg.ckpting_save_iter,
+        ckpting_save_iter=bundle.train_config.checkpointing.ckpting_save_iter,
         ckpting_save_folder=None,
         get_batch=batch_getter,
         lr_cosine_schedule=lr_cosine_schedule,
