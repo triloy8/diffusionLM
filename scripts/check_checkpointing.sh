@@ -29,6 +29,7 @@ if [[ ! -f "$BEST_ALIAS" ]]; then
 fi
 
 python - <<'PY' "$MANIFEST" "$LATEST_ALIAS" "$BEST_ALIAS" "$VERSION_ID"
+import hashlib
 import json
 import sys
 from pathlib import Path
