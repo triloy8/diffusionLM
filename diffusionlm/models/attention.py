@@ -37,8 +37,27 @@ class RotaryPositionalEmbedding(torch.nn.Module):
         return x_rotated.flatten(-2)
 
 
-def scaled_dot_product_attention(Q: torch.Tensor, K: torch.Tensor, V: torch.Tensor):
+def _prepare_attention_mask(attention_mask: torch.Tensor, qk_score: torch.Tensor) -> torch.Tensor:
+    mask = attention_mask.to(device=qk_score.device, dtype=torch.bool)
+    if mask.dim() == 2:
+        mask = mask[:, None, None, :]
+    elif mask.dim() == 3:
+        mask = mask[:, None, :, :]
+    elif mask.dim() != 4:
+        raise ValueError("attention_mask must be 2D, 3D, or 4D")
+    return mask
+
+
+def scaled_dot_product_attention(
+    Q: torch.Tensor,
+    K: torch.Tensor,
+    V: torch.Tensor,
+    attention_mask: torch.Tensor | None = None,
+):
     qk_score = einsum(Q, K, "batch_size ... n d_k, batch_size ... m d_k -> batch_size ... n m") / torch.sqrt(torch.tensor(Q.shape[-1]))
+    if attention_mask is not None:
+        mask = _prepare_attention_mask(attention_mask, qk_score)
+        qk_score = qk_score.masked_fill(~mask, float("-inf"))
     softmax_qk_score = softmax(qk_score, dim=-1)
     attn = einsum(softmax_qk_score, V, "batch_size ... n m, batch_size ... m d_k -> batch_size ... n d_k")
     return attn
@@ -61,7 +80,12 @@ class MultiheadSelfAttentionRoPE(nn.Module):
 
         self.rope = RotaryPositionalEmbedding(self.theta, self.d_k, self.max_seq_len, device)
 
-    def forward(self, x: torch.Tensor, token_positions: torch.Tensor) -> torch.Tensor:
+    def forward(
+        self,
+        x: torch.Tensor,
+        token_positions: torch.Tensor,
+        attention_mask: torch.Tensor | None = None,
+    ) -> torch.Tensor:
         wqx = self.q_proj(x)
         wqx_rearr = rearrange(wqx, "... seq_len (num_heads d_k) -> ... num_heads seq_len d_k", num_heads=self.num_heads, d_k=self.d_k)
         wqx_rearr_rope = self.rope(wqx_rearr, token_positions)
@@ -73,7 +97,7 @@ class MultiheadSelfAttentionRoPE(nn.Module):
         wvx = self.v_proj(x)
         wvx_rearr = rearrange(wvx, "... seq_len (num_heads d_v) -> ... num_heads seq_len d_v", num_heads=self.num_heads, d_v=self.d_v)
 
-        attn = scaled_dot_product_attention(wqx_rearr_rope, wkx_rearr_rope, wvx_rearr)
+        attn = scaled_dot_product_attention(wqx_rearr_rope, wkx_rearr_rope, wvx_rearr, attention_mask=attention_mask)
         attn_rearr = rearrange(attn, "... num_heads seq_len d_v -> ... seq_len (num_heads d_v)", num_heads=self.num_heads, d_v=self.d_v)
         attn_rearr_proj = self.output_proj(attn_rearr)
         return attn_rearr_proj

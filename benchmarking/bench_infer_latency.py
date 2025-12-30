@@ -17,7 +17,7 @@ from diffusionlm.training.loss import cross_entropy, diffusion_cross_entropy
 from diffusionlm.training.optim import AdamW
 from diffusionlm.training.grad import gradient_clipping
 from diffusionlm.training.data import get_batch as diffusion_get_batch
-from diffusionlm.training.streaming import HFTokenIteratorFactory, StreamingBatcher
+from diffusionlm.training.streaming import HFTokenIteratorFactory, StreamingBatcher, RowBatcher
 from logger import ConsoleLogger
 from profiling import nvtx
 
@@ -31,7 +31,7 @@ def _build_streaming_batcher(
     *,
     shuffle_buffer_size: int,
     shuffle_seed: Optional[int],
-) -> StreamingBatcher:
+) -> StreamingBatcher | RowBatcher:
     iterator = HFTokenIteratorFactory(
         dataset_name=str(data_cfg.dataset_name),
         dataset_config=(str(data_cfg.dataset_config) if data_cfg.dataset_config is not None else None),
@@ -43,18 +43,31 @@ def _build_streaming_batcher(
         world_size=1,
         rank=0,
     )
+    pipeline_mode = str(getattr(data_cfg, "pipeline_mode", "packed")).lower()
+    if pipeline_mode == "rows":
+        pad_token_id = getattr(data_cfg, "pad_token_id", None)
+        if pad_token_id is None:
+            raise ValueError("data.pad_token_id must be set when pipeline_mode='rows'")
+        return RowBatcher(iterator, device=device, pad_token_id=int(pad_token_id))
     return StreamingBatcher(iterator, device=device)
 
 
 def _sample_eval_batch_streaming(
-    batcher: StreamingBatcher,
+    batcher: StreamingBatcher | RowBatcher,
     batch_size: int,
     context_length: int,
-) -> Tuple[torch.Tensor, torch.Tensor]:
-    seqs = batcher.draw(batch_size=batch_size, context_length=context_length + 1)
+) -> Tuple[torch.Tensor, torch.Tensor, Optional[torch.Tensor], Optional[torch.Tensor]]:
+    drawn = batcher.draw(batch_size=batch_size, context_length=context_length + 1)
+    attention_mask = None
+    if isinstance(drawn, tuple):
+        seqs, attention_mask = drawn
+    else:
+        seqs = drawn
     inputs = seqs[:, :-1]
     targets = seqs[:, 1:]
-    return inputs, targets
+    input_mask = attention_mask[:, :-1] if attention_mask is not None else None
+    target_mask = attention_mask[:, 1:] if attention_mask is not None else None
+    return inputs, targets, input_mask, target_mask
 
 
 def _parse_only_config():
@@ -285,19 +298,38 @@ def main():
                     noise_epsilon=cfg.model.noise_epsilon,
                     random_trunc_prob=cfg.model.random_trunc_prob,
                 )
+            attn_mask = getattr(batch, "attention_mask", None)
             if nvtx.enabled("fine"):
                 with nvtx.range("bench/iter/forward"):
-                    logits = model(batch.noisy_inputs)
+                    if attn_mask is not None:
+                        logits = model(batch.noisy_inputs, attention_mask=attn_mask)
+                    else:
+                        logits = model(batch.noisy_inputs)
                 with nvtx.range("bench/iter/loss"):
-                    loss = diffusion_cross_entropy(logits, batch.clean_targets, batch.mask, batch.p_mask)
+                    loss = diffusion_cross_entropy(
+                        logits,
+                        batch.clean_targets,
+                        batch.mask,
+                        batch.p_mask,
+                        loss_mask=getattr(batch, "loss_mask", None),
+                    )
                 with nvtx.range("bench/iter/backward"):
                     loss.backward()
             else:
-                logits = model(batch.noisy_inputs)
-                loss = diffusion_cross_entropy(logits, batch.clean_targets, batch.mask, batch.p_mask)
+                if attn_mask is not None:
+                    logits = model(batch.noisy_inputs, attention_mask=attn_mask)
+                else:
+                    logits = model(batch.noisy_inputs)
+                loss = diffusion_cross_entropy(
+                    logits,
+                    batch.clean_targets,
+                    batch.mask,
+                    batch.p_mask,
+                    loss_mask=getattr(batch, "loss_mask", None),
+                )
                 loss.backward()
             last_loss = loss
-            processed_tokens += int(batch.clean_targets.numel())
+            processed_tokens += int(batch.metadata.get("token_count", batch.clean_targets.numel()))
             mask_ratio_accum += float(batch.metadata.get("mask_ratio", 0.0))
 
             if cfg.benchmark.optimizer_step and optimizer is not None:
@@ -399,16 +431,25 @@ def main():
             model.eval()
             with torch.no_grad():
                 for _ in range(eval_batches):
-                    seqs, tgts = _sample_eval_batch_streaming(
+                    seqs, tgts, input_mask, target_mask = _sample_eval_batch_streaming(
                         eval_batcher,
                         eval_batch_size,
                         cfg.model.context_length,
                     )
-                    logits = model(seqs)
-                    loss_per_position = cross_entropy(logits, tgts).reshape(-1)
-                    batch_loss_sum = float(loss_per_position.sum().item()) * eval_batch_size
+                    if input_mask is not None:
+                        logits = model(seqs, attention_mask=input_mask)
+                    else:
+                        logits = model(seqs)
+                    loss_per_position = cross_entropy(logits, tgts, reduction="none")
+                    if target_mask is not None:
+                        loss_per_position = loss_per_position * target_mask.to(loss_per_position.dtype)
+                        batch_loss_sum = float(loss_per_position.sum().item())
+                        batch_tokens = int(target_mask.sum().item())
+                    else:
+                        batch_loss_sum = float(loss_per_position.sum().item())
+                        batch_tokens = int(loss_per_position.numel())
                     total_loss += batch_loss_sum
-                    total_tokens += eval_batch_size * seqs.shape[1]
+                    total_tokens += batch_tokens
                     actual_batches += 1
         except ValueError as exc:
             logger.log(

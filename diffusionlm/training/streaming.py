@@ -182,3 +182,63 @@ class StreamingBatcher:
         self._iterator = self.iterator_factory()
         if hasattr(self.iterator_factory, "set_state") and "iterator_factory" in state:
             self.iterator_factory.set_state(state["iterator_factory"])
+
+
+class RowBatcher:
+    """Row-based batcher that pads each row to a fixed context length."""
+
+    def __init__(
+        self,
+        iterator_factory: HFTokenIteratorFactory,
+        *,
+        device: str | torch.device,
+        pad_token_id: int,
+        logger: Optional[Logger] = None,
+    ) -> None:
+        self.iterator_factory = iterator_factory
+        self.device = torch.device(device)
+        self.pad_token_id = int(pad_token_id)
+        self._iterator: Iterator[list[int]] = self.iterator_factory()
+        self._logger = logger
+
+    def _next_row(self) -> list[int]:
+        while True:
+            try:
+                return next(self._iterator)
+            except StopIteration:
+                self._iterator = self.iterator_factory()
+
+    def draw(self, batch_size: int, context_length: int) -> tuple[torch.Tensor, torch.Tensor]:
+        if context_length <= 0:
+            raise ValueError("context_length must be > 0")
+        sequences: list[list[int]] = []
+        masks: list[list[bool]] = []
+        for _ in range(batch_size):
+            tokens = list(self._next_row())
+            if len(tokens) > context_length:
+                tokens = tokens[:context_length]
+            valid_len = len(tokens)
+            pad_len = context_length - valid_len
+            if pad_len > 0:
+                tokens = tokens + [self.pad_token_id] * pad_len
+                mask = [True] * valid_len + [False] * pad_len
+            else:
+                mask = [True] * context_length
+            sequences.append(tokens)
+            masks.append(mask)
+        token_tensor = torch.tensor(sequences, dtype=torch.long, device=self.device)
+        mask_tensor = torch.tensor(masks, dtype=torch.bool, device=self.device)
+        return token_tensor, mask_tensor
+
+    def get_state(self) -> dict:
+        state = {
+            "exact": False,
+        }
+        if hasattr(self.iterator_factory, "get_state"):
+            state["iterator_factory"] = self.iterator_factory.get_state()
+        return state
+
+    def set_state(self, state: dict) -> None:
+        self._iterator = self.iterator_factory()
+        if hasattr(self.iterator_factory, "set_state") and "iterator_factory" in state:
+            self.iterator_factory.set_state(state["iterator_factory"])

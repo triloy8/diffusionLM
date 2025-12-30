@@ -237,6 +237,8 @@ class DataConfig(_BaseConfig):
     val_split: str
     text_field: str
     tokenizer: TokenizerConfig
+    pipeline_mode: str = "packed"
+    pad_token_id: Optional[int] = None
     shuffle_buffer_size: int = 0
     shuffle_seed: Optional[int] = None
 
@@ -250,6 +252,14 @@ class DataConfig(_BaseConfig):
             raise ValueError("val_split must not be empty")
         if not self.text_field:
             raise ValueError("text_field must not be empty")
+        self.pipeline_mode = self.pipeline_mode.lower()
+        if self.pipeline_mode not in {"packed", "rows"}:
+            raise ValueError("pipeline_mode must be one of: packed, rows")
+        if self.pipeline_mode == "rows":
+            if self.pad_token_id is None:
+                raise ValueError("pad_token_id must be set when pipeline_mode='rows'")
+            if self.pad_token_id < 0:
+                raise ValueError("pad_token_id must be >= 0")
         if self.shuffle_buffer_size < 0:
             raise ValueError("shuffle_buffer_size must be >= 0")
         if self.shuffle_seed is not None and self.shuffle_seed < 0:
@@ -542,6 +552,8 @@ class BenchDataConfig(_BaseConfig):
     dataset_config: Optional[str] = None
     split: str
     text_field: str
+    pipeline_mode: str = "packed"
+    pad_token_id: Optional[int] = None
     shuffle_buffer_size: int = 0
     shuffle_seed: Optional[int] = None
 
@@ -553,6 +565,14 @@ class BenchDataConfig(_BaseConfig):
             raise ValueError("data.split must not be empty")
         if not self.text_field:
             raise ValueError("data.text_field must not be empty")
+        self.pipeline_mode = self.pipeline_mode.lower()
+        if self.pipeline_mode not in {"packed", "rows"}:
+            raise ValueError("data.pipeline_mode must be one of: packed, rows")
+        if self.pipeline_mode == "rows":
+            if self.pad_token_id is None:
+                raise ValueError("data.pad_token_id must be set when pipeline_mode='rows'")
+            if self.pad_token_id < 0:
+                raise ValueError("data.pad_token_id must be >= 0")
         if self.shuffle_buffer_size < 0:
             raise ValueError("data.shuffle_buffer_size must be >= 0")
         if self.shuffle_seed is not None and self.shuffle_seed < 0:

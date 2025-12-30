@@ -13,7 +13,7 @@ from checkpointing import CheckpointManager
 from diffusionlm.training.schedule import lr_cosine_schedule
 from diffusionlm.training.grad import gradient_clipping
 from diffusionlm.training.loop import train_loop
-from diffusionlm.training.streaming import HFTokenIteratorFactory, StreamingBatcher
+from diffusionlm.training.streaming import HFTokenIteratorFactory, StreamingBatcher, RowBatcher
 
 from datetime import datetime
 from pathlib import Path
@@ -203,8 +203,28 @@ def train_transformer_ddp(local_rank, args, cfg_dc):
         logger=logger,
         hf_debug_logging=True,
     )
-    train_batcher = StreamingBatcher(train_iterator_factory, device=str(cfg.device), logger=logger)
-    val_batcher = StreamingBatcher(val_iterator_factory, device=str(cfg.device), logger=logger)
+    pipeline_mode = str(getattr(args, "pipeline_mode", "packed")).lower()
+    pad_token_id = getattr(args, "pad_token_id", None)
+    if pipeline_mode not in {"packed", "rows"}:
+        raise ValueError("pipeline_mode must be one of: packed, rows")
+    if pipeline_mode == "rows":
+        if pad_token_id is None:
+            raise ValueError("pad_token_id must be set when pipeline_mode='rows'")
+        train_batcher = RowBatcher(
+            train_iterator_factory,
+            device=str(cfg.device),
+            pad_token_id=int(pad_token_id),
+            logger=logger,
+        )
+        val_batcher = RowBatcher(
+            val_iterator_factory,
+            device=str(cfg.device),
+            pad_token_id=int(pad_token_id),
+            logger=logger,
+        )
+    else:
+        train_batcher = StreamingBatcher(train_iterator_factory, device=str(cfg.device), logger=logger)
+        val_batcher = StreamingBatcher(val_iterator_factory, device=str(cfg.device), logger=logger)
     checkpoint_manager.attach_batchers(
         generator=torch_generator,
         train_batcher=train_batcher,
@@ -249,7 +269,13 @@ def train_transformer_ddp(local_rank, args, cfg_dc):
     )
 
     def _compute_loss(logits: torch.Tensor, batch) -> torch.Tensor:
-        return diffusion_cross_entropy(logits, batch.clean_targets, batch.mask, batch.p_mask)
+        return diffusion_cross_entropy(
+            logits,
+            batch.clean_targets,
+            batch.mask,
+            batch.p_mask,
+            loss_mask=getattr(batch, "loss_mask", None),
+        )
 
     def _sync():
         ddp_model.finish_gradient_synchronization()

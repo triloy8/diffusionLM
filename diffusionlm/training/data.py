@@ -12,6 +12,8 @@ class DiffusionBatch:
     clean_targets: torch.Tensor
     mask: torch.Tensor
     p_mask: torch.Tensor
+    attention_mask: torch.Tensor | None
+    loss_mask: torch.Tensor | None
     metadata: Dict[str, Any]
 
 
@@ -41,7 +43,15 @@ def get_batch(
     device_obj = torch.device(device)
     rng_device = generator.device if generator is not None and hasattr(generator, "device") else torch.device("cpu")
 
-    clean_targets = dataset.draw(batch_size=batch_size, context_length=context_length).to(device_obj, dtype=torch.long)
+    attention_mask = None
+    drawn = dataset.draw(batch_size=batch_size, context_length=context_length)
+    if isinstance(drawn, tuple):
+        clean_targets, attention_mask = drawn
+    else:
+        clean_targets = drawn
+    clean_targets = clean_targets.to(device_obj, dtype=torch.long)
+    if attention_mask is not None:
+        attention_mask = attention_mask.to(device_obj, dtype=torch.bool)
 
     random_trunc_applied = False
     if random_trunc_prob > 0:
@@ -52,21 +62,28 @@ def get_batch(
             clean_targets = clean_targets[:, :trunc_len]
             random_trunc_applied = True
 
+    if attention_mask is not None and random_trunc_applied:
+        attention_mask = attention_mask[:, : clean_targets.shape[1]]
+
     batch_size, seq_len = clean_targets.shape
 
     t = _rand_uniform((batch_size,), device=device_obj, generator=generator)
     p_mask = (1.0 - noise_epsilon) * t[:, None] + noise_epsilon
     mask_rand = _rand_uniform((batch_size, seq_len), device=device_obj, generator=generator)
     mask = mask_rand < p_mask
+    if attention_mask is not None:
+        mask = mask & attention_mask
 
     mask_token_tensor = torch.full_like(clean_targets, fill_value=mask_token_id)
     noisy_inputs = torch.where(mask, mask_token_tensor, clean_targets)
 
+    loss_mask = attention_mask
+    token_count = int(loss_mask.sum().item()) if loss_mask is not None else int(clean_targets.numel())
     metadata: Dict[str, Any] = {
         "random_truncation_applied": random_trunc_applied,
         "sequence_length": seq_len,
         "mask_ratio": float(mask.float().mean().detach().cpu().item()),
-        "token_count": int(clean_targets.numel()),
+        "token_count": token_count,
     }
 
     return DiffusionBatch(
@@ -74,6 +91,8 @@ def get_batch(
         clean_targets=clean_targets,
         mask=mask,
         p_mask=p_mask,
+        attention_mask=attention_mask,
+        loss_mask=loss_mask,
         metadata=metadata,
     )
 

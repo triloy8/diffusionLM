@@ -54,10 +54,29 @@ class RotaryPositionalEmbedding(torch.nn.Module):
             return x_rotated.flatten(-2)
 
 
-def scaled_dot_product_attention(Q: torch.Tensor, K: torch.Tensor, V: torch.Tensor):
+def _prepare_attention_mask(attention_mask: torch.Tensor, qk_score: torch.Tensor) -> torch.Tensor:
+    mask = attention_mask.to(device=qk_score.device, dtype=torch.bool)
+    if mask.dim() == 2:
+        mask = mask[:, None, None, :]
+    elif mask.dim() == 3:
+        mask = mask[:, None, :, :]
+    elif mask.dim() != 4:
+        raise ValueError("attention_mask must be 2D, 3D, or 4D")
+    return mask
+
+
+def scaled_dot_product_attention(
+    Q: torch.Tensor,
+    K: torch.Tensor,
+    V: torch.Tensor,
+    attention_mask: torch.Tensor | None = None,
+):
     if nvtx.enabled("fine"):
         with nvtx.range("sdpa/qk"):
             qk_score = einsum(Q, K, "batch_size ... n d_k, batch_size ... m d_k -> batch_size ... n m") / torch.sqrt(torch.tensor(Q.shape[-1]))
+            if attention_mask is not None:
+                mask = _prepare_attention_mask(attention_mask, qk_score)
+                qk_score = qk_score.masked_fill(~mask, float("-inf"))
         with nvtx.range("sdpa/softmax"):
             softmax_qk_score = softmax(qk_score, dim=-1)
         with nvtx.range("sdpa/attnV"):
@@ -65,6 +84,9 @@ def scaled_dot_product_attention(Q: torch.Tensor, K: torch.Tensor, V: torch.Tens
         return attn
     else:
         qk_score = einsum(Q, K, "batch_size ... n d_k, batch_size ... m d_k -> batch_size ... n m") / torch.sqrt(torch.tensor(Q.shape[-1]))
+        if attention_mask is not None:
+            mask = _prepare_attention_mask(attention_mask, qk_score)
+            qk_score = qk_score.masked_fill(~mask, float("-inf"))
         softmax_qk_score = softmax(qk_score, dim=-1)
         attn = einsum(softmax_qk_score, V, "batch_size ... n m, batch_size ... m d_k -> batch_size ... n d_k")
         return attn
@@ -87,7 +109,12 @@ class MultiheadSelfAttentionRoPE(nn.Module):
 
         self.rope = RotaryPositionalEmbedding(self.theta, self.d_k, self.max_seq_len, device)
 
-    def forward(self, x: torch.Tensor, token_positions: torch.Tensor) -> torch.Tensor:
+    def forward(
+        self,
+        x: torch.Tensor,
+        token_positions: torch.Tensor,
+        attention_mask: torch.Tensor | None = None,
+    ) -> torch.Tensor:
         with nvtx.range("attn/q_proj"):
             wqx = self.q_proj(x)
         if nvtx.enabled("fine"):
@@ -120,7 +147,12 @@ class MultiheadSelfAttentionRoPE(nn.Module):
 
         seq_len = token_positions.shape[-1]
         with nvtx.range("attn/sdpa"):
-            attn = scaled_dot_product_attention(wqx_rearr_rope, wkx_rearr_rope, wvx_rearr)
+            attn = scaled_dot_product_attention(
+                wqx_rearr_rope,
+                wkx_rearr_rope,
+                wvx_rearr,
+                attention_mask=attention_mask,
+            )
         if nvtx.enabled("fine"):
             with nvtx.range("attn/merge_heads"):
                 attn_rearr = rearrange(attn, "... num_heads seq_len d_v -> ... seq_len (num_heads d_v)", num_heads=self.num_heads, d_v=self.d_v)

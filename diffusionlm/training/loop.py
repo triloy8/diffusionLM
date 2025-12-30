@@ -80,6 +80,13 @@ def train_loop(
             return batch_obj["noisy_inputs"]
         raise ValueError("Prepared batch must expose `noisy_inputs` for model input.")
 
+    def _attention_mask(batch_obj: object) -> Optional[torch.Tensor]:
+        if hasattr(batch_obj, "attention_mask"):
+            return getattr(batch_obj, "attention_mask")
+        if isinstance(batch_obj, dict) and "attention_mask" in batch_obj:
+            return batch_obj["attention_mask"]
+        return None
+
     train_iteration = start_iteration
     tokens_seen = 0
     accum_steps = max(1, int(grad_accum_steps))
@@ -124,6 +131,7 @@ def train_loop(
 
         train_batch = prepare(raw_train_batch)
         train_inputs = _inputs(train_batch)
+        train_attn_mask = _attention_mask(train_batch)
 
         # schedule (set LR for this iteration before forward/step)
         logged_lr = None
@@ -152,7 +160,10 @@ def train_loop(
                 )
 
         # forward
-        train_logits = model(train_inputs)
+        if train_attn_mask is not None:
+            train_logits = model(train_inputs, attention_mask=train_attn_mask)
+        else:
+            train_logits = model(train_inputs)
         train_loss = compute_loss(train_logits, train_batch)
         scaled_loss = train_loss / accum_steps
         if logger is not None and device.startswith("cuda") and torch.cuda.is_available():
@@ -314,7 +325,11 @@ def train_loop(
                     )
                     val_batch = prepare(raw_val_batch)
                     val_inputs = _inputs(val_batch)
-                    val_logits = model(val_inputs)
+                    val_attn_mask = _attention_mask(val_batch)
+                    if val_attn_mask is not None:
+                        val_logits = model(val_inputs, attention_mask=val_attn_mask)
+                    else:
+                        val_logits = model(val_inputs)
                     val_loss = compute_loss(val_logits, val_batch)
                     running_val_loss += float(val_loss.item())
                     val_tokens += int(val_inputs.numel())

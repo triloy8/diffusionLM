@@ -13,10 +13,10 @@ class TransformerBlock(nn.Module):
         self.ln1 = RMSNorm(d_model, device=device, dtype=dtype)
         self.ln2 = RMSNorm(d_model, device=device, dtype=dtype)
 
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
+    def forward(self, x: torch.Tensor, attention_mask: torch.Tensor | None = None) -> torch.Tensor:
         token_positions = torch.arange(x.shape[-2], device=x.device, dtype=torch.long)
         ln1x = self.ln1(x)
-        x = x + self.attn(ln1x, token_positions)
+        x = x + self.attn(ln1x, token_positions, attention_mask=attention_mask)
         ln2x = self.ln2(x)
         x = x + self.ffn(ln2x)
         return x
@@ -31,10 +31,10 @@ class TransformerLM(nn.Module):
         self.ln_final = RMSNorm(d_model, device=device, dtype=dtype)
         self.lm_head = Linear(d_model, vocab_size, device, dtype)
 
-    def forward(self, in_indices: torch.Tensor) -> torch.Tensor:
+    def forward(self, in_indices: torch.Tensor, attention_mask: torch.Tensor | None = None) -> torch.Tensor:
         output_seq = self.token_embeddings(in_indices)
         for layer in self.layers:
-            output_seq = layer(output_seq)
+            output_seq = layer(output_seq, attention_mask=attention_mask)
         normed_output_seq = self.ln_final(output_seq)
         logits = self.lm_head(normed_output_seq)
         return logits

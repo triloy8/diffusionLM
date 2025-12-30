@@ -74,6 +74,8 @@ def main():
         tokenizer_vocab_path=cfg_dc.data.tokenizer.vocab_path,
         tokenizer_merges_path=cfg_dc.data.tokenizer.merges_path,
         tokenizer_special_tokens_path=str(cfg_dc.data.tokenizer.special_tokens_path),
+        pipeline_mode=cfg_dc.data.pipeline_mode,
+        pad_token_id=cfg_dc.data.pad_token_id,
         shuffle_buffer_size=cfg_dc.data.shuffle_buffer_size,
         shuffle_seed=cfg_dc.data.shuffle_seed,
         rng_seed=cfg_dc.training.seed,

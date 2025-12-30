@@ -14,7 +14,7 @@ class TransformerBlock(nn.Module):
         self.ln1 = RMSNorm(d_model, device=device, dtype=dtype)
         self.ln2 = RMSNorm(d_model, device=device, dtype=dtype)
 
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
+    def forward(self, x: torch.Tensor, attention_mask: torch.Tensor | None = None) -> torch.Tensor:
         token_positions = torch.arange(x.shape[-2], device=x.device, dtype=torch.long)
         # Attention path
         with nvtx.range("model/block/attn"):
@@ -23,7 +23,7 @@ class TransformerBlock(nn.Module):
                     ln1x = self.ln1(x)
             else:
                 ln1x = self.ln1(x)
-            x = x + self.attn(ln1x, token_positions)
+            x = x + self.attn(ln1x, token_positions, attention_mask=attention_mask)
         # FFN path
         with nvtx.range("model/block/ffn"):
             if nvtx.enabled("fine"):
@@ -44,13 +44,13 @@ class TransformerLM(nn.Module):
         self.ln_final = RMSNorm(d_model, device=device, dtype=dtype)
         self.lm_head = Linear(d_model, vocab_size, device, dtype)
 
-    def forward(self, in_indices: torch.Tensor) -> torch.Tensor:
+    def forward(self, in_indices: torch.Tensor, attention_mask: torch.Tensor | None = None) -> torch.Tensor:
         with nvtx.range("model/forward"):
             with nvtx.range("model/embedding"):
                 output_seq = self.token_embeddings(in_indices)
             for i, layer in enumerate(self.layers):
                 with nvtx.range(f"model/layer[{i}]"):
-                    output_seq = layer(output_seq)
+                    output_seq = layer(output_seq, attention_mask=attention_mask)
             if nvtx.enabled("fine"):
                 with nvtx.range("model/ln_final"):
                     normed_output_seq = self.ln_final(output_seq)

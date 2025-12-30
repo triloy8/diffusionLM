@@ -38,6 +38,8 @@ dataset_name = "HuggingFaceFW/fineweb"
 dataset_config = ""
 split = "train"
 text_field = "text"
+pipeline_mode = "packed"
+# pad_token_id = 0
 shuffle_buffer_size = 0
 shuffle_seed = 0
 

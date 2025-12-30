@@ -22,11 +22,24 @@ def cross_entropy(inputs: Tensor, targets: Tensor, *, reduction: str = "mean_bat
     raise ValueError(f"Unsupported reduction: {reduction}")
 
 
-def diffusion_cross_entropy(logits: Tensor, targets: Tensor, mask: Tensor, p_mask: Tensor) -> Tensor:
+def diffusion_cross_entropy(
+    logits: Tensor,
+    targets: Tensor,
+    mask: Tensor,
+    p_mask: Tensor,
+    *,
+    loss_mask: Tensor | None = None,
+) -> Tensor:
     per_token = cross_entropy(logits, targets, reduction="none")
     mask_f = mask.to(per_token.dtype)
+    if loss_mask is not None:
+        loss_mask_f = loss_mask.to(per_token.dtype)
+        mask_f = mask_f * loss_mask_f
     weighted = (per_token * mask_f) / p_mask
-    denom = targets.shape[0] * targets.shape[1]
+    if loss_mask is not None:
+        denom = loss_mask_f.sum().item()
+    else:
+        denom = targets.shape[0] * targets.shape[1]
     return weighted.sum() / max(denom, 1)
 
 
