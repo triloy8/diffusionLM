@@ -22,10 +22,10 @@ ckpt_path = "./runs/2025-12-28_13-47-52/20000.ckpt"
 
 [inference]
 prompt = "Once upon a time,"
-steps = 128
+steps = 512
 total_length = 512
-block_length = 128
-temperature = 0.7
+block_length = 64
+temperature = 0.3
 mask_id = 50257
 seed = 3407
 eos_token_id = 50256
@@ -42,9 +42,9 @@ print_every = 1
 
 # Parameter grids, any omitted list falls back to [inference.*]
 # steps = [256, 512]
-temperatures = [0.15, 0.3, 0.6]
+# temperatures = [0.15, 0.3, 0.6]
 remasking = ["random", "low_confidence"]
-seeds = [3407, 3408, 3409]
+seeds = [3407, 3408, 3409, 3410, 3411, 3412]
 # cfg_scales = [0.0, 1.5, 3.0]
 # prompts = ["Once upon a time,", "In a distant future,"]
 # total_lengths = [256]
