@@ -1,5 +1,5 @@
 [model]
-vocab_size = 50258
+vocab_size = 50259
 context_length = 512
 d_model = 768
 num_layers = 8
@@ -8,8 +8,8 @@ d_ff = 3072
 rope_theta = 10000.0
 device = "cuda"
 dtype = "bfloat16"
-mask_token_id = 50257
-eot_token_id = 50256
+mask_token_id = 50258
+eot_token_id = 50257
 noise_epsilon = 0.001
 random_trunc_prob = 0 # 0.01
 
@@ -26,7 +26,7 @@ cosine_cycle_iters = 50000
 grad_clip_max_l2_norm = 1.0
 
 [training]
-batch_size = 70
+batch_size = 68
 max_train_iteration = 50000
 max_val_iteration = 10
 val_freq_iteration = 125
@@ -41,8 +41,8 @@ dataset_config = ""
 train_split = "train"
 val_split = "validation"
 text_field = "text"
-pipeline_mode = "packed"
-# pad_token_id = 0
+pipeline_mode = "rows" # rows/packed
+pad_token_id = 50256
 shuffle_buffer_size = 30000
 shuffle_seed = 3407
 
