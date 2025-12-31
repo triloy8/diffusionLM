@@ -14,7 +14,7 @@ noise_epsilon = 0.001
 random_trunc_prob = 0 # 0.01
 
 [optimizer]
-optimizer_name = "adamw"
+optimizer_name = "muon"
 betas = [0.9, 0.95] # adamw
 eps = 1e-10 # adamw
 weight_decay = 0.05 # adamw
