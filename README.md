@@ -256,11 +256,3 @@ print(memory.summary())
 print(memory.peaks())
 memory.reset_peaks()
 ```
-
-## Future Work
-
-- [ ] Checkpoint resume state for streaming data (persist iterator/shuffle RNG state so resumed training matches the original run exactly).
-- [ ] Add a deterministic streaming dataset fixture/smoke test so bench/tests `datasets.load_dataset` end-to-end offline.
-- [ ] Rework perplexity reporting so metrics better reflect diffusion LLM behavior (the current LM-style cross-entropy doesn’t translate).
-- [ ] Instrument the streaming loader (tokens/sec, shuffle buffer occupancy, cache provenance) and log dataset metadata per run.
-- [ ] Provide an HF-oriented `make_data` path (e.g., parquet/JSON writer) to replace the legacy `.dat` builder for people who still need offline preprocessing.

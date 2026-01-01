@@ -30,7 +30,7 @@ kill-train:
 
 fetch any_file:
 	echo "Fetching {{any_file}} from {{prime_host}}"
-	scp -r {{prime_host}}:{{remote_root}}/{{any_file}} .
+	scp -r {{prime_host}}:{{remote_root}}/{{any_file}} {{any_file}}
 
 list-runs:
 	ssh {{prime_host}} "ls -1 {{remote_root}}/runs"
