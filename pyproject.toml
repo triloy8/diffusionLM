@@ -17,6 +17,7 @@ dependencies = [
     "pydantic>=2.10",
     "safetensors>=0.4.5",
     "boto3>=1.34.0",
+    "transformers>=4.57.3",
 ]
 
 [tool.uv]

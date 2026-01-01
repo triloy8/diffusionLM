@@ -10,13 +10,18 @@ def softmax(x: torch.Tensor, dim: int):
 
 
 def top_p_filter(probs: torch.Tensor, p: float) -> torch.Tensor:
+    if probs.dim() < 2:
+        raise ValueError("probs must have at least 2 dimensions")
+    orig_shape = probs.shape
+    vocab = orig_shape[-1]
+    probs = probs.reshape(-1, vocab)
     if p <= 0:
         argmax = probs.argmax(dim=-1)
         out = torch.zeros_like(probs)
         out.scatter_(-1, argmax.unsqueeze(-1), 1.0)
-        return out
+        return out.reshape(orig_shape)
     if p >= 1:
-        return probs / probs.sum(dim=-1, keepdim=True)
+        return (probs / probs.sum(dim=-1, keepdim=True)).reshape(orig_shape)
 
     sorted_probs, sorted_indices = torch.sort(probs, descending=True)
     cumulative = torch.cumsum(sorted_probs, dim=-1)
@@ -30,7 +35,7 @@ def top_p_filter(probs: torch.Tensor, p: float) -> torch.Tensor:
         sel_probs = sorted_probs[i, :k]
         filtered[i, sel] = sel_probs
         filtered[i] /= filtered[i].sum()
-    return filtered
+    return filtered.reshape(orig_shape)
 
 
 def add_gumbel_noise(logits: torch.Tensor, temperature: float, *, generator: torch.Generator | None = None) -> torch.Tensor:

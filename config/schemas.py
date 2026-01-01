@@ -353,6 +353,7 @@ class InferenceConfig(_BaseConfig):
     total_length: Optional[int] = None
     block_length: int
     temperature: float = 1.0
+    top_p: Optional[float] = None
     mask_id: Optional[int] = None
     seed: Optional[int] = None
     eos_token_id: Optional[int] = None
@@ -371,6 +372,8 @@ class InferenceConfig(_BaseConfig):
             raise ValueError("block_length must be > 0")
         if self.temperature < 0:
             raise ValueError("temperature must be >= 0")
+        if self.top_p is not None and (self.top_p < 0 or self.top_p > 1):
+            raise ValueError("top_p must be between 0 and 1 when provided")
         if self.mask_id is not None and self.mask_id < 0:
             raise ValueError("mask_id must be >= 0")
         if self.seed is not None and self.seed < 0:
@@ -396,6 +399,7 @@ class SweepConfig(_BaseConfig):
     block_lengths: Optional[List[int]] = None
     cfg_scales: Optional[List[float]] = None
     remasking: Optional[List[str]] = None
+    top_ps: Optional[List[float]] = None
     seeds: Optional[List[int]] = None
     output_path: Path = Path("runs/sweep_infer.jsonl")
     html_output_path: Optional[Path] = None
@@ -420,6 +424,8 @@ class SweepConfig(_BaseConfig):
             for r in self.remasking:
                 if r not in {"low_confidence", "random"}:
                     raise ValueError("sweep.remasking must be one of: low_confidence, random")
+        if self.top_ps is not None and any((p < 0 or p > 1) for p in self.top_ps):
+            raise ValueError("sweep.top_ps must be between 0 and 1")
         if self.seeds is not None and any(s < 0 for s in self.seeds):
             raise ValueError("sweep.seeds must be >= 0")
         if self.print_every < 0:

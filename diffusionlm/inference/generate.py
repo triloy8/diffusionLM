@@ -3,7 +3,7 @@ from __future__ import annotations
 import math
 
 import torch
-from diffusionlm.inference.sampling import add_gumbel_noise, compute_transfer_schedule, softmax
+from diffusionlm.inference.sampling import add_gumbel_noise, compute_transfer_schedule, softmax, top_p_filter
 
 
 @torch.no_grad()
@@ -17,6 +17,7 @@ def diffusion_generate(
     gen_length: int,
     block_length: int,
     temperature: float = 0.0,
+    top_p: float | None = None,
     cfg_scale: float = 0.0,
     remasking: str = "random",
     logits_eos_inf: bool = False,
@@ -80,6 +81,15 @@ def diffusion_generate(
 
             if logits_eos_inf and eos_token_id is not None:
                 logits[:, :, eos_token_id] = float("-inf")
+
+            if top_p is not None:
+                probs = softmax(logits, dim=-1)
+                probs = top_p_filter(probs, float(top_p))
+                logits = torch.where(
+                    probs > 0,
+                    logits,
+                    torch.full_like(logits, float("-inf")),
+                )
 
             logits_with_noise = add_gumbel_noise(logits, temperature, generator=generator)
             predictions = torch.argmax(logits_with_noise, dim=-1)

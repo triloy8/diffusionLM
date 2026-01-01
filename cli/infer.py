@@ -48,6 +48,7 @@ def main():
         mask_id=cfg_dc.inference.mask_id,
         seed=cfg_dc.inference.seed,
         eos_token_id=cfg_dc.inference.eos_token_id,
+        top_p=cfg_dc.inference.top_p,
         cfg_scale=cfg_dc.inference.cfg_scale,
         remasking=cfg_dc.inference.remasking,
         logits_eos_inf=cfg_dc.inference.logits_eos_inf,

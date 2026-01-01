@@ -21,13 +21,14 @@ random_trunc_prob = 0
 ckpt_path = "./runs/2025-12-31_17-22-13/versions/v050000/model.safetensors"
 
 [inference]
-prompt = "Once upon a time,"
+prompt = "Once upon a time there was"
 steps = 128
 total_length = 128
 block_length = 64
-temperature = 0.5
+temperature = 0.6
+top_p = 0.8
 mask_id = 50258
-seed = 3411
+seed = 34123
 eos_token_id = 50257
 cfg_scale = 0.0
 remasking = "low_confidence"

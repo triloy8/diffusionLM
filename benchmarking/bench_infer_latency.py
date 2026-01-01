@@ -6,6 +6,7 @@ from typing import List, Optional, Tuple
 import math
 
 import torch
+from safetensors.torch import load_file
 
 from cli.utils import add_config_args, load_config_or_print
 from config import load_bench_infer_config
@@ -113,8 +114,8 @@ def main():
             device=cfg.model.device,
             dtype=DTYPES[cfg.model.dtype],
         )
-        ckpt = torch.load(str(cfg.checkpoint.ckpt_path), map_location=cfg.model.device)
-        model.load_state_dict(ckpt["model_state_dict"])  # type: ignore[index]
+        model_state = load_file(str(cfg.checkpoint.ckpt_path))
+        model.load_state_dict(model_state)
         # Snapshot initial model state on CPU for per-repeat resets
         initial_model_state = {k: v.detach().cpu() for k, v in model.state_dict().items()}
     # Snapshot initial model state on CPU for per-repeat resets
@@ -152,6 +153,7 @@ def main():
         "rope_theta": cfg.model.rope_theta,
         # sampling
         "temperature": cfg.inference.temperature,
+        "top_p": cfg.inference.top_p,
         "steps": cfg.inference.steps,
         "total_length": total_length,
         "gen_length": gen_length,
@@ -241,6 +243,7 @@ def main():
                                 gen_length=int(gen_length),
                                 block_length=int(cfg.inference.block_length),
                                 temperature=float(cfg.inference.temperature),
+                                top_p=(None if cfg.inference.top_p is None else float(cfg.inference.top_p)),
                                 cfg_scale=float(cfg.inference.cfg_scale),
                                 remasking=str(cfg.inference.remasking),
                                 logits_eos_inf=bool(cfg.inference.logits_eos_inf),
@@ -257,6 +260,7 @@ def main():
                             gen_length=int(gen_length),
                             block_length=int(cfg.inference.block_length),
                             temperature=float(cfg.inference.temperature),
+                            top_p=(None if cfg.inference.top_p is None else float(cfg.inference.top_p)),
                             cfg_scale=float(cfg.inference.cfg_scale),
                             remasking=str(cfg.inference.remasking),
                             logits_eos_inf=bool(cfg.inference.logits_eos_inf),

@@ -58,6 +58,10 @@ def main():
     block_lengths = cfg.sweep.block_lengths or [int(cfg.inference.block_length)]
     cfg_scales = cfg.sweep.cfg_scales or [float(cfg.inference.cfg_scale)]
     remasking = cfg.sweep.remasking or [str(cfg.inference.remasking)]
+    if cfg.sweep.top_ps is None:
+        top_ps = [None if cfg.inference.top_p is None else float(cfg.inference.top_p)]
+    else:
+        top_ps = cfg.sweep.top_ps
     seeds = cfg.sweep.seeds if cfg.sweep.seeds is not None else [cfg.inference.seed]
 
     model, tokenizer = _load_model_and_tokenizer(cfg)
@@ -74,6 +78,7 @@ def main():
             block_lengths,
             cfg_scales,
             remasking,
+            top_ps,
             seeds,
         )
     )
@@ -84,7 +89,7 @@ def main():
 
     records = [] if cfg.sweep.html_output_path else None
     with output_path.open("w", encoding="utf-8") as f:
-        for idx, (prompt, temp, steps, total_len, block_len, cfg_scale, remask, seed) in enumerate(grid, 1):
+        for idx, (prompt, temp, steps, total_len, block_len, cfg_scale, remask, top_p, seed) in enumerate(grid, 1):
             ids = [tokenizer.encode(prompt)]
             prompt_len = len(ids[0])
             total_len = int(total_len)
@@ -113,6 +118,7 @@ def main():
                     gen_length=int(gen_length),
                     block_length=int(block_len),
                     temperature=float(temp),
+                    top_p=(None if top_p is None else float(top_p)),
                     cfg_scale=float(cfg_scale),
                     remasking=str(remask),
                     logits_eos_inf=bool(cfg.inference.logits_eos_inf),
@@ -131,6 +137,7 @@ def main():
                 "steps": int(steps),
                 "total_length": int(total_len),
                 "block_length": int(block_len),
+                "top_p": (None if top_p is None else float(top_p)),
                 "cfg_scale": float(cfg_scale),
                 "remasking": str(remask),
                 "seed": (None if seed is None else int(seed)),
@@ -154,6 +161,7 @@ def main():
             "steps",
             "total_length",
             "block_length",
+            "top_p",
             "cfg_scale",
             "remasking",
             "seed",

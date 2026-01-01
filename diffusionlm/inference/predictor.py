@@ -44,6 +44,7 @@ def infer_transformer(args, *, logger: Optional[Logger] = None, artifact_path: O
 
     in_indices = torch.tensor(ids, device=args.device)
     eos_token_id = getattr(args, "eos_token_id", None)
+    top_p = getattr(args, "top_p", None)
     cfg_scale = float(getattr(args, "cfg_scale", 0.0))
     remasking = getattr(args, "remasking", "random")
     logits_eos_inf = bool(getattr(args, "logits_eos_inf", False))
@@ -67,6 +68,7 @@ def infer_transformer(args, *, logger: Optional[Logger] = None, artifact_path: O
                 "params.mask_id": int(args.mask_id),
                 "params.seed": (None if seed is None else int(seed)),
                 "params.eos_token_id": (None if eos_token_id is None else int(eos_token_id)),
+                "params.top_p": (None if top_p is None else float(top_p)),
                 "params.cfg_scale": float(cfg_scale),
                 "params.remasking": str(remasking),
                 "params.logits_eos_inf": bool(logits_eos_inf),
@@ -85,6 +87,7 @@ def infer_transformer(args, *, logger: Optional[Logger] = None, artifact_path: O
             gen_length=int(gen_length),
             block_length=int(args.block_length),
             temperature=float(args.temperature),
+            top_p=(None if top_p is None else float(top_p)),
             cfg_scale=float(cfg_scale),
             remasking=str(remasking),
             logits_eos_inf=bool(logits_eos_inf),
@@ -126,6 +129,7 @@ def infer_transformer(args, *, logger: Optional[Logger] = None, artifact_path: O
                     "mask_id": args.mask_id,
                     "seed": seed,
                     "eos_token_id": eos_token_id,
+                    "top_p": top_p,
                     "cfg_scale": cfg_scale,
                     "remasking": remasking,
                     "logits_eos_inf": logits_eos_inf,
