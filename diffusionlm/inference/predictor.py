@@ -1,10 +1,13 @@
+from typing import Optional
+
+import torch
+import time
+from safetensors.torch import load_file
+
 from diffusionlm.tokenizer.tokenizer import Tokenizer
 from diffusionlm.models import TransformerLM
 from diffusionlm.inference.generate import diffusion_generate
-import torch
-import time
 from diffusionlm.utils.dtypes import DTYPES
-from typing import Optional
 from logger import Logger
 
 
@@ -36,8 +39,8 @@ def infer_transformer(args, *, logger: Optional[Logger] = None, artifact_path: O
         dtype=DTYPES[args.dtype],
     )
 
-    ckpt_dict = torch.load(args.ckpt_path)
-    model.load_state_dict(ckpt_dict["model_state_dict"])
+    model_state = load_file(str(args.ckpt_path))
+    model.load_state_dict(model_state)
 
     in_indices = torch.tensor(ids, device=args.device)
     eos_token_id = getattr(args, "eos_token_id", None)

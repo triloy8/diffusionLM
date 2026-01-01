@@ -8,6 +8,7 @@ from html import escape as html_escape
 from pathlib import Path
 
 import torch
+from safetensors.torch import load_file
 
 from config import load_sweep_infer_config
 from diffusionlm.inference.generate import diffusion_generate
@@ -34,8 +35,8 @@ def _load_model_and_tokenizer(cfg):
         device=cfg.model.device,
         dtype=DTYPES[cfg.model.dtype],
     )
-    ckpt = torch.load(cfg.checkpoint.ckpt_path)
-    model.load_state_dict(ckpt["model_state_dict"])
+    model_state = load_file(str(cfg.checkpoint.ckpt_path))
+    model.load_state_dict(model_state)
     model.eval()
     return model, tokenizer
 

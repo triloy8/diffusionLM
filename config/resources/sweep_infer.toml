@@ -4,7 +4,7 @@ vocab_path = "./data/vocab.json"
 special_tokens_path = "./data/special_tokens.json"
 
 [model]
-vocab_size = 50258
+vocab_size = 50259
 context_length = 512
 d_model = 768
 num_layers = 8
@@ -13,38 +13,38 @@ d_ff = 3072
 rope_theta = 10000.0
 device = "cuda"
 dtype = "bfloat16"
-mask_token_id = 50257
+mask_token_id = 50258
 noise_epsilon = 0.001
 random_trunc_prob = 0
 
 [checkpoint]
-ckpt_path = "./runs/2025-12-28_13-47-52/20000.ckpt"
+ckpt_path = "./runs/2025-12-31_17-22-13/versions/v050000/model.safetensors"
 
 [inference]
 prompt = "Once upon a time,"
-steps = 512
-total_length = 512
-block_length = 64
-temperature = 0.3
-mask_id = 50257
-seed = 3407
-eos_token_id = 50256
+steps = 128
+total_length = 128
+block_length = 32
+temperature = 0.5
+mask_id = 50258
+seed = 3411
+eos_token_id = 50257
 cfg_scale = 0.0
-remasking = "random"
+remasking = "low_confidence"
 logits_eos_inf = false
 confidence_eos_eot_inf = false
 
 [sweep]
-output_path = "./runs/2025-12-28_13-47-52/sweep_infer.jsonl"
-html_output_path = "./runs/2025-12-28_13-47-52/sweep_infer.html"
+output_path = "./runs/2025-12-31_17-22-13/sweep_infer.jsonl"
+html_output_path = "./runs/2025-12-31_17-22-13/sweep_infer.html"
 print_every = 1
 # limit = 12
 
 # Parameter grids, any omitted list falls back to [inference.*]
 # steps = [256, 512]
-# temperatures = [0.15, 0.3, 0.6]
-remasking = ["random", "low_confidence"]
-seeds = [3407, 3408, 3409, 3410, 3411, 3412]
+temperatures = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6]
+# remasking = ["random", "low_confidence"]
+seeds = [3407, 3408, 3409, 3410, 3411, 3412, 3413, 3414, 3415, 3416]
 # cfg_scales = [0.0, 1.5, 3.0]
 # prompts = ["Once upon a time,", "In a distant future,"]
 # total_lengths = [256]
