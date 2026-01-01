@@ -21,7 +21,7 @@ weight_decay = 0.05 # adamw
 initial_learning_rate = 1e-4 # adamw, unused in cosine scheduler
 max_learning_rate = 4e-4 # adamw
 min_learning_rate = 1e-5 # adamw
-warmup_iters = 0
+warmup_iters = 1000
 cosine_cycle_iters = 50000
 grad_clip_max_l2_norm = 1.0
 
@@ -85,7 +85,7 @@ special_tokens_path = "./data/special_tokens.json"
 [logging]
 backend = "wandb"
 architecture = "DiffusionLM"
-dataset = "TinyStories"
+dataset = "SimpleStories"
 log_activation_norms = true
 log_weight_norms = true
 val_log_every = 8
