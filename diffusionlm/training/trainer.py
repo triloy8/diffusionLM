@@ -8,7 +8,6 @@ from diffusionlm.training.optim import (
 )
 from diffusionlm.training.data import get_batch, DiffusionBatch
 from diffusionlm.training.loss import diffusion_cross_entropy
-from diffusionlm.training.checkpoint import save_checkpoint
 from checkpointing import CheckpointManager
 from diffusionlm.training.schedule import lr_cosine_schedule
 from diffusionlm.training.grad import gradient_clipping
@@ -304,7 +303,6 @@ def train_transformer_ddp(local_rank, args, cfg_dc):
         get_batch=batch_getter,
         lr_cosine_schedule=lr_cosine_schedule,
         gradient_clipping=gradient_clipping,
-        save_checkpoint=save_checkpoint,
         checkpoint_callback=checkpoint_callback,
         compute_loss=_compute_loss,
         batch_generator=torch_generator,

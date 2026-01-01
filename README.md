@@ -113,7 +113,7 @@ The `Justfile` plus helper scripts under `scripts/` provide a thin remote contro
 
 - diffusionlm.training
   - Purpose: Training loop, loss, optimizer, schedule, checkpointing, and streaming batch construction.
-  - Key files: `diffusionlm/training/trainer.py`, `diffusionlm/training/loop.py`, `diffusionlm/training/optim.py`, `diffusionlm/training/schedule.py`, `diffusionlm/training/checkpoint.py`, `diffusionlm/training/data.py`.
+  - Key files: `diffusionlm/training/trainer.py`, `diffusionlm/training/loop.py`, `diffusionlm/training/optim.py`, `diffusionlm/training/schedule.py`, `diffusionlm/training/data.py`.
   - Notes: `[model]` config now includes `mask_token_id`, `noise_epsilon`, and `random_trunc_prob` for diffusion-aware batching.
 
 - diffusionlm.inference

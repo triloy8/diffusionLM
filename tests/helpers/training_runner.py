@@ -17,7 +17,14 @@ from diffusionlm.training.grad import gradient_clipping
 from diffusionlm.training.loss import diffusion_cross_entropy
 from diffusionlm.training.schedule import lr_cosine_schedule
 from diffusionlm.training.optim import AdamW
-from diffusionlm.training.checkpoint import save_checkpoint, load_checkpoint
+from checkpointing import (
+    CheckpointCoordinator,
+    load_manifest,
+    load_model_from_manifest,
+    load_optimizer_shard,
+    load_rng_state,
+)
+from checkpointing.state import restore_rng_state
 
 from ddp import DDP, OptimizerStateSharding
 from ddp.utils import setup_process_group, cleanup_process_group, allreduce_mean
@@ -69,6 +76,29 @@ def _set_all_seeds(seed: int, device: torch.device) -> torch.Generator:
     generator = torch.Generator(device="cpu")
     generator.manual_seed(seed)
     return generator
+
+
+def _build_checkpoint_coordinator(run_dir: Path, *, rank: int, world_size: int) -> CheckpointCoordinator:
+    run_id = run_dir.name or "run"
+    coordinator = CheckpointCoordinator(
+        run_dir=run_dir,
+        runs_root_parent=run_dir.parent,
+        run_id=run_id,
+        config_src_path=Path(""),
+        config_snapshot={"test": True},
+        best_metric_name="val_loss",
+        best_mode="min",
+        s3_cfg=None,
+        rank=rank,
+        world_size=world_size,
+    )
+    coordinator.prepare_run()
+    return coordinator
+
+
+def _checkpoint_manifest_path(run_dir: Path, step_idx: int) -> Path:
+    version_id = f"v{int(step_idx):06d}"
+    return run_dir / "versions" / version_id / "manifest.json"
 
 
 class InMemoryStreamingBatcher:
@@ -210,7 +240,6 @@ def _run_loop(
         get_batch=batch_getter,
         lr_cosine_schedule=lr_cosine_schedule,
         gradient_clipping=gradient_clipping,
-        save_checkpoint=lambda *_, **__: None,
         compute_loss=_compute_loss,
         batch_generator=generator,
         logger=None,
@@ -351,19 +380,26 @@ def run_training_with_checkpoint(
     snapshots_resumed: List[TrainingStepSnapshot] = []
 
     with tempfile.TemporaryDirectory() as tmpdir:
-        ckpt_path = Path(tmpdir) / "resume.ckpt"
+        run_dir = Path(tmpdir) / "runs" / "test-run"
+        coordinator = _build_checkpoint_coordinator(run_dir, rank=0, world_size=1)
+        coordinator.attach_state_sources(
+            generator=generator,
+            train_batcher=train_batcher,
+            val_batcher=valid_batcher,
+        )
         state_holder: Dict[str, Any] = {}
 
         def _hook(step_idx: int, model_ref: torch.nn.Module, optimizer_ref: torch.optim.Optimizer) -> None:
-            if step_idx == checkpoint_step - 1 and "generator_state" not in state_holder:
-                save_checkpoint(model_ref, optimizer_ref, step_idx, ckpt_path)
-                state_holder["generator_state"] = generator.get_state()
-                state_holder["python_state"] = random.getstate()
-                state_holder["numpy_state"] = np.random.get_state()
-                state_holder["torch_state"] = torch.random.get_rng_state()
+            if step_idx == checkpoint_step - 1 and "manifest_path" not in state_holder:
+                coordinator.save_version(
+                    step_idx,
+                    model=model_ref,
+                    optimizer=optimizer_ref,
+                    metrics=None,
+                    all_gather=None,
+                )
+                state_holder["manifest_path"] = _checkpoint_manifest_path(run_dir, step_idx)
                 state_holder["iteration"] = step_idx
-                state_holder["train_batcher_state"] = train_batcher.get_state()
-                state_holder["valid_batcher_state"] = valid_batcher.get_state()
 
         _run_loop(
             module=model,
@@ -378,30 +414,36 @@ def run_training_with_checkpoint(
             hook=_hook,
         )
 
-        if "generator_state" not in state_holder:
+        if "manifest_path" not in state_holder:
             raise RuntimeError("Checkpoint hook did not trigger")
 
         remaining = total_steps - checkpoint_step
         if remaining > 0:
             resume_base_iteration = int(state_holder["iteration"]) + 1
             generator_resume = torch.Generator(device="cpu")
-            generator_resume.set_state(state_holder["generator_state"])
-
-            random.setstate(state_holder["python_state"])
-            np.random.set_state(state_holder["numpy_state"])
-            torch.random.set_rng_state(state_holder["torch_state"])
 
             model_resume = bundle.model_factory()
             optimizer_resume = bundle.optimizer_factory(model_resume.parameters())
-            load_checkpoint(ckpt_path, model_resume, optimizer_resume)
-
-            random.setstate(state_holder["python_state"])
-            np.random.set_state(state_holder["numpy_state"])
-            torch.random.set_rng_state(state_holder["torch_state"])
+            manifest = load_manifest(state_holder["manifest_path"], root_parent=run_dir.parent)
+            model_state = load_model_from_manifest(manifest, run_dir, root_parent=run_dir.parent)
+            model_resume.load_state_dict(model_state)
+            optimizer_state = load_optimizer_shard(
+                manifest,
+                run_dir,
+                rank=0,
+                map_location=str(device),
+                root_parent=run_dir.parent,
+            )
+            optimizer_resume.load_state_dict(optimizer_state)
+            rng_state = load_rng_state(manifest, run_dir, rank=0, root_parent=run_dir.parent)
+            _ = restore_rng_state(rng_state, generator_resume)
 
             train_batcher_resume, valid_batcher_resume = _prepare_streaming_batchers(bundle, device)
-            train_batcher_resume.set_state(state_holder["train_batcher_state"])
-            valid_batcher_resume.set_state(state_holder["valid_batcher_state"])
+            batchers = rng_state.get("batchers", {})
+            if "train" in batchers:
+                train_batcher_resume.set_state(batchers["train"])
+            if "val" in batchers:
+                valid_batcher_resume.set_state(batchers["val"])
 
             _run_loop(
                 module=model_resume,
@@ -474,19 +516,26 @@ def run_training_with_checkpoint_ddp(
             ddp_model.finish_gradient_synchronization()
 
         with tempfile.TemporaryDirectory() as tmpdir:
-            ckpt_path = Path(tmpdir) / "resume.ckpt"
+            run_dir = Path(tmpdir) / "runs" / "test-run"
+            coordinator = _build_checkpoint_coordinator(run_dir, rank=0, world_size=1)
+            coordinator.attach_state_sources(
+                generator=generator,
+                train_batcher=train_batcher,
+                val_batcher=valid_batcher,
+            )
             state_holder: Dict[str, Any] = {}
 
             def _hook(step_idx: int, model_ref: torch.nn.Module, optimizer_ref: torch.optim.Optimizer) -> None:
-                if step_idx == checkpoint_step - 1 and "generator_state" not in state_holder:
-                    save_checkpoint(model_ref, optimizer_ref, step_idx, ckpt_path)
-                    state_holder["generator_state"] = generator.get_state()
-                    state_holder["python_state"] = random.getstate()
-                    state_holder["numpy_state"] = np.random.get_state()
-                    state_holder["torch_state"] = torch.random.get_rng_state()
+                if step_idx == checkpoint_step - 1 and "manifest_path" not in state_holder:
+                    coordinator.save_version(
+                        step_idx,
+                        model=model_ref,
+                        optimizer=optimizer_ref,
+                        metrics=None,
+                        all_gather=None,
+                    )
+                    state_holder["manifest_path"] = _checkpoint_manifest_path(run_dir, step_idx)
                     state_holder["iteration"] = step_idx
-                    state_holder["train_batcher_state"] = train_batcher.get_state()
-                    state_holder["valid_batcher_state"] = valid_batcher.get_state()
 
             _run_loop(
                 module=ddp_model,
@@ -504,18 +553,13 @@ def run_training_with_checkpoint_ddp(
                 is_rank_zero=True,
             )
 
-            if "generator_state" not in state_holder:
+            if "manifest_path" not in state_holder:
                 raise RuntimeError("Checkpoint hook did not trigger")
 
             remaining = total_steps - checkpoint_step
             if remaining > 0:
                 resume_base_iteration = int(state_holder["iteration"]) + 1
                 generator_resume = torch.Generator(device="cpu")
-                generator_resume.set_state(state_holder["generator_state"])
-
-                random.setstate(state_holder["python_state"])
-                np.random.set_state(state_holder["numpy_state"])
-                torch.random.set_rng_state(state_holder["torch_state"])
 
                 model_resume = bundle.model_factory()
                 ddp_model_resume = DDP(model_resume, world_size=1, bucket_size_mb=0)
@@ -529,15 +573,26 @@ def run_training_with_checkpoint_ddp(
                     eps=float(optimizer_cfg.eps),
                     weight_decay=optimizer_cfg.weight_decay,
                 )
-                load_checkpoint(ckpt_path, ddp_model_resume, optimizer_resume)
-
-                random.setstate(state_holder["python_state"])
-                np.random.set_state(state_holder["numpy_state"])
-                torch.random.set_rng_state(state_holder["torch_state"])
+                manifest = load_manifest(state_holder["manifest_path"], root_parent=run_dir.parent)
+                model_state = load_model_from_manifest(manifest, run_dir, root_parent=run_dir.parent)
+                ddp_model_resume.load_state_dict(model_state)
+                optimizer_state = load_optimizer_shard(
+                    manifest,
+                    run_dir,
+                    rank=0,
+                    map_location=str(device),
+                    root_parent=run_dir.parent,
+                )
+                optimizer_resume.load_state_dict(optimizer_state)
+                rng_state = load_rng_state(manifest, run_dir, rank=0, root_parent=run_dir.parent)
+                _ = restore_rng_state(rng_state, generator_resume)
 
                 train_batcher_resume, valid_batcher_resume = _prepare_streaming_batchers(bundle, device)
-                train_batcher_resume.set_state(state_holder["train_batcher_state"])
-                valid_batcher_resume.set_state(state_holder["valid_batcher_state"])
+                batchers = rng_state.get("batchers", {})
+                if "train" in batchers:
+                    train_batcher_resume.set_state(batchers["train"])
+                if "val" in batchers:
+                    valid_batcher_resume.set_state(batchers["val"])
 
                 def _sync_resume():
                     ddp_model_resume.finish_gradient_synchronization()

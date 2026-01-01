@@ -10,10 +10,14 @@ from diffusionlm.training import (
     lr_cosine_schedule,
     gradient_clipping,
     get_batch,
-    save_checkpoint,
-    load_checkpoint,
 )
 from diffusionlm.training.streaming import StreamingBatcher
+from checkpointing import (
+    CheckpointCoordinator,
+    load_manifest,
+    load_model_from_manifest,
+    load_optimizer_shard,
+)
 
 
 
@@ -177,9 +181,27 @@ def test_checkpointing_roundtrip(tmp_path, device):
     )
     opt = AdamW(model.parameters(), lr=1e-3)
 
-    # Save
-    ckpt_file = tmp_path / "ckpt.pt"
-    save_checkpoint(model, opt, iteration=123, out=str(ckpt_file))
+    run_dir = tmp_path / "runs" / "test-run"
+    coordinator = CheckpointCoordinator(
+        run_dir=run_dir,
+        runs_root_parent=run_dir.parent,
+        run_id="test-run",
+        config_src_path=tmp_path / "train.toml",
+        config_snapshot={"test": True},
+        best_metric_name="val_loss",
+        best_mode="min",
+        s3_cfg=None,
+        rank=0,
+        world_size=1,
+    )
+    coordinator.prepare_run()
+    coordinator.save_version(
+        123,
+        model=model,
+        optimizer=opt,
+        metrics=None,
+        all_gather=None,
+    )
 
     # Mutate model
     orig_state = copy.deepcopy(model.state_dict())
@@ -188,8 +210,18 @@ def test_checkpointing_roundtrip(tmp_path, device):
             p.zero_()
 
     # Load
-    it = load_checkpoint(str(ckpt_file), model, opt)
-    assert it == 123
+    manifest_path = run_dir / "versions" / "v000123" / "manifest.json"
+    manifest = load_manifest(manifest_path, root_parent=run_dir.parent)
+    model_state = load_model_from_manifest(manifest, run_dir, root_parent=run_dir.parent)
+    model.load_state_dict(model_state)
+    optimizer_state = load_optimizer_shard(
+        manifest,
+        run_dir,
+        rank=0,
+        map_location=str(device),
+        root_parent=run_dir.parent,
+    )
+    opt.load_state_dict(optimizer_state)
 
     # Compare states
     new_state = model.state_dict()

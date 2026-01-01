@@ -38,7 +38,6 @@ def train_loop(
     get_batch,
     lr_cosine_schedule,
     gradient_clipping,
-    save_checkpoint,
     compute_loss,
     checkpoint_callback: Optional[Callable[[int, torch.nn.Module, torch.optim.Optimizer, Optional[dict]], None]] = None,
     prepare_batch: Optional[Callable[[object], object]] = None,
@@ -375,22 +374,12 @@ def train_loop(
 
         # checkpoints
         if (
-            train_iteration > 0
+            checkpoint_callback is not None
+            and train_iteration > 0
             and train_iteration % ckpting_save_iter == 0
             and ckpting_save_folder is not None
         ):
-            if checkpoint_callback is not None:
-                checkpoint_callback(train_iteration, model, optimizer, last_val_metrics)
-            elif is_rank_zero:
-                ckpting_save_folder = Path(ckpting_save_folder)
-                ckpting_save_folder.mkdir(parents=True, exist_ok=True)
-                ckpt_file_iter = ckpting_save_folder / f"{train_iteration}.ckpt"
-                save_checkpoint(model, optimizer, train_iteration, ckpt_file_iter)
-                if logger is not None:
-                    try:
-                        logger.log_artifact(str(ckpt_file_iter), name=str(ckpt_file_iter), type_="checkpoint")
-                    except Exception:
-                        pass
+            checkpoint_callback(train_iteration, model, optimizer, last_val_metrics)
 
         if step_callback is not None:
             step_callback(
