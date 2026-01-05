@@ -204,6 +204,7 @@ def train_transformer_ddp(local_rank, args, cfg_dc):
     )
     pipeline_mode = str(getattr(args, "pipeline_mode", "packed")).lower()
     pad_token_id = getattr(args, "pad_token_id", None)
+    pad_random_shift = bool(getattr(args, "pad_random_shift", False))
     if pipeline_mode not in {"packed", "rows"}:
         raise ValueError("pipeline_mode must be one of: packed, rows")
     if pipeline_mode == "rows":
@@ -213,12 +214,14 @@ def train_transformer_ddp(local_rank, args, cfg_dc):
             train_iterator_factory,
             device=str(cfg.device),
             pad_token_id=int(pad_token_id),
+            pad_random_shift=pad_random_shift,
             logger=logger,
         )
         val_batcher = RowBatcher(
             val_iterator_factory,
             device=str(cfg.device),
             pad_token_id=int(pad_token_id),
+            pad_random_shift=pad_random_shift,
             logger=logger,
         )
     else:

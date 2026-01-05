@@ -76,6 +76,7 @@ def main():
         tokenizer_special_tokens_path=str(cfg_dc.data.tokenizer.special_tokens_path),
         pipeline_mode=cfg_dc.data.pipeline_mode,
         pad_token_id=cfg_dc.data.pad_token_id,
+        pad_random_shift=bool(getattr(cfg_dc.data, "pad_random_shift", False)),
         shuffle_buffer_size=cfg_dc.data.shuffle_buffer_size,
         shuffle_seed=cfg_dc.data.shuffle_seed,
         rng_seed=cfg_dc.training.seed,

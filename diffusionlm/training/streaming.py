@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import Iterable, Iterator, Optional
 import time
+import random
 
 from datasets import load_dataset
 from datasets.utils import logging as hf_logging
@@ -193,11 +194,13 @@ class RowBatcher:
         *,
         device: str | torch.device,
         pad_token_id: int,
+        pad_random_shift: bool = False,
         logger: Optional[Logger] = None,
     ) -> None:
         self.iterator_factory = iterator_factory
         self.device = torch.device(device)
         self.pad_token_id = int(pad_token_id)
+        self.pad_random_shift = bool(pad_random_shift)
         self._iterator: Iterator[list[int]] = self.iterator_factory()
         self._logger = logger
 
@@ -220,8 +223,14 @@ class RowBatcher:
             valid_len = len(tokens)
             pad_len = context_length - valid_len
             if pad_len > 0:
-                tokens = tokens + [self.pad_token_id] * pad_len
-                mask = [True] * valid_len + [False] * pad_len
+                if self.pad_random_shift:
+                    left_pad = random.randint(0, pad_len)
+                    right_pad = pad_len - left_pad
+                    tokens = ([self.pad_token_id] * left_pad) + tokens + ([self.pad_token_id] * right_pad)
+                    mask = ([False] * left_pad) + ([True] * valid_len) + ([False] * right_pad)
+                else:
+                    tokens = tokens + [self.pad_token_id] * pad_len
+                    mask = [True] * valid_len + [False] * pad_len
             else:
                 mask = [True] * context_length
             sequences.append(tokens)

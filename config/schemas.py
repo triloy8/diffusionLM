@@ -239,6 +239,7 @@ class DataConfig(_BaseConfig):
     tokenizer: TokenizerConfig
     pipeline_mode: str = "packed"
     pad_token_id: Optional[int] = None
+    pad_random_shift: bool = False
     shuffle_buffer_size: int = 0
     shuffle_seed: Optional[int] = None
 
@@ -361,6 +362,7 @@ class InferenceConfig(_BaseConfig):
     remasking: str = "random"
     logits_eos_inf: bool = False
     confidence_eos_eot_inf: bool = False
+    generation_mode: str = "diffusion"
 
     @model_validator(mode="after")
     def _validate_inference(self):
@@ -386,6 +388,8 @@ class InferenceConfig(_BaseConfig):
             raise ValueError("cfg_scale must be >= 0")
         if self.remasking not in {"low_confidence", "random"}:
             raise ValueError("remasking must be one of: low_confidence, random")
+        if self.generation_mode not in {"diffusion", "ar"}:
+            raise ValueError("generation_mode must be one of: diffusion, ar")
         if (self.logits_eos_inf or self.confidence_eos_eot_inf) and self.eos_token_id is None:
             raise ValueError("eos_token_id must be set when EOS suppression is enabled")
         return self
