@@ -54,7 +54,8 @@ def scaled_dot_product_attention(
     V: torch.Tensor,
     attention_mask: torch.Tensor | None = None,
 ):
-    qk_score = einsum(Q, K, "batch_size ... n d_k, batch_size ... m d_k -> batch_size ... n m") / torch.sqrt(torch.tensor(Q.shape[-1]))
+    scale = torch.tensor(Q.shape[-1], device=Q.device, dtype=Q.dtype).sqrt()
+    qk_score = einsum(Q, K, "batch_size ... n d_k, batch_size ... m d_k -> batch_size ... n m") / scale
     if attention_mask is not None:
         mask = _prepare_attention_mask(attention_mask, qk_score)
         qk_score = qk_score.masked_fill(~mask, float("-inf"))
