@@ -6,7 +6,7 @@ from safetensors.torch import load_file
 
 from diffusionlm.tokenizer.tokenizer import Tokenizer
 from diffusionlm.models import TransformerLM
-from diffusionlm.inference.generate import diffusion_generate
+from diffusionlm.inference.generate import autoregressive_generate, diffusion_generate
 from diffusionlm.utils.dtypes import DTYPES
 from logger import Logger
 
@@ -49,6 +49,7 @@ def infer_transformer(args, *, logger: Optional[Logger] = None, artifact_path: O
     remasking = getattr(args, "remasking", "random")
     logits_eos_inf = bool(getattr(args, "logits_eos_inf", False))
     confidence_eos_eot_inf = bool(getattr(args, "confidence_eos_eot_inf", False))
+    generation_mode = getattr(args, "generation_mode", "diffusion")
     seed = getattr(args, "seed", None)
     generator = None
     if seed is not None:
@@ -78,22 +79,36 @@ def infer_transformer(args, *, logger: Optional[Logger] = None, artifact_path: O
 
     t0 = time.time()
     if gen_length > 0:
-        out_indices = diffusion_generate(
-            model,
-            in_indices,
-            mask_id=int(args.mask_id),
-            eos_token_id=(None if eos_token_id is None else int(eos_token_id)),
-            steps=int(args.steps),
-            gen_length=int(gen_length),
-            block_length=int(args.block_length),
-            temperature=float(args.temperature),
-            top_p=(None if top_p is None else float(top_p)),
-            cfg_scale=float(cfg_scale),
-            remasking=str(remasking),
-            logits_eos_inf=bool(logits_eos_inf),
-            confidence_eos_eot_inf=bool(confidence_eos_eot_inf),
-            generator=generator,
-        )
+        if generation_mode == "ar":
+            out_indices = autoregressive_generate(
+                model,
+                in_indices,
+                gen_length=int(gen_length),
+                temperature=float(args.temperature),
+                top_p=(None if top_p is None else float(top_p)),
+                eos_token_id=(None if eos_token_id is None else int(eos_token_id)),
+                logits_eos_inf=bool(logits_eos_inf),
+                generator=generator,
+            )
+        elif generation_mode == "diffusion":
+            out_indices = diffusion_generate(
+                model,
+                in_indices,
+                mask_id=int(args.mask_id),
+                eos_token_id=(None if eos_token_id is None else int(eos_token_id)),
+                steps=int(args.steps),
+                gen_length=int(gen_length),
+                block_length=int(args.block_length),
+                temperature=float(args.temperature),
+                top_p=(None if top_p is None else float(top_p)),
+                cfg_scale=float(cfg_scale),
+                remasking=str(remasking),
+                logits_eos_inf=bool(logits_eos_inf),
+                confidence_eos_eot_inf=bool(confidence_eos_eot_inf),
+                generator=generator,
+            )
+        else:
+            raise ValueError(f"Unsupported generation_mode: {generation_mode}")
     else:
         out_indices = in_indices
     elapsed = time.time() - t0

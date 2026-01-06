@@ -53,6 +53,7 @@ def main():
         remasking=cfg_dc.inference.remasking,
         logits_eos_inf=cfg_dc.inference.logits_eos_inf,
         confidence_eos_eot_inf=cfg_dc.inference.confidence_eos_eot_inf,
+        generation_mode=cfg_dc.inference.generation_mode,
     )
     logger = ConsoleLogger()
     _ = infer_transformer(ns, logger=logger)

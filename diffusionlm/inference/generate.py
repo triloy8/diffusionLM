@@ -140,11 +140,59 @@ def diffusion_generate(
     return x
 
 
+@torch.no_grad()
+def autoregressive_generate(
+    model,
+    prompt_indices: torch.Tensor,
+    *,
+    gen_length: int,
+    temperature: float = 0.0,
+    top_p: float | None = None,
+    eos_token_id: int | None = None,
+    logits_eos_inf: bool = False,
+    generator: torch.Generator | None = None,
+) -> torch.Tensor:
+    """Generate sequences token-by-token with a causal attention mask."""
+
+    if prompt_indices.dim() != 2:
+        raise ValueError("prompt_indices must be 2D (batch, seq)")
+    if gen_length <= 0:
+        return prompt_indices
+
+    x = prompt_indices
+    for _ in range(gen_length):
+        seq_len = x.shape[1]
+        causal = torch.tril(torch.ones((seq_len, seq_len), device=x.device, dtype=torch.bool))
+        attention_mask = causal.unsqueeze(0).expand(x.shape[0], -1, -1)
+
+        logits = model(x, attention_mask=attention_mask)
+        next_logits = logits[:, -1, :]
+
+        if logits_eos_inf and eos_token_id is not None:
+            next_logits[:, eos_token_id] = float("-inf")
+
+        if top_p is not None:
+            probs = softmax(next_logits, dim=-1)
+            probs = top_p_filter(probs, float(top_p))
+            next_logits = torch.where(
+                probs > 0,
+                next_logits,
+                torch.full_like(next_logits, float("-inf")),
+            )
+
+        logits_with_noise = add_gumbel_noise(next_logits, temperature, generator=generator)
+        next_token = torch.argmax(logits_with_noise, dim=-1, keepdim=True)
+        x = torch.cat([x, next_token], dim=1)
+
+    return x
+
+
 # Backwards-compatible alias
 generate = diffusion_generate
 
 
 __all__ = [
     "diffusion_generate",
+    "autoregressive_generate",
     "generate",
 ]

@@ -18,19 +18,20 @@ noise_epsilon = 0.001
 random_trunc_prob = 0
 
 [checkpoint]
-ckpt_path = "./runs/2025-12-31_17-22-13/versions/v050000/model.safetensors"
+ckpt_path = "./runs/2026-01-05_19-54-59/versions/v038000/model.safetensors"
 
 [inference]
-prompt = "Once upon a time there was"
+prompt = "Once upon a time,"
 steps = 128
 total_length = 128
 block_length = 64
-temperature = 0.6
-top_p = 0.8
+temperature = 0.4
+top_p = 0.9
 mask_id = 50258
-seed = 34123
+seed = 3407
 eos_token_id = 50257
 cfg_scale = 0.0
-remasking = "low_confidence"
+remasking = "random"
 logits_eos_inf = false
 confidence_eos_eot_inf = false
+generation_mode = "diffusion" # diffusion/ar

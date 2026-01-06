@@ -11,7 +11,7 @@ import torch
 from safetensors.torch import load_file
 
 from config import load_sweep_infer_config
-from diffusionlm.inference.generate import diffusion_generate
+from diffusionlm.inference.generate import autoregressive_generate, diffusion_generate
 from diffusionlm.models import TransformerLM
 from diffusionlm.tokenizer.tokenizer import Tokenizer
 from diffusionlm.utils.dtypes import DTYPES
@@ -58,6 +58,7 @@ def main():
     block_lengths = cfg.sweep.block_lengths or [int(cfg.inference.block_length)]
     cfg_scales = cfg.sweep.cfg_scales or [float(cfg.inference.cfg_scale)]
     remasking = cfg.sweep.remasking or [str(cfg.inference.remasking)]
+    generation_mode = str(cfg.inference.generation_mode)
     if cfg.sweep.top_ps is None:
         top_ps = [None if cfg.inference.top_p is None else float(cfg.inference.top_p)]
     else:
@@ -109,22 +110,36 @@ def main():
 
             t0 = time.time()
             if gen_length > 0:
-                out_indices = diffusion_generate(
-                    model,
-                    in_indices,
-                    mask_id=int(cfg.inference.mask_id),
-                    eos_token_id=(None if cfg.inference.eos_token_id is None else int(cfg.inference.eos_token_id)),
-                    steps=int(steps),
-                    gen_length=int(gen_length),
-                    block_length=int(block_len),
-                    temperature=float(temp),
-                    top_p=(None if top_p is None else float(top_p)),
-                    cfg_scale=float(cfg_scale),
-                    remasking=str(remask),
-                    logits_eos_inf=bool(cfg.inference.logits_eos_inf),
-                    confidence_eos_eot_inf=bool(cfg.inference.confidence_eos_eot_inf),
-                    generator=generator,
-                )
+                if generation_mode == "ar":
+                    out_indices = autoregressive_generate(
+                        model,
+                        in_indices,
+                        gen_length=int(gen_length),
+                        temperature=float(temp),
+                        top_p=(None if top_p is None else float(top_p)),
+                        eos_token_id=(None if cfg.inference.eos_token_id is None else int(cfg.inference.eos_token_id)),
+                        logits_eos_inf=bool(cfg.inference.logits_eos_inf),
+                        generator=generator,
+                    )
+                elif generation_mode == "diffusion":
+                    out_indices = diffusion_generate(
+                        model,
+                        in_indices,
+                        mask_id=int(cfg.inference.mask_id),
+                        eos_token_id=(None if cfg.inference.eos_token_id is None else int(cfg.inference.eos_token_id)),
+                        steps=int(steps),
+                        gen_length=int(gen_length),
+                        block_length=int(block_len),
+                        temperature=float(temp),
+                        top_p=(None if top_p is None else float(top_p)),
+                        cfg_scale=float(cfg_scale),
+                        remasking=str(remask),
+                        logits_eos_inf=bool(cfg.inference.logits_eos_inf),
+                        confidence_eos_eot_inf=bool(cfg.inference.confidence_eos_eot_inf),
+                        generator=generator,
+                    )
+                else:
+                    raise ValueError(f"Unsupported generation_mode: {generation_mode}")
             else:
                 out_indices = in_indices
             latency_ms = (time.time() - t0) * 1000.0
