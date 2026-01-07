@@ -18,7 +18,11 @@ class WandbLogger(Logger):
         # Import lazily to keep core free of wandb dependency
         import wandb  # type: ignore
 
-        self._run = wandb.init(entity=self._entity, project=self._project, name=self._name, config=config)
+        if wandb.run is not None:
+            self._run = wandb.run
+            wandb.config.update(config, allow_val_change=True)
+        else:
+            self._run = wandb.init(entity=self._entity, project=self._project, name=self._name, config=config)
         return {"run_name": self._run.name}
 
     def log(self, data: Dict[str, Any], step: Optional[int] = None) -> None:

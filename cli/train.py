@@ -8,24 +8,9 @@ from diffusionlm.training.trainer import train_transformer_ddp
 from cli.utils import add_config_args, load_config_or_print
 
 
-def _parse_only_config():
-    parser = argparse.ArgumentParser(description="Training via config file only.", allow_abbrev=False)
-    add_config_args(parser, type_=Path)
-    return parser.parse_args()
-
-
-def main():
-    # Config-only entry point
-    args_cfg = _parse_only_config()
-    cfg_dc = load_config_or_print(load_train_config, args_cfg.config, args_cfg.print_config)
-    if cfg_dc is None:
-        return
-    if cfg_dc.ddp is None:
-        raise ValueError("DDP config is required when using diffusionlm-train")
-
-    # Build an argparse-like namespace expected by existing code
-    ns = argparse.Namespace(
-        config_path=str(args_cfg.config),
+def build_train_namespace(cfg_dc, config_path: str) -> argparse.Namespace:
+    return argparse.Namespace(
+        config_path=config_path,
         # optimizer
         optimizer_name=cfg_dc.optimizer.optimizer_name,
         betas=(cfg_dc.optimizer.betas[0], cfg_dc.optimizer.betas[1]),
@@ -91,6 +76,25 @@ def main():
         bucket_size_mb=cfg_dc.ddp.bucket_size_mb,
         nccl_p2p_disable=cfg_dc.ddp.nccl_p2p_disable,
     )
+
+
+def _parse_only_config():
+    parser = argparse.ArgumentParser(description="Training via config file only.", allow_abbrev=False)
+    add_config_args(parser, type_=Path)
+    return parser.parse_args()
+
+
+def main():
+    # Config-only entry point
+    args_cfg = _parse_only_config()
+    cfg_dc = load_config_or_print(load_train_config, args_cfg.config, args_cfg.print_config)
+    if cfg_dc is None:
+        return
+    if cfg_dc.ddp is None:
+        raise ValueError("DDP config is required when using diffusionlm-train")
+
+    # Build an argparse-like namespace expected by existing code
+    ns = build_train_namespace(cfg_dc, str(args_cfg.config))
 
     nprocs = max(1, int(cfg_dc.ddp.num_gpus_per_node))
     mp.spawn(train_transformer_ddp, args=(ns, cfg_dc), nprocs=nprocs, join=True)

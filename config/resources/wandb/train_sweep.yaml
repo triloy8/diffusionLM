@@ -1,68 +1,111 @@
-program: cli/train.py
+program: cli/sweep_train.py
+command:
+  - ${env}
+  - uv
+  - run
+  - diffusionlm-sweep-train
+  - --config
+  - config/resources/train.toml
 method: bayes
 metric:
   goal: minimize
-  name: val_loss
+  name: metrics.val_loss
 parameters:
-  architecture:
-    value: Transformer LM
-  batch_size:
-    value: 4
-  checkpointing.ckpting_save_iter:
-    value: 125
-  context_length:
-    value: 256
-  d_ff:
-    value: 1344
-  d_model:
-    value: 512
-  dataset:
-    value: TinyStoriesV2-GPT4
-  device:
-    value: cuda
-  dtype:
-    value: float32
-  eps:
-    value: 1e-8
-  grad_clip_max_l2_norm:
-    value: 1.0
-  max_train_iteration:
-    value: 5000
-  max_val_iteration:
+  logging.architecture:
+    value: DiffusionLM
+  logging.dataset:
+    value: TinyStories
+  training.batch_size:
+    value: 68
+  training.max_train_iteration:
+    value: 2000
+  training.max_val_iteration:
     value: 10
-  num_heads:
-    value: 16
-  num_layers:
-    value: 4
-  rope_theta:
-    value: 10000
-  vocab_size:
+  training.val_freq_iteration:
+    value: 250
+  training.grad_accum_steps:
+    value: 2
+  checkpointing.ckpting_save_iter:
+    value: 1000
+  model.context_length:
+    value: 512
+  model.d_ff:
+    value: 3072
+  model.d_model:
+    value: 768
+  data.dataset_name:
+    value: roneneldan/TinyStories
+  data.dataset_config:
+    value: ""
+  data.train_split:
+    value: train
+  data.val_split:
+    value: validation
+  data.text_field:
+    value: text
+  data.pipeline_mode:
+    value: rows
+  data.pad_token_id:
+    value: 50256
+  data.pad_random_shift:
+    value: true
+  data.shuffle_buffer_size:
+    value: 30000
+  data.shuffle_seed:
+    value: 3407
+  model.device:
+    value: cuda
+  model.dtype:
+    value: bfloat16
+  model.vocab_size:
+    value: 50259
+  model.mask_token_id:
+    value: 50258
+  model.eot_token_id:
     value: 50257
-  cosine_cycle_iters:
-    distribution: int_uniform
-    max: 4500
-    min: 3000
-  initial_learning_rate:
+  model.noise_epsilon:
+    value: 0.001
+  model.random_trunc_prob:
+    value: 0
+  optimizer.optimizer_name:
+    value: muon
+  optimizer.betas:
+    value: [0.9, 0.95]
+  optimizer.eps:
+    value: 1e-10
+  optimizer.grad_clip_max_l2_norm:
+    value: 1.0
+  model.num_heads:
+    value: 16
+  model.num_layers:
+    value: 8
+  model.rope_theta:
+    value: 10000.0
+  optimizer.cosine_cycle_iters:
+    value: 50000
+  optimizer.initial_learning_rate:
+    value: 0.0001
+  optimizer.max_learning_rate:
+    value: 0.0005
+  optimizer.warmup_iters:
+    value: 500
+  optimizer.weight_decay:
+    value: 0.05
+  optimizer.min_learning_rate:
+    value: 0.00005
+  optimizer.muon.hidden.max_learning_rate:
     distribution: uniform
-    max: 0.002
-    min: 0.00015
-  learning_rate:
-    distribution: uniform
-    max: 0.002
-    min: 0.0005
-  max_learning_rate:
-    distribution: uniform
-    max: 0.002
-    min: 0.00015
-  warmup_iters:
-    distribution: int_uniform
-    max: 200
-    min: 5
-  weight_decay:
-    distribution: uniform
-    max: 0.2
     min: 0.005
-  min_learning_rate:
+    max: 0.02
+  optimizer.muon.head.max_learning_rate:
     distribution: uniform
-    max: 0.0002
-    min: 1.5e-05
+    min: 0.0015
+    max: 0.006
+  optimizer.muon.embed.max_learning_rate:
+    distribution: uniform
+    min: 0.01
+    max: 0.04
+  optimizer.muon.scalar.max_learning_rate:
+    distribution: uniform
+    min: 0.0004
+    max: 0.0016
