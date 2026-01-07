@@ -16,6 +16,9 @@ build-remote:
 train config="config/resources/train.toml" extra="":
 	ssh {{prime_host}} "cd {{remote_root}} && bash scripts/run_train_remote.sh $(printf '%q' '{{config}}') $(printf '%q' '{{extra}}')"
 
+sweep-train config="config/resources/wandb/train_sweep.yaml" extra="":
+	ssh {{prime_host}} "cd {{remote_root}} && bash scripts/run_sweep_train_remote.sh $(printf '%q' '{{config}}') $(printf '%q' '{{extra}}')"
+
 infer command="{{infer_command_default}}" args="":
 	ssh {{prime_host}} "cd {{remote_root}} && bash scripts/run_infer_remote.sh $(printf '%q' '{{command}}') $(printf '%q' '{{args}}')"
 
@@ -41,3 +44,5 @@ sync-env:
 	if [ -f env/checkpointing.env ]; then scp env/checkpointing.env {{prime_host}}:{{remote_root}}/env/checkpointing.env; else echo "Skipping env/checkpointing.env (optional)"; fi
 
 auto-train: bootstrap-remote data-remote sync-env train
+
+auto-sweep-train: bootstrap-remote data-remote sync-env sweep-train
