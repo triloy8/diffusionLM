@@ -28,8 +28,14 @@ nvitop:
 attach-train:
 	ssh -t {{prime_host}} 'tmux attach -t diffusionlm-train'
 
+attach-sweep:
+	ssh -t {{prime_host}} 'tmux attach -t diffusionlm-sweep-train'
+
 kill-train:
 	ssh {{prime_host}} 'tmux kill-session -t diffusionlm-train 2>/dev/null || true'
+
+kill-sweep:
+	ssh {{prime_host}} 'tmux kill-session -t diffusionlm-sweep-train 2>/dev/null || true'
 
 fetch any_file:
 	echo "Fetching {{any_file}} from {{prime_host}}"
