@@ -62,7 +62,14 @@ if tmux has-session -t "${SESSION}" 2>/dev/null; then
 fi
 
 set +e
-tmux new -d -s "${SESSION}" "bash -lc 'set -euo pipefail; $(declare -f run_sweep); run_sweep; exec bash'"
+tmux new -d -s "${SESSION}" "bash -lc 'set -euo pipefail; \
+LOG_FILE=\"${LOG_FILE}\"; \
+CONFIG=\"${CONFIG}\"; \
+EXTRA_ARGS=\"${EXTRA_ARGS}\"; \
+WANDB_API_KEY=\"${WANDB_API_KEY}\"; \
+$(declare -f run_sweep); \
+run_sweep; \
+exec bash'"
 tmux_status=$?
 set -e
 
