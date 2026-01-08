@@ -69,9 +69,15 @@ def main():
         raise ValueError("DDP config is required when using diffusionlm-sweep-train")
 
     config_json = os.environ.get("WANDB_CONFIG_JSON")
-    if not config_json:
-        raise ValueError("WANDB_CONFIG_JSON not set; run via `wandb agent` for sweeps.")
-    overrides = json.loads(config_json)
+    overrides = None
+    if config_json:
+        overrides = json.loads(config_json)
+    else:
+        import wandb  # type: ignore
+
+        run = wandb.init()
+        overrides = dict(run.config)
+        run.finish()
     cfg_dict = _apply_overrides(asdict_pretty(cfg_dc), overrides)
     cfg_dict = _apply_muon_lr_constraints(cfg_dict, overrides)
     cfg_dc = TrainConfig.model_validate(cfg_dict)
