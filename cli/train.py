@@ -49,6 +49,7 @@ def build_train_namespace(cfg_dc, config_path: str) -> argparse.Namespace:
         val_freq_iteration=cfg_dc.training.val_freq_iteration,
         skip_validation=cfg_dc.training.skip_validation,
         grad_accum_steps=cfg_dc.training.grad_accum_steps,
+        train_loss_ema_decay=cfg_dc.training.train_loss_ema_decay,
         # data/paths
         runs_path=cfg_dc.data.runs_path,
         dataset_name=cfg_dc.data.dataset_name,

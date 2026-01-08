@@ -200,6 +200,7 @@ class TrainingConfig(_BaseConfig):
     seed: Optional[int] = None
     skip_validation: bool = False
     grad_accum_steps: int = 1
+    train_loss_ema_decay: float = 0.0
 
     @model_validator(mode="after")
     def _validate_training(self):
@@ -210,6 +211,8 @@ class TrainingConfig(_BaseConfig):
             raise ValueError("grad_accum_steps must be > 0")
         if self.seed is not None and self.seed < 0:
             raise ValueError("seed must be >= 0 when provided")
+        if self.train_loss_ema_decay < 0 or self.train_loss_ema_decay >= 1:
+            raise ValueError("train_loss_ema_decay must be in [0, 1)")
         return self
 
 

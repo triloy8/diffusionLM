@@ -45,6 +45,7 @@ def train_loop(
     batch_generator: torch.Generator | None = None,
     # logging
     logger: Optional[Logger] = None,
+    train_loss_ema_decay: float = 0.0,
     # optional logging helpers
     activation_norms: dict | None = None,
     log_activation_norms: bool = False,
@@ -91,6 +92,7 @@ def train_loop(
     accum_steps = max(1, int(grad_accum_steps))
     accum_count = 0
     current_lr = None
+    train_loss_ema = None
     val_pass_count = 0
     last_val_metrics: Optional[dict] = None
 
@@ -179,8 +181,17 @@ def train_loop(
         tloss_val = float(train_loss.item())
         if reduce_metric is not None:
             tloss_val = float(reduce_metric(tloss_val))
+        if train_loss_ema_decay > 0:
+            if train_loss_ema is None:
+                train_loss_ema = float(tloss_val)
+            else:
+                decay = float(train_loss_ema_decay)
+                train_loss_ema = decay * float(train_loss_ema) + (1.0 - decay) * float(tloss_val)
         if logger is not None:
-            logger.log({"phase": "train", "metrics.train_loss": tloss_val}, step=train_iteration)
+            payload = {"phase": "train", "metrics.train_loss": tloss_val}
+            if train_loss_ema is not None:
+                payload["metrics.train_loss_ema"] = float(train_loss_ema)
+            logger.log(payload, step=train_iteration)
             batch_metadata = getattr(train_batch, "metadata", None)
             if isinstance(batch_metadata, dict):
                 token_count = batch_metadata.get("token_count")

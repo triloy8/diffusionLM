@@ -409,6 +409,7 @@ def train_transformer_ddp(local_rank, args, cfg_dc):
         compute_loss=_compute_loss,
         batch_generator=torch_generator,
         logger=logger,
+        train_loss_ema_decay=float(getattr(cfg, "train_loss_ema_decay", 0.0)),
         activation_norms=activation_norms,
         log_activation_norms=bool(getattr(cfg, "log_activation_norms", False)),
         log_weight_norms=bool(getattr(cfg, "log_weight_norms", False)),
