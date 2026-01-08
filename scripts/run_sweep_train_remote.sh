@@ -35,7 +35,7 @@ if ! command -v tmux >/dev/null 2>&1; then
 	exit 1
 fi
 
-SWEEP_OUT=$(WANDB_API_KEY=${WANDB_API_KEY} uv run wandb sweep "${CONFIG}")
+SWEEP_OUT=$(WANDB_API_KEY=${WANDB_API_KEY} uv run wandb sweep "${CONFIG}" 2>&1)
 AGENT_CMD=$(printf "%s\n" "${SWEEP_OUT}" | grep -Eo "wandb agent [^[:space:]]+" | tail -n1)
 if [ -z "${AGENT_CMD}" ]; then
 	echo "Failed to parse wandb agent command" >&2
