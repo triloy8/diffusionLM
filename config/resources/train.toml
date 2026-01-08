@@ -62,7 +62,7 @@ max_train_iteration = 50000
 max_val_iteration = 10
 val_freq_iteration = 250
 seed = 3407
-skip_validation = false
+skip_validation = true
 grad_accum_steps = 2
 train_loss_ema_decay = 0.99
 
