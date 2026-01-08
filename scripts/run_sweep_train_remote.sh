@@ -46,4 +46,11 @@ if [ -n "${EXTRA_ARGS}" ]; then
 fi
 echo "${AGENT_CMD}"
 AGENT_CMD="${AGENT_CMD/wandb/uv run wandb}"
-eval "${AGENT_CMD}"
+
+SESSION="diffusionlm-sweep-train"
+if tmux has-session -t "${SESSION}" 2>/dev/null; then
+	tmux kill-session -t "${SESSION}"
+fi
+
+tmux new -d -s "${SESSION}" "bash -lc 'export WANDB_API_KEY=${WANDB_API_KEY}; ${AGENT_CMD}'"
+echo "Started tmux session ${SESSION}"
