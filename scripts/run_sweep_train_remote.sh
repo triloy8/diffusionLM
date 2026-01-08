@@ -36,22 +36,39 @@ if ! command -v tmux >/dev/null 2>&1; then
 fi
 
 SESSION="diffusionlm-sweep-train"
+LOG_FILE="runs/sweep_train_$(date +%Y-%m-%d_%H-%M-%S).log"
+
+run_sweep() {
+	mkdir -p runs
+	WANDB_API_KEY=${WANDB_API_KEY} \
+	SWEEP_OUT=$(uv run wandb sweep "${CONFIG}")
+	echo "${SWEEP_OUT}"
+	AGENT_CMD=$(printf "%s\n" "${SWEEP_OUT}" | grep -Eo "wandb agent [^[:space:]]+" | tail -n1)
+	if [ -z "${AGENT_CMD}" ]; then
+		echo "Failed to parse wandb agent command" >&2
+		exit 1
+	fi
+	if [ -n "${EXTRA_ARGS}" ]; then
+		AGENT_CMD="${AGENT_CMD} ${EXTRA_ARGS}"
+	fi
+	AGENT_CMD="${AGENT_CMD/wandb/uv run wandb}"
+	{ eval "${AGENT_CMD}"; } 2>&1 | tee "${LOG_FILE}"
+	echo "Log written to ${LOG_FILE}"
+}
+
 if tmux has-session -t "${SESSION}" 2>/dev/null; then
 	tmux kill-session -t "${SESSION}"
 fi
 
-LOG_FILE="runs/sweep_train_$(date +%Y-%m-%d_%H-%M-%S).log"
-tmux new -d -s "${SESSION}" \
-	"bash -lc 'set -euo pipefail; mkdir -p runs; \
-LOG_FILE=\"${LOG_FILE}\"; \
-WANDB_API_KEY=${WANDB_API_KEY} \
-SWEEP_OUT=\$(uv run wandb sweep \"${CONFIG}\"); \
-echo \"\${SWEEP_OUT}\"; \
-AGENT_CMD=\$(printf \"%s\\n\" \"\${SWEEP_OUT}\" | grep -Eo \"wandb agent [^[:space:]]+\" | tail -n1); \
-if [ -z \"\${AGENT_CMD}\" ]; then echo \"Failed to parse wandb agent command\" >&2; exit 1; fi; \
-if [ -n \"${EXTRA_ARGS}\" ]; then AGENT_CMD=\"\${AGENT_CMD} ${EXTRA_ARGS}\"; fi; \
-AGENT_CMD=\"\${AGENT_CMD/wandb/uv run wandb}\"; \
-{ eval \"\${AGENT_CMD}\"; } 2>&1 | tee \"${LOG_FILE}\"; \
-echo \"Log written to ${LOG_FILE}\"; \
-exec bash'"
+set +e
+tmux new -d -s "${SESSION}" "bash -lc 'set -euo pipefail; $(declare -f run_sweep); run_sweep'"
+tmux_status=$?
+set -e
+
+if [ "${tmux_status}" -ne 0 ]; then
+	echo "tmux failed to start; running sweep in foreground" >&2
+	run_sweep
+	exit 0
+fi
+
 echo "Started tmux session ${SESSION} (log: ${LOG_FILE})"
