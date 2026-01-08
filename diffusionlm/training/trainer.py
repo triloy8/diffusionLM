@@ -286,6 +286,7 @@ def train_transformer_ddp(local_rank, args, cfg_dc):
 
     checkpoint_callback = checkpoint_manager.make_checkpoint_callback()
 
+    is_rank_zero = (global_rank == 0)
     train_infer_cfg = getattr(cfg_dc, "train_infer", None)
     infer_every = int(getattr(train_infer_cfg, "infer_every", 0)) if train_infer_cfg else 0
     prompts = [str(p) for p in getattr(train_infer_cfg, "prompts", [])] if train_infer_cfg else []
@@ -418,7 +419,7 @@ def train_transformer_ddp(local_rank, args, cfg_dc):
         val_sample_decode=tokenizer.decode,
         sync_gradients=_sync,
         reduce_metric=allreduce_mean,
-        is_rank_zero=(global_rank == 0),
+        is_rank_zero=is_rank_zero,
         skip_validation=bool(getattr(cfg, "skip_validation", False)),
         step_callback=_step_callback,
         start_iteration=start_iteration,
