@@ -90,7 +90,22 @@ dataset = "TinyStories"
 log_activation_norms = true
 log_weight_norms = true
 val_log_every = 8
-val_log_samples = 4
+val_log_samples = 1
+
+[train_infer]
+infer_every = 1000
+prompts = ["Once upon a time,", "One day,"]
+steps = 256
+total_length = 256
+block_length = 64
+temperature = 0.6
+top_p = 0.95
+cfg_scale = 0.0
+remasking = "random"
+generation_mode = "diffusion"
+logits_eos_inf = false
+confidence_eos_eot_inf = false
+seed = 3410
 
 [wandb]
 entity = "yiltro8-org"

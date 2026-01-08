@@ -327,11 +327,56 @@ class CheckpointingConfig(_BaseConfig):
         return self
 
 
+class TrainInferConfig(_BaseConfig):
+    infer_every: int = 0
+    prompts: List[str] = Field(default_factory=list)
+    steps: int = 256
+    total_length: Optional[int] = None
+    block_length: int = 128
+    temperature: float = 1.0
+    top_p: Optional[float] = None
+    cfg_scale: float = 0.0
+    remasking: str = "random"
+    generation_mode: str = "diffusion"
+    logits_eos_inf: bool = False
+    confidence_eos_eot_inf: bool = False
+    seed: Optional[int] = None
+
+    @model_validator(mode="after")
+    def _validate_train_infer(self):
+        if self.infer_every < 0:
+            raise ValueError("train_infer.infer_every must be >= 0")
+        if self.infer_every > 0 and not self.prompts:
+            raise ValueError("train_infer.prompts must be set when infer_every > 0")
+        if any(not p for p in self.prompts):
+            raise ValueError("train_infer.prompts must not contain empty strings")
+        if self.steps <= 0:
+            raise ValueError("train_infer.steps must be > 0")
+        if self.total_length is not None and self.total_length <= 0:
+            raise ValueError("train_infer.total_length must be > 0 when provided")
+        if self.block_length <= 0:
+            raise ValueError("train_infer.block_length must be > 0")
+        if self.temperature < 0:
+            raise ValueError("train_infer.temperature must be >= 0")
+        if self.top_p is not None and (self.top_p < 0 or self.top_p > 1):
+            raise ValueError("train_infer.top_p must be between 0 and 1 when provided")
+        if self.cfg_scale < 0:
+            raise ValueError("train_infer.cfg_scale must be >= 0")
+        if self.remasking not in {"low_confidence", "random"}:
+            raise ValueError("train_infer.remasking must be one of: low_confidence, random")
+        if self.generation_mode not in {"diffusion", "ar"}:
+            raise ValueError("train_infer.generation_mode must be one of: diffusion, ar")
+        if self.seed is not None and self.seed < 0:
+            raise ValueError("train_infer.seed must be >= 0 when provided")
+        return self
+
+
 class TrainConfig(_BaseConfig):
     model: ModelConfig
     optimizer: OptimizerConfig
     training: TrainingConfig
     data: DataConfig
+    train_infer: Optional[TrainInferConfig] = None
     wandb: Optional[WandbConfig] = None
     logging: Optional[LoggingConfig] = None
     ddp: Optional[DdpConfig] = None

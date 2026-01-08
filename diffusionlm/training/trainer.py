@@ -10,6 +10,7 @@ from diffusionlm.training.data import get_batch, DiffusionBatch
 from diffusionlm.training.loss import diffusion_cross_entropy
 from checkpointing import CheckpointManager
 from diffusionlm.training.schedule import lr_cosine_schedule
+from diffusionlm.inference.generate import autoregressive_generate, diffusion_generate
 from diffusionlm.training.grad import gradient_clipping
 from diffusionlm.training.loop import train_loop
 from diffusionlm.training.streaming import HFTokenIteratorFactory, StreamingBatcher, RowBatcher
@@ -19,6 +20,7 @@ from pathlib import Path
 import numpy as np
 import os
 import random
+import time
 import torch
 # import torch.distributed as dist
 from functools import partial
@@ -284,6 +286,103 @@ def train_transformer_ddp(local_rank, args, cfg_dc):
 
     checkpoint_callback = checkpoint_manager.make_checkpoint_callback()
 
+    train_infer_cfg = getattr(cfg_dc, "train_infer", None)
+    infer_every = int(getattr(train_infer_cfg, "infer_every", 0)) if train_infer_cfg else 0
+    prompts = [str(p) for p in getattr(train_infer_cfg, "prompts", [])] if train_infer_cfg else []
+    infer_total_length = getattr(train_infer_cfg, "total_length", None) if train_infer_cfg else None
+    if infer_total_length is None:
+        infer_total_length = int(cfg.context_length)
+    else:
+        infer_total_length = int(infer_total_length)
+    if infer_total_length > int(cfg.context_length):
+        raise ValueError("train_infer.total_length must be <= model.context_length")
+
+    def _step_callback(train_iteration, model, _optimizer, _train_loss, _lr):
+        if infer_every <= 0 or not prompts or not is_rank_zero or logger is None:
+            return
+        if train_iteration % infer_every != 0:
+            return
+
+        was_training = model.training
+        model.eval()
+        rows = []
+        generation_mode = str(getattr(train_infer_cfg, "generation_mode", "diffusion")) if train_infer_cfg else "diffusion"
+        top_p = getattr(train_infer_cfg, "top_p", None) if train_infer_cfg else None
+        cfg_scale = float(getattr(train_infer_cfg, "cfg_scale", 0.0)) if train_infer_cfg else 0.0
+        remasking = str(getattr(train_infer_cfg, "remasking", "random")) if train_infer_cfg else "random"
+        logits_eos_inf = bool(getattr(train_infer_cfg, "logits_eos_inf", False)) if train_infer_cfg else False
+        confidence_eos_eot_inf = bool(
+            getattr(train_infer_cfg, "confidence_eos_eot_inf", False)
+        ) if train_infer_cfg else False
+        steps = int(getattr(train_infer_cfg, "steps", 0)) if train_infer_cfg else 0
+        block_length = int(getattr(train_infer_cfg, "block_length", 0)) if train_infer_cfg else 0
+        temperature = float(getattr(train_infer_cfg, "temperature", 1.0)) if train_infer_cfg else 1.0
+        base_seed = getattr(train_infer_cfg, "seed", None) if train_infer_cfg else None
+        eos_token_id = getattr(cfg, "eot_token_id", None)
+        mask_id = int(getattr(cfg, "mask_token_id", cfg.vocab_size - 1))
+
+        with torch.no_grad():
+            for idx, prompt in enumerate(prompts):
+                prompt_ids = tokenizer.encode(prompt)
+                prompt_len = len(prompt_ids)
+                if infer_total_length < prompt_len:
+                    rows.append({"prompt": prompt, "output": "", "latency_ms": 0.0, "error": "prompt_too_long"})
+                    continue
+                gen_length = infer_total_length - prompt_len
+                in_indices = torch.tensor([prompt_ids], device=str(cfg.device))
+                generator = None
+                if base_seed is not None:
+                    generator = torch.Generator(device=str(cfg.device))
+                    generator.manual_seed(int(base_seed) + int(train_iteration) + int(idx))
+                t0 = time.perf_counter()
+                if gen_length > 0:
+                    if generation_mode == "ar":
+                        out_indices = autoregressive_generate(
+                            model,
+                            in_indices,
+                            gen_length=int(gen_length),
+                            temperature=float(temperature),
+                            top_p=(None if top_p is None else float(top_p)),
+                            eos_token_id=(None if eos_token_id is None else int(eos_token_id)),
+                            logits_eos_inf=bool(logits_eos_inf),
+                            generator=generator,
+                        )
+                    elif generation_mode == "diffusion":
+                        out_indices = diffusion_generate(
+                            model,
+                            in_indices,
+                            mask_id=int(mask_id),
+                            eos_token_id=(None if eos_token_id is None else int(eos_token_id)),
+                            steps=int(steps),
+                            gen_length=int(gen_length),
+                            block_length=int(block_length),
+                            temperature=float(temperature),
+                            top_p=(None if top_p is None else float(top_p)),
+                            cfg_scale=float(cfg_scale),
+                            remasking=str(remasking),
+                            logits_eos_inf=bool(logits_eos_inf),
+                            confidence_eos_eot_inf=bool(confidence_eos_eot_inf),
+                            generator=generator,
+                        )
+                    else:
+                        raise ValueError(f"Unsupported generation_mode: {generation_mode}")
+                else:
+                    out_indices = in_indices
+                elapsed_ms = float((time.perf_counter() - t0) * 1000.0)
+                output = tokenizer.decode(out_indices[0].tolist())
+                output_short = output[:200] + ("…" if len(output) > 200 else "")
+                rows.append(
+                    {
+                        "prompt": prompt,
+                        "output": output_short,
+                        "latency_ms": elapsed_ms,
+                        "error": "",
+                    }
+                )
+        logger.log_table("train_infer/samples", rows, step=train_iteration)
+        if was_training:
+            model.train()
+
     train_loop(
         ddp_model,
         optimizer,
@@ -320,6 +419,7 @@ def train_transformer_ddp(local_rank, args, cfg_dc):
         reduce_metric=allreduce_mean,
         is_rank_zero=(global_rank == 0),
         skip_validation=bool(getattr(cfg, "skip_validation", False)),
+        step_callback=_step_callback,
         start_iteration=start_iteration,
     )
 
