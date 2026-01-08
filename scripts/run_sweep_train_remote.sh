@@ -45,3 +45,5 @@ if [ -n "${EXTRA_ARGS}" ]; then
 	AGENT_CMD="${AGENT_CMD} ${EXTRA_ARGS}"
 fi
 echo "${AGENT_CMD}"
+AGENT_CMD="${AGENT_CMD/wandb/uv run wandb}"
+eval "${AGENT_CMD}"
