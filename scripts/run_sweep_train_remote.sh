@@ -42,10 +42,11 @@ fi
 
 tmux new -d -s "${SESSION}" \
 	"WANDB_API_KEY=${WANDB_API_KEY} \
-SWEEP_OUT=\$(wandb sweep \"${CONFIG}\"); \
-echo \"\${SWEEP_OUT}\"; \
-AGENT_CMD=\$(printf \"%s\\n\" \"\${SWEEP_OUT}\" | grep -Eo \"wandb agent [^[:space:]]+\" | tail -n1); \
-if [ -z \"\${AGENT_CMD}\" ]; then echo \"Failed to parse wandb agent command\" >&2; exit 1; fi; \
-if [ -n \"${EXTRA_ARGS}\" ]; then AGENT_CMD=\"\${AGENT_CMD} ${EXTRA_ARGS}\"; fi; \
-eval \"\${AGENT_CMD}\""
+	SWEEP_OUT=\$(uv run wandb sweep \"${CONFIG}\"); \
+	echo \"\${SWEEP_OUT}\"; \
+	AGENT_CMD=\$(printf \"%s\\n\" \"\${SWEEP_OUT}\" | grep -Eo \"wandb agent [^[:space:]]+\" | tail -n1); \
+	if [ -z \"\${AGENT_CMD}\" ]; then echo \"Failed to parse wandb agent command\" >&2; exit 1; fi; \
+	if [ -n \"${EXTRA_ARGS}\" ]; then AGENT_CMD=\"\${AGENT_CMD} ${EXTRA_ARGS}\"; fi; \
+	AGENT_CMD=\"\${AGENT_CMD/wandb/uv run wandb}\"; \
+	eval \"\${AGENT_CMD}\""
 echo "Started tmux session ${SESSION}"
