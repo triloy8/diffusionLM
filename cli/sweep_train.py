@@ -34,6 +34,31 @@ def _apply_overrides(base: dict, overrides: dict) -> dict:
                 cursor = cursor[part]
     return base
 
+def _apply_muon_lr_constraints(base: dict, overrides: dict) -> dict:
+    ratios = {
+        "hidden": 0.1,
+        "head": 0.1,
+        "embed": 0.1,
+        "scalar": 0.05,
+    }
+    muon = base.get("optimizer", {}).get("muon", {})
+    for group, ratio in ratios.items():
+        max_key = f"optimizer.muon.{group}.max_learning_rate"
+        min_key = f"optimizer.muon.{group}.min_learning_rate"
+        init_key = f"optimizer.muon.{group}.initial_learning_rate"
+        if max_key in overrides:
+            try:
+                max_val = float(overrides[max_key])
+            except (TypeError, ValueError):
+                continue
+            if isinstance(muon, dict) and group in muon:
+                if min_key not in overrides:
+                    muon[group]["min_learning_rate"] = max_val * ratio
+                if init_key not in overrides:
+                    muon[group]["initial_learning_rate"] = max_val
+    return base
+
+
 
 def main():
     args_cfg = _parse_only_config()
@@ -48,6 +73,7 @@ def main():
         raise ValueError("WANDB_CONFIG_JSON not set; run via `wandb agent` for sweeps.")
     overrides = json.loads(config_json)
     cfg_dict = _apply_overrides(asdict_pretty(cfg_dc), overrides)
+    cfg_dict = _apply_muon_lr_constraints(cfg_dict, overrides)
     cfg_dc = TrainConfig.model_validate(cfg_dict)
 
     ns = build_train_namespace(cfg_dc, str(args_cfg.config))
