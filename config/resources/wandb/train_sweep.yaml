@@ -1,5 +1,5 @@
 program: cli/sweep_train.py
-project: diffusionLM-cli
+project: diffusion_lm
 command:
   - ${env}
   - uv
@@ -96,12 +96,12 @@ parameters:
     value: 0.00005
   optimizer.muon.hidden.max_learning_rate:
     distribution: log_uniform_values
-    min: 0.007
-    max: 0.014
-  optimizer.muon.embed.max_learning_rate:
-    distribution: log_uniform_values
-    min: 0.012
-    max: 0.025
+    min: 0.014
+    max: 0.02
+  # optimizer.muon.embed.max_learning_rate:
+  #   distribution: log_uniform_values
+  #   min: 0.012
+  #   max: 0.025
   # optimizer.muon.head.max_learning_rate:
   #   distribution: log_uniform_values
   #   min: 0.0015
