@@ -1,4 +1,5 @@
 program: cli/sweep_train.py
+project: diffusionLM-cli
 command:
   - ${env}
   - uv
