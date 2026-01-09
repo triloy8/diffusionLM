@@ -285,6 +285,7 @@ class LoggingConfig(_BaseConfig):
     dataset: Optional[str] = None
     log_activation_norms: bool = False
     log_weight_norms: bool = False
+    log_grad_norms: bool = False
     val_log_every: int = 0
     val_log_samples: int = 0
 

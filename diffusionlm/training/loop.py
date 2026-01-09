@@ -50,6 +50,7 @@ def train_loop(
     activation_norms: dict | None = None,
     log_activation_norms: bool = False,
     log_weight_norms: bool = False,
+    log_grad_norms: bool = False,
     val_log_every: int = 0,
     val_log_samples: int = 0,
     val_sample_decode: Optional[Callable[[list[int]], str]] = None,
@@ -267,12 +268,12 @@ def train_loop(
             )
         accum_count += 1
         if accum_count >= accum_steps:
-            grads = [p.grad for p in model.parameters() if p.grad is not None]
-            l2_norm = torch.norm(torch.stack([g.detach().norm(2) for g in grads]))
-            l2_val = float(l2_norm.item())
-            if reduce_metric is not None:
-                l2_val = float(reduce_metric(l2_val))
-            if logger is not None:
+            if logger is not None and log_grad_norms:
+                grads = [p.grad for p in model.parameters() if p.grad is not None]
+                l2_norm = torch.norm(torch.stack([g.detach().norm(2) for g in grads]))
+                l2_val = float(l2_norm.item())
+                if reduce_metric is not None:
+                    l2_val = float(reduce_metric(l2_val))
                 logger.log({"phase": "train", "metrics.grad_l2_norm": l2_val}, step=train_iteration)
             # Optional DDP gradient synchronization before optimizer step
             if sync_gradients is not None:
