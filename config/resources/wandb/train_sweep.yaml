@@ -1,5 +1,5 @@
 program: cli/sweep_train.py
-project: diffusion_lm
+project: diffusion_lm_hidden_high
 command:
   - ${env}
   - uv
