@@ -27,7 +27,7 @@ grad_clip_max_l2_norm = 1.0
 
 [optimizer.muon.hidden]
 initial_learning_rate = 0.01 # unused in cosine scheduler
-max_learning_rate = 0.014
+max_learning_rate = 0.016689
 min_learning_rate = 0.0014
 momentum = 0.90
 weight_decay = 0.01

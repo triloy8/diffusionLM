@@ -217,6 +217,7 @@ __marimo__/
 todo/
 *.pdf
 !README.md
+research/
 
 # nsys profiling
 *.qdstrm
