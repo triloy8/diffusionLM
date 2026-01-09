@@ -6,6 +6,7 @@ import numpy as np
 from typing import Optional, Callable
 from logger import Logger
 from diffusionlm.training.data import DiffusionBatch
+from diffusionlm.training.loss import cross_entropy
 
 
 def train_loop(
@@ -51,6 +52,8 @@ def train_loop(
     log_activation_norms: bool = False,
     log_weight_norms: bool = False,
     log_grad_norms: bool = False,
+    log_p_mask_bucket_loss: bool = False,
+    p_mask_bucket_edges: list[float] | None = None,
     val_log_every: int = 0,
     val_log_samples: int = 0,
     val_sample_decode: Optional[Callable[[list[int]], str]] = None,
@@ -87,6 +90,65 @@ def train_loop(
         if isinstance(batch_obj, dict) and "attention_mask" in batch_obj:
             return batch_obj["attention_mask"]
         return None
+
+    def _resolve_p_mask_edges(edges: list[float] | None) -> list[float]:
+        if edges is None:
+            return [i / 10.0 for i in range(11)]
+        cleaned = sorted({float(e) for e in edges})
+        if len(cleaned) < 2:
+            return [0.0, 1.0]
+        return cleaned
+
+    def _p_mask_bucket_payload(logits: torch.Tensor, batch_obj: object) -> Optional[dict]:
+        if not hasattr(batch_obj, "p_mask") or not hasattr(batch_obj, "mask") or not hasattr(batch_obj, "clean_targets"):
+            return None
+        p_mask = getattr(batch_obj, "p_mask", None)
+        mask = getattr(batch_obj, "mask", None)
+        targets = getattr(batch_obj, "clean_targets", None)
+        if p_mask is None or mask is None or targets is None:
+            return None
+        loss_mask = getattr(batch_obj, "loss_mask", None)
+        edges = _resolve_p_mask_edges(p_mask_bucket_edges)
+        if len(edges) < 2:
+            return None
+        with torch.no_grad():
+            per_token = cross_entropy(logits, targets, reduction="none")
+            mask_f = mask.to(per_token.dtype)
+            if loss_mask is not None:
+                loss_mask_f = loss_mask.to(per_token.dtype)
+                mask_f = mask_f * loss_mask_f
+            else:
+                loss_mask_f = None
+            weighted = (per_token * mask_f) / p_mask
+            if loss_mask_f is not None:
+                denom = loss_mask_f.sum(dim=1)
+            else:
+                denom = torch.full(
+                    (targets.shape[0],),
+                    targets.shape[1],
+                    device=per_token.device,
+                    dtype=per_token.dtype,
+                )
+            per_example_loss = weighted.sum(dim=1) / denom.clamp_min(1)
+            p_mask_vals = p_mask.view(-1)
+            if len(edges) > 2:
+                boundaries = torch.tensor(edges[1:-1], device=p_mask_vals.device, dtype=p_mask_vals.dtype)
+                bucket_ids = torch.bucketize(p_mask_vals, boundaries)
+            else:
+                bucket_ids = torch.zeros_like(p_mask_vals, dtype=torch.long)
+            payload = {}
+            for i in range(len(edges) - 1):
+                in_bucket = bucket_ids == i
+                count = int(in_bucket.sum().item())
+                if count == 0:
+                    continue
+                mean_val = float(per_example_loss[in_bucket].mean().item())
+                if reduce_metric is not None:
+                    mean_val = float(reduce_metric(mean_val))
+                label = f"{edges[i]:.2f}-{edges[i + 1]:.2f}"
+                payload[f"metrics.p_mask_bucket_loss/{label}"] = mean_val
+                payload[f"metrics.p_mask_bucket_count/{label}"] = count
+            return payload if payload else None
 
     train_iteration = start_iteration
     tokens_seen = 0
@@ -240,6 +302,10 @@ def train_loop(
                         },
                         step=train_iteration,
                     )
+            if log_p_mask_bucket_loss:
+                bucket_payload = _p_mask_bucket_payload(train_logits, train_batch)
+                if bucket_payload:
+                    logger.log({"phase": "train", **bucket_payload}, step=train_iteration)
 
         # activation norms (if hooks populate activation_norms)
         if logger is not None and log_activation_norms and activation_norms is not None and len(activation_norms) > 0:

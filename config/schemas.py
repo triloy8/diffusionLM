@@ -286,6 +286,8 @@ class LoggingConfig(_BaseConfig):
     log_activation_norms: bool = False
     log_weight_norms: bool = False
     log_grad_norms: bool = False
+    log_p_mask_bucket_loss: bool = False
+    p_mask_bucket_edges: Optional[List[float]] = None
     val_log_every: int = 0
     val_log_samples: int = 0
 

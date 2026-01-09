@@ -414,6 +414,8 @@ def train_transformer_ddp(local_rank, args, cfg_dc):
         activation_norms=activation_norms,
         log_activation_norms=bool(getattr(cfg, "log_activation_norms", False)),
         log_weight_norms=bool(getattr(cfg, "log_weight_norms", False)),
+        log_p_mask_bucket_loss=bool(getattr(cfg, "log_p_mask_bucket_loss", False)),
+        p_mask_bucket_edges=getattr(cfg, "p_mask_bucket_edges", None),
         log_grad_norms=bool(getattr(cfg, "log_grad_norms", False)),
         val_log_every=val_log_every,
         val_log_samples=val_log_samples,

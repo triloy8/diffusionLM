@@ -54,7 +54,7 @@ max_learning_rate = 0.0008
 min_learning_rate = 0.00004
 betas = [0.9, 0.95]
 eps = 1e-10
-weight_decay = 0.0
+weight_decay = 0.01
 
 [training]
 batch_size = 68
@@ -91,6 +91,8 @@ dataset = "TinyStories"
 log_activation_norms = true
 log_weight_norms = true
 log_grad_norms = true
+log_p_mask_bucket_loss = false
+p_mask_bucket_edges = [0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0]
 val_log_every = 8
 val_log_samples = 1
 
