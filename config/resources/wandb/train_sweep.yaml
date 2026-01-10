@@ -1,5 +1,5 @@
 program: cli/sweep_train.py
-project: diffusion_lm_head_conservative
+project: diffusion_lm_adamw_lr
 command:
   - ${env}
   - uv
@@ -17,7 +17,7 @@ parameters:
   logging.dataset:
     value: TinyStories
   training.batch_size:
-    value: 68
+    value: 108
   training.max_train_iteration:
     value: 1600
   training.max_val_iteration:
@@ -29,11 +29,11 @@ parameters:
   checkpointing.ckpting_save_iter:
     value: 1000
   model.context_length:
-    value: 512
+    value: 256
   model.d_ff:
-    value: 3072
+    value: 2048
   model.d_model:
-    value: 768
+    value: 512
   data.dataset_name:
     value: roneneldan/TinyStories
   data.dataset_config:
@@ -45,7 +45,7 @@ parameters:
   data.text_field:
     value: text
   data.pipeline_mode:
-    value: rows
+    value: packed
   data.pad_token_id:
     value: 50256
   data.pad_random_shift:
@@ -57,7 +57,7 @@ parameters:
   model.device:
     value: cuda
   model.dtype:
-    value: bfloat16
+    value: float32
   model.vocab_size:
     value: 50259
   model.mask_token_id:
@@ -69,11 +69,11 @@ parameters:
   model.random_trunc_prob:
     value: 0
   optimizer.optimizer_name:
-    value: muon
+    value: adamw
   optimizer.betas:
     value: [0.9, 0.95]
   optimizer.eps:
-    value: 1e-10
+    value: 1e-8
   optimizer.grad_clip_max_l2_norm:
     value: 1.0
   model.num_heads:
@@ -83,28 +83,16 @@ parameters:
   model.rope_theta:
     value: 10000.0
   optimizer.cosine_cycle_iters:
-    value: 50000
+    value: 40000
   optimizer.initial_learning_rate:
     value: 0.0001
-  optimizer.max_learning_rate:
-    value: 0.0005
   optimizer.warmup_iters:
     value: 500
   optimizer.weight_decay:
-    value: 0.05
+    value: 0.001
   optimizer.min_learning_rate:
-    value: 0.00005
-  optimizer.muon.hidden.max_learning_rate:
-    value: 0.016689
-  # optimizer.muon.embed.max_learning_rate:
-  #   distribution: log_uniform_values
-  #   min: 0.012
-  #   max: 0.025
-  optimizer.muon.head.max_learning_rate:
+    value: 0.0001
+  optimizer.max_learning_rate:
     distribution: log_uniform_values
-    min: 0.0015
-    max: 0.0045
-  # optimizer.muon.scalar.max_learning_rate:
-  #   distribution: log_uniform_values
-  #   min: 0.0004
-  #   max: 0.0012
+    min: 0.0003
+    max: 0.003
