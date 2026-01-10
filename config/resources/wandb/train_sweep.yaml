@@ -59,11 +59,11 @@ parameters:
   model.dtype:
     value: float32
   model.vocab_size:
-    value: 50259
-  model.mask_token_id:
     value: 50258
-  model.eot_token_id:
+  model.mask_token_id:
     value: 50257
+  model.eot_token_id:
+    value: 50256
   model.noise_epsilon:
     value: 0.001
   model.random_trunc_prob:
