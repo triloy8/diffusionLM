@@ -17,7 +17,7 @@ parameters:
   logging.dataset:
     value: TinyStories
   training.batch_size:
-    value: 102
+    value: 92
   training.max_train_iteration:
     value: 1600
   training.max_val_iteration:
