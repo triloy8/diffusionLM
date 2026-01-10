@@ -10,7 +10,7 @@ command:
 method: bayes
 metric:
   goal: minimize
-  name: metrics.train_loss_ema
+  name: metrics.val_loss
 parameters:
   logging.architecture:
     value: DiffusionLM
@@ -19,11 +19,11 @@ parameters:
   training.batch_size:
     value: 72
   training.max_train_iteration:
-    value: 1600
+    value: 2000
   training.max_val_iteration:
     value: 10
   training.val_freq_iteration:
-    value: 250
+    value: 100
   training.grad_accum_steps:
     value: 2
   checkpointing.ckpting_save_iter:
