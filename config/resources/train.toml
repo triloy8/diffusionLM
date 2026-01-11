@@ -32,7 +32,7 @@ max_val_iteration = 10
 val_freq_iteration = 250
 seed = 3407
 skip_validation = false
-grad_accum_steps = 2
+grad_accum_steps = 1
 train_loss_ema_decay = 0.99
 
 [data]
@@ -71,10 +71,10 @@ prompts = ["Once upon a time,", "One day,"]
 steps = 256
 total_length = 256
 block_length = 64
-temperature = 0.6
+temperature = 0.3
 top_p = 0.95
 cfg_scale = 0.0
-remasking = "random"
+remasking = "low_confidence"
 generation_mode = "diffusion"
 logits_eos_inf = false
 confidence_eos_eot_inf = false

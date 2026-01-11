@@ -4,34 +4,34 @@ vocab_path = "./data/vocab.json"
 special_tokens_path = "./data/special_tokens.json"
 
 [model]
-vocab_size = 50259
-context_length = 512
-d_model = 768
-num_layers = 8
+vocab_size = 50258
+context_length = 256
+d_model = 512
+num_layers = 4
 num_heads = 16
-d_ff = 3072
+d_ff = 2048
 rope_theta = 10000.0
 device = "cuda"
-dtype = "bfloat16"
-mask_token_id = 50258
+dtype = "float32"
+mask_token_id = 50257
 noise_epsilon = 0.001
 random_trunc_prob = 0
 
 [checkpoint]
-ckpt_path = "./runs/2026-01-05_19-54-59/versions/v038000/model.safetensors"
+ckpt_path = "./runs/2026-01-11_14-51-58/versions/v032000/model.safetensors"
 
 [inference]
 prompt = "Once upon a time,"
-steps = 128
-total_length = 128
-block_length = 64
-temperature = 0.4
-top_p = 0.9
-mask_id = 50258
-seed = 3407
-eos_token_id = 50257
+steps = 256
+total_length = 256
+block_length = 128
+temperature = 0.3
+top_p = 0.95
+mask_id = 50257
+seed = 3410
+eos_token_id = 50256
 cfg_scale = 0.0
-remasking = "random"
+remasking = "low_confidence"
 logits_eos_inf = false
 confidence_eos_eot_inf = false
 generation_mode = "diffusion" # diffusion/ar
