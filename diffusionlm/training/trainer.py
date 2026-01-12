@@ -371,11 +371,10 @@ def train_transformer_ddp(local_rank, args, cfg_dc):
                     out_indices = in_indices
                 elapsed_ms = float((time.perf_counter() - t0) * 1000.0)
                 output = tokenizer.decode(out_indices[0].tolist())
-                output_short = output[:200] + ("…" if len(output) > 200 else "")
                 rows.append(
                     {
                         "prompt": prompt,
-                        "output": output_short,
+                        "output": output,
                         "latency_ms": elapsed_ms,
                         "error": "",
                     }

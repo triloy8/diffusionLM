@@ -17,7 +17,7 @@ parameters:
   logging.dataset:
     value: TinyStories
   training.batch_size:
-    value: 72
+    value: 48
   training.max_train_iteration:
     value: 2000
   training.max_val_iteration:
@@ -25,11 +25,11 @@ parameters:
   training.val_freq_iteration:
     value: 100
   training.grad_accum_steps:
-    value: 2
+    value: 1
   checkpointing.ckpting_save_iter:
     value: 1000
   model.context_length:
-    value: 256
+    value: 512
   model.d_ff:
     value: 2048
   model.d_model:
@@ -67,7 +67,7 @@ parameters:
   model.noise_epsilon:
     value: 0.001
   model.random_trunc_prob:
-    value: 0
+    value: 0.01
   optimizer.optimizer_name:
     value: adamw
   optimizer.betas:

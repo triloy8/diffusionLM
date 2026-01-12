@@ -27,7 +27,7 @@ grad_clip_max_l2_norm = 1.0
 
 [training]
 batch_size = 48
-max_train_iteration = 50000
+max_train_iteration = 2000
 max_val_iteration = 10
 val_freq_iteration = 250
 seed = 3407
@@ -60,7 +60,7 @@ dataset = "TinyStories"
 log_activation_norms = true
 log_weight_norms = true
 log_grad_norms = true
-log_p_mask_bucket_loss = false
+log_p_mask_bucket_loss = true
 p_mask_bucket_edges = [0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0]
 val_log_every = 8
 val_log_samples = 1
@@ -70,7 +70,7 @@ infer_every = 1000
 prompts = ["Once upon a time,", "One day,"]
 steps = 256
 total_length = 256
-block_length = 64
+block_length = 128
 temperature = 0.3
 top_p = 0.95
 cfg_scale = 0.0
