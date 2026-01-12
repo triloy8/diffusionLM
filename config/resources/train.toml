@@ -1,6 +1,6 @@
 [model]
 vocab_size = 50258
-context_length = 256
+context_length = 512
 d_model = 512
 num_layers = 4
 num_heads = 16
