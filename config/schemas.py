@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
@@ -216,6 +216,23 @@ class TrainingConfig(_BaseConfig):
         return self
 
 
+class CompileConfig(_BaseConfig):
+    enabled: bool = False
+    backend: str = "inductor"
+    mode: str = "default"
+    fullgraph: bool = False
+    dynamic: bool = False
+    options: Optional[Dict[str, Any]] = None
+
+    @model_validator(mode="after")
+    def _validate_compile(self):
+        if not self.backend:
+            raise ValueError("compile.backend must not be empty")
+        if not self.mode:
+            raise ValueError("compile.mode must not be empty")
+        return self
+
+
 class TokenizerConfig(_BaseConfig):
     merges_path: Path
     vocab_path: Path
@@ -382,6 +399,7 @@ class TrainConfig(_BaseConfig):
     optimizer: OptimizerConfig
     training: TrainingConfig
     data: DataConfig
+    compile: Optional[CompileConfig] = None
     train_infer: Optional[TrainInferConfig] = None
     wandb: Optional[WandbConfig] = None
     logging: Optional[LoggingConfig] = None

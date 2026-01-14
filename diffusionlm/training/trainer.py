@@ -151,6 +151,20 @@ def train_transformer_ddp(local_rank, args, cfg_dc):
         dtype=DTYPES[cfg.dtype],
     )
 
+    if bool(getattr(cfg, "compile_enabled", False)):
+        if not hasattr(torch, "compile"):
+            raise RuntimeError("torch.compile is not available in this PyTorch build")
+        compile_kwargs = {
+            "backend": getattr(cfg, "compile_backend", "inductor"),
+            "mode": getattr(cfg, "compile_mode", "default"),
+            "fullgraph": bool(getattr(cfg, "compile_fullgraph", False)),
+            "dynamic": bool(getattr(cfg, "compile_dynamic", False)),
+        }
+        compile_options = getattr(cfg, "compile_options", None)
+        if compile_options:
+            compile_kwargs["options"] = compile_options
+        model = torch.compile(model, **compile_kwargs)
+
     ddp_model = DDP(model, cfg.world_size, cfg.bucket_size_mb)
 
     optimizer_cls, param_groups, optimizer_kwargs = _prepare_optimizer_setup(cfg, model)

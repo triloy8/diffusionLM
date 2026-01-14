@@ -54,6 +54,13 @@ def build_train_namespace(cfg_dc, config_path: str) -> argparse.Namespace:
         skip_validation=cfg_dc.training.skip_validation,
         grad_accum_steps=cfg_dc.training.grad_accum_steps,
         train_loss_ema_decay=cfg_dc.training.train_loss_ema_decay,
+        # compile
+        compile_enabled=bool(getattr(cfg_dc.compile, "enabled", False)) if cfg_dc.compile else False,
+        compile_backend=getattr(cfg_dc.compile, "backend", "inductor") if cfg_dc.compile else "inductor",
+        compile_mode=getattr(cfg_dc.compile, "mode", "default") if cfg_dc.compile else "default",
+        compile_fullgraph=bool(getattr(cfg_dc.compile, "fullgraph", False)) if cfg_dc.compile else False,
+        compile_dynamic=bool(getattr(cfg_dc.compile, "dynamic", False)) if cfg_dc.compile else False,
+        compile_options=getattr(cfg_dc.compile, "options", None) if cfg_dc.compile else None,
         # data/paths
         runs_path=cfg_dc.data.runs_path,
         dataset_name=cfg_dc.data.dataset_name,
