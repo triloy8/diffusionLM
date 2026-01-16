@@ -1,6 +1,6 @@
 [model]
 vocab_size = 50258
-context_length = 512
+context_length = 256
 d_model = 512
 num_layers = 4
 num_heads = 16
@@ -27,7 +27,7 @@ cosine_cycle_iters = 40000
 grad_clip_max_l2_norm = 1.0
 
 [training]
-batch_size = 88
+batch_size = 32
 max_train_iteration = 50000
 max_val_iteration = 10
 val_freq_iteration = 250
