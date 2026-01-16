@@ -100,6 +100,9 @@ def torch_scaled_dot_product_attention(
     V: torch.Tensor,
     attention_mask: torch.Tensor | None = None,
 ):
+    Q = Q.contiguous()
+    K = K.contiguous()
+    V = V.contiguous()
     mask = None
     if attention_mask is not None:
         mask = _prepare_attention_mask(attention_mask, Q)
