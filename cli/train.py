@@ -31,6 +31,7 @@ def build_train_namespace(cfg_dc, config_path: str) -> argparse.Namespace:
         d_ff=cfg_dc.model.d_ff,
         rope_theta=cfg_dc.model.rope_theta,
         attention_backend=cfg_dc.model.attention_backend,
+        attention_sdp_backend=cfg_dc.model.attention_sdp_backend,
         mask_token_id=cfg_dc.model.mask_token_id,
         eot_token_id=cfg_dc.model.eot_token_id,
         noise_epsilon=cfg_dc.model.noise_epsilon,

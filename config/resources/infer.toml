@@ -12,6 +12,7 @@ num_heads = 16
 d_ff = 2048
 rope_theta = 10000.0
 attention_backend = "custom"
+attention_sdp_backend = "auto"
 device = "cuda"
 dtype = "float32"
 mask_token_id = 50257

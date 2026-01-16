@@ -13,6 +13,7 @@ from safetensors.torch import load_file
 from config import load_sweep_infer_config
 from diffusionlm.inference.generate import autoregressive_generate, diffusion_generate
 from diffusionlm.models import TransformerLM
+from diffusionlm.models.attention import set_sdp_backend
 from diffusionlm.tokenizer.tokenizer import Tokenizer
 from diffusionlm.utils.dtypes import DTYPES
 from cli.utils import add_config_args, load_config_or_print
@@ -24,6 +25,7 @@ def _load_model_and_tokenizer(cfg):
         merges_filepath=cfg.tokenizer.merges_path,
         special_tokens_path=cfg.tokenizer.special_tokens_path,
     )
+    set_sdp_backend(cfg.model.attention_sdp_backend)
     model = TransformerLM(
         vocab_size=cfg.model.vocab_size,
         context_length=cfg.model.context_length,

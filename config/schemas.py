@@ -9,6 +9,7 @@ ALLOWED_DTYPES = {"float32", "float16", "bfloat16"}
 ALLOWED_DEVICES = {"cpu", "cuda"}
 ALLOWED_OPTIMIZERS = {"adamw", "muon"}
 ALLOWED_ATTENTION_BACKENDS = {"custom", "torch_sdpa"}
+ALLOWED_SDP_BACKENDS = {"auto", "flash", "mem_efficient", "math"}
 
 
 class _BaseConfig(BaseModel):
@@ -150,6 +151,7 @@ class ModelConfig(_BaseConfig):
     d_ff: int
     rope_theta: float
     attention_backend: str = "custom"
+    attention_sdp_backend: str = "auto"
     device: str
     dtype: str
     mask_token_id: Optional[int] = None
@@ -183,6 +185,9 @@ class ModelConfig(_BaseConfig):
         self.attention_backend = self.attention_backend.lower()
         if self.attention_backend not in ALLOWED_ATTENTION_BACKENDS:
             raise ValueError(f"attention_backend must be one of {sorted(ALLOWED_ATTENTION_BACKENDS)}")
+        self.attention_sdp_backend = self.attention_sdp_backend.lower()
+        if self.attention_sdp_backend not in ALLOWED_SDP_BACKENDS:
+            raise ValueError(f"attention_sdp_backend must be one of {sorted(ALLOWED_SDP_BACKENDS)}")
         if self.mask_token_id is None:
             self.mask_token_id = self.vocab_size - 1
         if not (0 <= self.mask_token_id < self.vocab_size):

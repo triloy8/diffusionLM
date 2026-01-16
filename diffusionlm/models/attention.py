@@ -7,6 +7,23 @@ from diffusionlm.models.layers import Linear
 from diffusionlm.inference.sampling import softmax
 
 ALLOWED_ATTENTION_BACKENDS = {"custom", "torch_sdpa"}
+ALLOWED_SDP_BACKENDS = {"auto", "flash", "mem_efficient", "math"}
+
+
+def set_sdp_backend(backend: str) -> None:
+    backend = backend.lower()
+    if backend not in ALLOWED_SDP_BACKENDS:
+        raise ValueError(f"attention_sdp_backend must be one of {sorted(ALLOWED_SDP_BACKENDS)}")
+    if not torch.cuda.is_available():
+        return
+    if backend == "auto":
+        torch.backends.cuda.enable_flash_sdp(True)
+        torch.backends.cuda.enable_mem_efficient_sdp(True)
+        torch.backends.cuda.enable_math_sdp(True)
+        return
+    torch.backends.cuda.enable_flash_sdp(backend == "flash")
+    torch.backends.cuda.enable_mem_efficient_sdp(backend == "mem_efficient")
+    torch.backends.cuda.enable_math_sdp(backend == "math")
 
 
 class RotaryPositionalEmbedding(torch.nn.Module):

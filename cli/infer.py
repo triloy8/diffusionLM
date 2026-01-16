@@ -33,6 +33,7 @@ def main():
         d_ff=cfg_dc.model.d_ff,
         rope_theta=cfg_dc.model.rope_theta,
         attention_backend=cfg_dc.model.attention_backend,
+        attention_sdp_backend=cfg_dc.model.attention_sdp_backend,
         device=cfg_dc.model.device,
         dtype=cfg_dc.model.dtype,
         mask_token_id=cfg_dc.model.mask_token_id,

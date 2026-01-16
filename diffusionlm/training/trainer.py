@@ -2,6 +2,7 @@ from diffusionlm.models import (
     TransformerLM,
     Linear,
 )
+from diffusionlm.models.attention import set_sdp_backend
 from diffusionlm.training.optim import (
     build_optimizer_param_groups,
     resolve_optimizer_cls,
@@ -139,6 +140,7 @@ def train_transformer_ddp(local_rank, args, cfg_dc):
     checkpoint_manager.prepare_run(torch_generator)
     ckpting_save_folder = checkpoint_manager.run_dir
 
+    set_sdp_backend(getattr(cfg, "attention_sdp_backend", "auto"))
     model = TransformerLM(
         vocab_size=cfg.vocab_size,
         context_length=cfg.context_length,
@@ -459,6 +461,7 @@ def build_run_config(cfg, cfg_dc):
         "d_ff": cfg.d_ff,
         "rope_theta": cfg.rope_theta,
         "attention_backend": cfg.attention_backend,
+        "attention_sdp_backend": cfg.attention_sdp_backend,
         "mask_token_id": cfg.mask_token_id,
         "noise_epsilon": getattr(cfg, "noise_epsilon", None),
         "random_trunc_prob": getattr(cfg, "random_trunc_prob", None),

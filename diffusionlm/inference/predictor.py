@@ -6,6 +6,7 @@ from safetensors.torch import load_file
 
 from diffusionlm.tokenizer.tokenizer import Tokenizer
 from diffusionlm.models import TransformerLM
+from diffusionlm.models.attention import set_sdp_backend
 from diffusionlm.inference.generate import autoregressive_generate, diffusion_generate
 from diffusionlm.utils.dtypes import DTYPES
 from logger import Logger
@@ -27,6 +28,7 @@ def infer_transformer(args, *, logger: Optional[Logger] = None, artifact_path: O
     if total_length > args.context_length:
         raise ValueError("total_length must be <= model context_length")
 
+    set_sdp_backend(getattr(args, "attention_sdp_backend", "auto"))
     model = TransformerLM(
         vocab_size=args.vocab_size,
         context_length=args.context_length,

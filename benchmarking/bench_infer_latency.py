@@ -12,6 +12,7 @@ from cli.utils import add_config_args, load_config_or_print
 from config import load_bench_infer_config
 from diffusionlm.tokenizer.tokenizer import Tokenizer
 from diffusionlm.models import TransformerLM
+from diffusionlm.models.attention import set_sdp_backend
 from diffusionlm.utils.dtypes import DTYPES
 from diffusionlm.inference.generate import diffusion_generate
 from diffusionlm.training.loss import cross_entropy, diffusion_cross_entropy
@@ -103,6 +104,7 @@ def main():
 
     # Model
     with nvtx.range("bench/setup/model_load"):
+        set_sdp_backend(cfg.model.attention_sdp_backend)
         model = TransformerLM(
             vocab_size=cfg.model.vocab_size,
             context_length=cfg.model.context_length,
