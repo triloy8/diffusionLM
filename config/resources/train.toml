@@ -6,6 +6,7 @@ num_layers = 4
 num_heads = 16
 d_ff = 2048
 rope_theta = 10000.0
+attention_backend = "torch_sdpa"
 device = "cuda"
 dtype = "float32"
 mask_token_id = 50257
@@ -67,7 +68,7 @@ architecture = "DiffusionLM"
 dataset = "TinyStories"
 log_activation_norms = true
 log_weight_norms = true
-log_grad_norms = true
+log_grad_norms = false
 log_p_mask_bucket_loss = false
 p_mask_bucket_edges = [0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0]
 val_log_every = 8
@@ -90,12 +91,12 @@ seed = 3410
 
 [wandb]
 entity = "yiltro8-org"
-project = "diffusion_lm"
+project = "diffusion_lm_sdpa_test"
 
 [ddp]
 backend = "nccl"               # gloo/nccl
 num_nodes = 1                  # total nodes participating
-num_gpus_per_node = 2          # processes launched per node (mp.spawn uses this)
+num_gpus_per_node = 1          # processes launched per node (mp.spawn uses this)
 node_rank = 0                  # index of this node
 master_addr = "127.0.0.1"      # rank 0 hostname/IP
 master_port = "29500"

@@ -176,6 +176,7 @@ def test_checkpointing_roundtrip(tmp_path, device):
         num_heads=2,
         d_ff=16,
         rope_theta=10000.0,
+        attention_backend="custom",
         device=device,
         dtype=torch.float32,
     )

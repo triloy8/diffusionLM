@@ -35,6 +35,7 @@ def infer_transformer(args, *, logger: Optional[Logger] = None, artifact_path: O
         num_heads=args.num_heads,
         d_ff=args.d_ff,
         rope_theta=args.rope_theta,
+        attention_backend=getattr(args, "attention_backend", "custom"),
         device=args.device,
         dtype=DTYPES[args.dtype],
     )

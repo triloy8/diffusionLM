@@ -147,6 +147,7 @@ def train_transformer_ddp(local_rank, args, cfg_dc):
         num_heads=cfg.num_heads,
         d_ff=cfg.d_ff,
         rope_theta=cfg.rope_theta,
+        attention_backend=cfg.attention_backend,
         device=cfg.device,
         dtype=DTYPES[cfg.dtype],
     )
@@ -457,6 +458,7 @@ def build_run_config(cfg, cfg_dc):
         "num_heads": cfg.num_heads,
         "d_ff": cfg.d_ff,
         "rope_theta": cfg.rope_theta,
+        "attention_backend": cfg.attention_backend,
         "mask_token_id": cfg.mask_token_id,
         "noise_epsilon": getattr(cfg, "noise_epsilon", None),
         "random_trunc_prob": getattr(cfg, "random_trunc_prob", None),

@@ -8,6 +8,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 ALLOWED_DTYPES = {"float32", "float16", "bfloat16"}
 ALLOWED_DEVICES = {"cpu", "cuda"}
 ALLOWED_OPTIMIZERS = {"adamw", "muon"}
+ALLOWED_ATTENTION_BACKENDS = {"custom", "torch_sdpa"}
 
 
 class _BaseConfig(BaseModel):
@@ -148,6 +149,7 @@ class ModelConfig(_BaseConfig):
     num_heads: int
     d_ff: int
     rope_theta: float
+    attention_backend: str = "custom"
     device: str
     dtype: str
     mask_token_id: Optional[int] = None
@@ -178,6 +180,9 @@ class ModelConfig(_BaseConfig):
             raise ValueError("d_model must be divisible by num_heads")
         if self.rope_theta <= 0:
             raise ValueError("rope_theta must be > 0")
+        self.attention_backend = self.attention_backend.lower()
+        if self.attention_backend not in ALLOWED_ATTENTION_BACKENDS:
+            raise ValueError(f"attention_backend must be one of {sorted(ALLOWED_ATTENTION_BACKENDS)}")
         if self.mask_token_id is None:
             self.mask_token_id = self.vocab_size - 1
         if not (0 <= self.mask_token_id < self.vocab_size):

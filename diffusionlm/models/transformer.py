@@ -6,10 +6,28 @@ from diffusionlm.models.attention import MultiheadSelfAttentionRoPE
 
 
 class TransformerBlock(nn.Module):
-    def __init__(self, d_model: int, num_heads: int, max_seq_len: int, theta: float, d_ff: int, device=None, dtype=None):
+    def __init__(
+        self,
+        d_model: int,
+        num_heads: int,
+        max_seq_len: int,
+        theta: float,
+        d_ff: int,
+        attention_backend: str = "custom",
+        device=None,
+        dtype=None,
+    ):
         super().__init__()
         self.ffn = SwiGLU(d_model, d_ff, device, dtype)
-        self.attn = MultiheadSelfAttentionRoPE(d_model, num_heads, max_seq_len, theta, device, dtype)
+        self.attn = MultiheadSelfAttentionRoPE(
+            d_model,
+            num_heads,
+            max_seq_len,
+            theta,
+            attention_backend=attention_backend,
+            device=device,
+            dtype=dtype,
+        )
         self.ln1 = RMSNorm(d_model, device=device, dtype=dtype)
         self.ln2 = RMSNorm(d_model, device=device, dtype=dtype)
 
@@ -23,11 +41,37 @@ class TransformerBlock(nn.Module):
 
 
 class TransformerLM(nn.Module):
-    def __init__(self, vocab_size: int, context_length: int, d_model: int, num_layers: int, num_heads: int, d_ff: int, rope_theta: float, device=None, dtype=None):
+    def __init__(
+        self,
+        vocab_size: int,
+        context_length: int,
+        d_model: int,
+        num_layers: int,
+        num_heads: int,
+        d_ff: int,
+        rope_theta: float,
+        attention_backend: str = "custom",
+        device=None,
+        dtype=None,
+    ):
         super().__init__()
         self.context_length = context_length
         self.token_embeddings = Embedding(vocab_size, d_model, device, dtype)
-        self.layers = torch.nn.ModuleList([TransformerBlock(d_model, num_heads, context_length, rope_theta, d_ff, device, dtype) for _ in range(num_layers)])
+        self.layers = torch.nn.ModuleList(
+            [
+                TransformerBlock(
+                    d_model,
+                    num_heads,
+                    context_length,
+                    rope_theta,
+                    d_ff,
+                    attention_backend=attention_backend,
+                    device=device,
+                    dtype=dtype,
+                )
+                for _ in range(num_layers)
+            ]
+        )
         self.ln_final = RMSNorm(d_model, device=device, dtype=dtype)
         self.lm_head = Linear(d_model, vocab_size, device, dtype)
 

@@ -1,11 +1,13 @@
 from einops import einsum, rearrange
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 from profiling import nvtx
 
 from diffusionlm.models.instrumented.layers import Linear
 from diffusionlm.inference.sampling import softmax
 
+ALLOWED_ATTENTION_BACKENDS = {"custom", "torch_sdpa"}
 
 class RotaryPositionalEmbedding(torch.nn.Module):
     def __init__(self, theta: float, d_k: int, max_seq_len: int, device=None):
@@ -54,8 +56,8 @@ class RotaryPositionalEmbedding(torch.nn.Module):
             return x_rotated.flatten(-2)
 
 
-def _prepare_attention_mask(attention_mask: torch.Tensor, qk_score: torch.Tensor) -> torch.Tensor:
-    mask = attention_mask.to(device=qk_score.device, dtype=torch.bool)
+def _prepare_attention_mask(attention_mask: torch.Tensor, ref_tensor: torch.Tensor) -> torch.Tensor:
+    mask = attention_mask.to(device=ref_tensor.device, dtype=torch.bool)
     if mask.dim() == 2:
         mask = mask[:, None, None, :]
     elif mask.dim() == 3:
@@ -92,8 +94,32 @@ def scaled_dot_product_attention(
         return attn
 
 
+def torch_scaled_dot_product_attention(
+    Q: torch.Tensor,
+    K: torch.Tensor,
+    V: torch.Tensor,
+    attention_mask: torch.Tensor | None = None,
+):
+    mask = None
+    if attention_mask is not None:
+        mask = _prepare_attention_mask(attention_mask, Q)
+    if nvtx.enabled("fine"):
+        with nvtx.range("sdpa/torch"):
+            return F.scaled_dot_product_attention(Q, K, V, attn_mask=mask, dropout_p=0.0, is_causal=False)
+    return F.scaled_dot_product_attention(Q, K, V, attn_mask=mask, dropout_p=0.0, is_causal=False)
+
+
 class MultiheadSelfAttentionRoPE(nn.Module):
-    def __init__(self, d_model: int, num_heads: int, max_seq_len: int, theta: float, device=None, dtype=None):
+    def __init__(
+        self,
+        d_model: int,
+        num_heads: int,
+        max_seq_len: int,
+        theta: float,
+        attention_backend: str = "custom",
+        device=None,
+        dtype=None,
+    ):
         super().__init__()
         self.d_model = d_model
         self.num_heads = num_heads
@@ -101,6 +127,9 @@ class MultiheadSelfAttentionRoPE(nn.Module):
         self.d_v = self.d_k
         self.max_seq_len = max_seq_len
         self.theta = theta
+        if attention_backend not in ALLOWED_ATTENTION_BACKENDS:
+            raise ValueError(f"attention_backend must be one of {sorted(ALLOWED_ATTENTION_BACKENDS)}")
+        self.attention_backend = attention_backend
 
         self.q_proj = Linear(self.d_model, self.d_model, device=device, dtype=dtype)
         self.k_proj = Linear(self.d_model, self.d_model, device=device, dtype=dtype)
@@ -147,12 +176,20 @@ class MultiheadSelfAttentionRoPE(nn.Module):
 
         seq_len = token_positions.shape[-1]
         with nvtx.range("attn/sdpa"):
-            attn = scaled_dot_product_attention(
-                wqx_rearr_rope,
-                wkx_rearr_rope,
-                wvx_rearr,
-                attention_mask=attention_mask,
-            )
+            if self.attention_backend == "torch_sdpa":
+                attn = torch_scaled_dot_product_attention(
+                    wqx_rearr_rope,
+                    wkx_rearr_rope,
+                    wvx_rearr,
+                    attention_mask=attention_mask,
+                )
+            else:
+                attn = scaled_dot_product_attention(
+                    wqx_rearr_rope,
+                    wkx_rearr_rope,
+                    wvx_rearr,
+                    attention_mask=attention_mask,
+                )
         if nvtx.enabled("fine"):
             with nvtx.range("attn/merge_heads"):
                 attn_rearr = rearrange(attn, "... num_heads seq_len d_v -> ... seq_len (num_heads d_v)", num_heads=self.num_heads, d_v=self.d_v)

@@ -138,6 +138,7 @@ def toy_training_bundle(device) -> TrainingBundle:
             num_heads=model_cfg.num_heads,
             d_ff=model_cfg.d_ff,
             rope_theta=model_cfg.rope_theta,
+            attention_backend=model_cfg.attention_backend,
             device=model_cfg.device,
             dtype=model_dtype,
         )

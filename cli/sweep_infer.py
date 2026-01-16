@@ -32,6 +32,7 @@ def _load_model_and_tokenizer(cfg):
         num_heads=cfg.model.num_heads,
         d_ff=cfg.model.d_ff,
         rope_theta=cfg.model.rope_theta,
+        attention_backend=cfg.model.attention_backend,
         device=cfg.model.device,
         dtype=DTYPES[cfg.model.dtype],
     )
