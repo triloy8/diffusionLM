@@ -23,6 +23,7 @@ import os
 import random
 import time
 import torch
+from contextlib import nullcontext
 # import torch.distributed as dist
 from functools import partial
 # from datasets import load_dataset
@@ -346,7 +347,8 @@ def train_transformer_ddp(local_rank, args, cfg_dc):
         eos_token_id = getattr(cfg, "eot_token_id", None)
         mask_id = int(getattr(cfg, "mask_token_id", cfg.vocab_size - 1))
 
-        with torch.no_grad():
+        autocast_ctx = torch.autocast("cuda", dtype=amp_torch_dtype) if use_amp else nullcontext()
+        with torch.no_grad(), autocast_ctx:
             for idx, prompt in enumerate(prompts):
                 prompt_ids = tokenizer.encode(prompt)
                 prompt_len = len(prompt_ids)
