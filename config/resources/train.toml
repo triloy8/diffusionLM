@@ -9,7 +9,7 @@ rope_theta = 10000.0
 attention_backend = "torch_sdpa"
 attention_sdp_backend = "flash"
 device = "cuda"
-dtype = "bfloat16"
+dtype = "float32"
 mask_token_id = 50257
 eot_token_id = 50256
 noise_epsilon = 0.001
@@ -36,8 +36,8 @@ seed = 3407
 skip_validation = false
 grad_accum_steps = 1
 train_loss_ema_decay = 0.99
-amp_enabled = false
-amp_dtype = "float16"
+amp_enabled = true
+amp_dtype = "bfloat16"
 
 [compile]
 enabled = false
