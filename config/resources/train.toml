@@ -13,7 +13,7 @@ dtype = "float32"
 mask_token_id = 50257
 eot_token_id = 50256
 noise_epsilon = 0.001
-random_trunc_prob = 0.01 # 0.01
+random_trunc_prob = 0.0 # 0.01
 
 [optimizer]
 optimizer_name = "adamw"
