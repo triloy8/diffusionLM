@@ -1,5 +1,5 @@
 [model]
-vocab_size = 50258
+vocab_size = 8000
 context_length = 512
 d_model = 512
 num_layers = 4
@@ -11,7 +11,7 @@ attention_sdp_backend = "flash"
 device = "cuda"
 dtype = "float32"
 mask_token_id = 50257
-eot_token_id = 50256
+eot_token_id = 7999
 noise_epsilon = 0.001
 random_trunc_prob = 0.0 # 0.01
 
@@ -63,9 +63,9 @@ shuffle_buffer_size = 30000
 shuffle_seed = 3407
 
 [data.tokenizer]
-vocab_path = "./data/vocab.json"
-merges_path = "./data/merges.txt"
-special_tokens_path = "./data/special_tokens.json"
+vocab_path = "./data/vocab_8k.json"
+merges_path = "./data/merges_8k.txt"
+special_tokens_path = "./data/special_tokens_8k.json"
 
 [logging]
 backend = "wandb"
@@ -83,9 +83,9 @@ val_log_samples = 1
 infer_every = 1000
 prompts = ["Once upon a time,", "One day,"]
 steps = 256
-total_length = 256
+total_length = 512
 block_length = 128
-temperature = 0.3
+temperature = 0.2
 top_p = 0.95
 cfg_scale = 0.0
 remasking = "low_confidence"
