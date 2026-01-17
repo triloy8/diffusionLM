@@ -21,6 +21,7 @@ def build_train_namespace(cfg_dc, config_path: str) -> argparse.Namespace:
         min_learning_rate=cfg_dc.optimizer.min_learning_rate,
         warmup_iters=cfg_dc.optimizer.warmup_iters,
         cosine_cycle_iters=cfg_dc.optimizer.cosine_cycle_iters,
+        lr_schedule=cfg_dc.optimizer.lr_schedule,
         grad_clip_max_l2_norm=cfg_dc.optimizer.grad_clip_max_l2_norm,
         # model
         vocab_size=cfg_dc.model.vocab_size,

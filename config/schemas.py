@@ -103,6 +103,7 @@ class MuonOptimizerConfig(_BaseConfig):
 
 class OptimizerConfig(_BaseConfig):
     optimizer_name: str = "adamw"
+    lr_schedule: str = "cosine"
     betas: Tuple[float, float] = (0.9, 0.95)
     eps: float
     weight_decay: float
@@ -119,6 +120,9 @@ class OptimizerConfig(_BaseConfig):
         self.optimizer_name = self.optimizer_name.lower()
         if self.optimizer_name not in ALLOWED_OPTIMIZERS:
             raise ValueError(f"optimizer_name must be one of {sorted(ALLOWED_OPTIMIZERS)}")
+        self.lr_schedule = self.lr_schedule.lower()
+        if self.lr_schedule not in {"cosine", "constant"}:
+            raise ValueError("lr_schedule must be one of: cosine, constant")
         if len(self.betas) != 2 or not (0 <= self.betas[0] < 1 and 0 <= self.betas[1] < 1):
             raise ValueError("optimizer betas must be 2 values in [0, 1)")
         if self.eps <= 0:

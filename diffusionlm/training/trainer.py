@@ -10,7 +10,7 @@ from diffusionlm.training.optim import (
 from diffusionlm.training.data import get_batch, get_autoregressive_batch
 from diffusionlm.training.loss import diffusion_cross_entropy, autoregressive_cross_entropy
 from checkpointing import CheckpointManager
-from diffusionlm.training.schedule import lr_cosine_schedule
+from diffusionlm.training.schedule import lr_cosine_schedule, lr_constant_schedule
 from diffusionlm.inference.generate import autoregressive_generate, diffusion_generate
 from diffusionlm.training.grad import gradient_clipping
 from diffusionlm.training.loop import train_loop
@@ -436,6 +436,8 @@ def train_transformer_ddp(local_rank, args, cfg_dc):
         if was_training:
             model.train()
 
+    lr_schedule = lr_constant_schedule if getattr(cfg, "lr_schedule", "cosine") == "constant" else lr_cosine_schedule
+
     train_loop(
         ddp_model,
         optimizer,
@@ -458,7 +460,7 @@ def train_transformer_ddp(local_rank, args, cfg_dc):
         ckpting_save_iter=cfg.ckpting_save_iter,
         ckpting_save_folder=ckpting_save_folder,
         get_batch=batch_getter,
-        lr_cosine_schedule=lr_cosine_schedule,
+        lr_cosine_schedule=lr_schedule,
         gradient_clipping=gradient_clipping,
         checkpoint_callback=checkpoint_callback,
         compute_loss=_compute_loss,
@@ -514,6 +516,7 @@ def build_run_config(cfg, cfg_dc):
         "min_learning_rate": cfg.min_learning_rate,
         "warmup_iters": cfg.warmup_iters,
         "cosine_cycle_iters": cfg.cosine_cycle_iters,
+        "lr_schedule": str(getattr(cfg, "lr_schedule", "cosine")),
         "max_train_iteration": cfg.max_train_iteration,
         "max_val_iteration": cfg.max_val_iteration,
         "val_freq_iteration": cfg.val_freq_iteration,
