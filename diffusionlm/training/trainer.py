@@ -416,6 +416,8 @@ def train_transformer_ddp(local_rank, args, cfg_dc):
         max_val_iteration=cfg.max_val_iteration,
         val_freq_iteration=cfg.val_freq_iteration,
         grad_accum_steps=int(getattr(cfg, "grad_accum_steps", 1)),
+        amp_enabled=bool(getattr(cfg, "amp_enabled", False)),
+        amp_dtype=str(getattr(cfg, "amp_dtype", "float16")),
         grad_clip_max_l2_norm=cfg.grad_clip_max_l2_norm,
         ckpting_save_iter=cfg.ckpting_save_iter,
         ckpting_save_folder=ckpting_save_folder,
@@ -482,6 +484,8 @@ def build_run_config(cfg, cfg_dc):
         "dtype": cfg.dtype,
         "ckpting_save_iter": cfg.ckpting_save_iter,
         "grad_accum_steps": int(getattr(cfg, "grad_accum_steps", 1)),
+        "amp_enabled": bool(getattr(cfg, "amp_enabled", False)),
+        "amp_dtype": str(getattr(cfg, "amp_dtype", "float16")),
         "val_log_every": int(getattr(cfg, "val_log_every", 0)),
         "val_log_samples": int(getattr(cfg, "val_log_samples", 0)),
     }

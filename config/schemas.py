@@ -10,6 +10,7 @@ ALLOWED_DEVICES = {"cpu", "cuda"}
 ALLOWED_OPTIMIZERS = {"adamw", "muon"}
 ALLOWED_ATTENTION_BACKENDS = {"custom", "torch_sdpa"}
 ALLOWED_SDP_BACKENDS = {"auto", "flash", "mem_efficient", "math"}
+ALLOWED_AMP_DTYPES = {"float16", "bfloat16"}
 
 
 class _BaseConfig(BaseModel):
@@ -211,6 +212,8 @@ class TrainingConfig(_BaseConfig):
     skip_validation: bool = False
     grad_accum_steps: int = 1
     train_loss_ema_decay: float = 0.0
+    amp_enabled: bool = False
+    amp_dtype: str = "float16"
 
     @model_validator(mode="after")
     def _validate_training(self):
@@ -223,6 +226,9 @@ class TrainingConfig(_BaseConfig):
             raise ValueError("seed must be >= 0 when provided")
         if self.train_loss_ema_decay < 0 or self.train_loss_ema_decay >= 1:
             raise ValueError("train_loss_ema_decay must be in [0, 1)")
+        self.amp_dtype = self.amp_dtype.lower()
+        if self.amp_dtype not in ALLOWED_AMP_DTYPES:
+            raise ValueError(f"amp_dtype must be one of {sorted(ALLOWED_AMP_DTYPES)}")
         return self
 
 

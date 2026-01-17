@@ -1,6 +1,7 @@
 import os
 from pathlib import Path
 import torch
+from contextlib import nullcontext
 from torch._utils import _flatten_dense_tensors, _unflatten_dense_tensors
 import numpy as np
 from typing import Optional, Callable
@@ -30,6 +31,8 @@ def train_loop(
     max_val_iteration: int | None,
     val_freq_iteration: int,
     grad_accum_steps: int = 1,
+    amp_enabled: bool = False,
+    amp_dtype: str = "float16",
     # regularization
     grad_clip_max_l2_norm: float,
     # checkpointing
@@ -154,6 +157,10 @@ def train_loop(
     tokens_seen = 0
     accum_steps = max(1, int(grad_accum_steps))
     accum_count = 0
+    use_amp = bool(amp_enabled) and device.startswith("cuda") and torch.cuda.is_available()
+    amp_dtype = amp_dtype.lower()
+    amp_torch_dtype = torch.float16 if amp_dtype == "float16" else torch.bfloat16
+    scaler = torch.amp.GradScaler(device="cuda", enabled=use_amp and amp_torch_dtype == torch.float16)
     current_lr = None
     train_loss_ema = None
     val_pass_count = 0
@@ -224,11 +231,13 @@ def train_loop(
                 )
 
         # forward
-        if train_attn_mask is not None:
-            train_logits = model(train_inputs, attention_mask=train_attn_mask)
-        else:
-            train_logits = model(train_inputs)
-        train_loss = compute_loss(train_logits, train_batch)
+        autocast_ctx = torch.autocast("cuda", dtype=amp_torch_dtype) if use_amp else nullcontext()
+        with autocast_ctx:
+            if train_attn_mask is not None:
+                train_logits = model(train_inputs, attention_mask=train_attn_mask)
+            else:
+                train_logits = model(train_inputs)
+            train_loss = compute_loss(train_logits, train_batch)
         scaled_loss = train_loss / accum_steps
         if logger is not None and device.startswith("cuda") and torch.cuda.is_available():
             logger.log(
@@ -321,7 +330,10 @@ def train_loop(
         # backward
         if accum_count == 0:
             optimizer.zero_grad()
-        scaled_loss.backward()
+        if scaler.is_enabled():
+            scaler.scale(scaled_loss).backward()
+        else:
+            scaled_loss.backward()
         if logger is not None and device.startswith("cuda") and torch.cuda.is_available():
             logger.log(
                 {
@@ -344,8 +356,14 @@ def train_loop(
             # Optional DDP gradient synchronization before optimizer step
             if sync_gradients is not None:
                 sync_gradients()
+            if scaler.is_enabled():
+                scaler.unscale_(optimizer)
             gradient_clipping(parameters=model.parameters(), max_l2_norm=grad_clip_max_l2_norm)
-            optimizer.step()
+            if scaler.is_enabled():
+                scaler.step(optimizer)
+                scaler.update()
+            else:
+                optimizer.step()
             accum_count = 0
 
         # weight norms
@@ -403,11 +421,12 @@ def train_loop(
                     val_batch = prepare(raw_val_batch)
                     val_inputs = _inputs(val_batch)
                     val_attn_mask = _attention_mask(val_batch)
-                    if val_attn_mask is not None:
-                        val_logits = model(val_inputs, attention_mask=val_attn_mask)
-                    else:
-                        val_logits = model(val_inputs)
-                    val_loss = compute_loss(val_logits, val_batch)
+                    with autocast_ctx:
+                        if val_attn_mask is not None:
+                            val_logits = model(val_inputs, attention_mask=val_attn_mask)
+                        else:
+                            val_logits = model(val_inputs)
+                        val_loss = compute_loss(val_logits, val_batch)
                     running_val_loss += float(val_loss.item())
                     val_tokens += int(val_inputs.numel())
                     if log_samples_now and sample_payload is None:

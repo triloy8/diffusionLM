@@ -56,6 +56,8 @@ def build_train_namespace(cfg_dc, config_path: str) -> argparse.Namespace:
         skip_validation=cfg_dc.training.skip_validation,
         grad_accum_steps=cfg_dc.training.grad_accum_steps,
         train_loss_ema_decay=cfg_dc.training.train_loss_ema_decay,
+        amp_enabled=bool(getattr(cfg_dc.training, "amp_enabled", False)),
+        amp_dtype=str(getattr(cfg_dc.training, "amp_dtype", "float16")),
         # compile
         compile_enabled=bool(getattr(cfg_dc.compile, "enabled", False)) if cfg_dc.compile else False,
         compile_backend=getattr(cfg_dc.compile, "backend", "inductor") if cfg_dc.compile else "inductor",
