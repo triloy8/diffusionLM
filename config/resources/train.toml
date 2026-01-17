@@ -29,7 +29,7 @@ grad_clip_max_l2_norm = 1.0
 lr_schedule = "constant" # constant/cosine
 
 [training]
-batch_size = 80
+batch_size = 256
 max_train_iteration = 50000
 max_val_iteration = 10
 val_freq_iteration = 250
