@@ -193,10 +193,9 @@ class ModelConfig(_BaseConfig):
         self.attention_sdp_backend = self.attention_sdp_backend.lower()
         if self.attention_sdp_backend not in ALLOWED_SDP_BACKENDS:
             raise ValueError(f"attention_sdp_backend must be one of {sorted(ALLOWED_SDP_BACKENDS)}")
-        if self.mask_token_id is None:
-            self.mask_token_id = self.vocab_size - 1
-        if not (0 <= self.mask_token_id < self.vocab_size):
-            raise ValueError("mask_token_id must be in [0, vocab_size)")
+        if self.mask_token_id is not None:
+            if not (0 <= self.mask_token_id < self.vocab_size):
+                raise ValueError("mask_token_id must be in [0, vocab_size)")
         if self.eot_token_id is not None:
             if not (0 <= self.eot_token_id < self.vocab_size):
                 raise ValueError("eot_token_id must be in [0, vocab_size)")
@@ -471,6 +470,8 @@ class InferenceConfig(_BaseConfig):
             raise ValueError("top_p must be between 0 and 1 when provided")
         if self.mask_id is not None and self.mask_id < 0:
             raise ValueError("mask_id must be >= 0")
+        if self.generation_mode == "diffusion" and self.mask_id is None:
+            raise ValueError("mask_id must be set when generation_mode='diffusion'")
         if self.seed is not None and self.seed < 0:
             raise ValueError("seed must be >= 0")
         if self.eos_token_id is not None and self.eos_token_id < 0:
@@ -545,7 +546,7 @@ class InferConfig(_BaseConfig):
         updates = {}
         if inf.total_length is None:
             updates["total_length"] = self.model.context_length
-        if inf.mask_id is None:
+        if inf.mask_id is None and self.model.mask_token_id is not None:
             updates["mask_id"] = self.model.mask_token_id
         if updates:
             inf = inf.model_copy(update=updates)
@@ -567,7 +568,7 @@ class SweepInferConfig(_BaseConfig):
         updates = {}
         if inf.total_length is None:
             updates["total_length"] = self.model.context_length
-        if inf.mask_id is None:
+        if inf.mask_id is None and self.model.mask_token_id is not None:
             updates["mask_id"] = self.model.mask_token_id
         if updates:
             inf = inf.model_copy(update=updates)

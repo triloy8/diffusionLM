@@ -282,7 +282,9 @@ def train_transformer_ddp(local_rank, args, cfg_dc):
         device=str(cfg.device),
     )
 
-    mask_token_id = getattr(cfg, "mask_token_id", cfg.vocab_size - 1)
+    mask_token_id = getattr(cfg, "mask_token_id", None)
+    if mask_token_id is None:
+        mask_token_id = cfg.vocab_size - 1
     noise_epsilon = getattr(cfg, "noise_epsilon", 1e-3)
     random_trunc_prob = getattr(cfg, "random_trunc_prob", 0.01)
     training_objective = str(getattr(cfg, "training_objective", "diffusion")).lower()
