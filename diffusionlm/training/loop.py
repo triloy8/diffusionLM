@@ -43,13 +43,16 @@ def train_loop(
     lr_cosine_schedule,
     gradient_clipping,
     compute_loss,
-    checkpoint_callback: Optional[Callable[[int, torch.nn.Module, torch.optim.Optimizer, Optional[dict]], None]] = None,
+    checkpoint_callback: Optional[
+        Callable[[int, torch.nn.Module, torch.optim.Optimizer, Optional[dict], Optional[torch.amp.GradScaler]], None]
+    ] = None,
     prepare_batch: Optional[Callable[[object], object]] = None,
     extract_model_inputs: Optional[Callable[[object], torch.Tensor]] = None,
     batch_generator: torch.Generator | None = None,
     # logging
     logger: Optional[Logger] = None,
     train_loss_ema_decay: float = 0.0,
+    scaler: Optional[torch.amp.GradScaler] = None,
     # optional logging helpers
     activation_norms: dict | None = None,
     log_activation_norms: bool = False,
@@ -160,7 +163,8 @@ def train_loop(
     use_amp = bool(amp_enabled) and device.startswith("cuda") and torch.cuda.is_available()
     amp_dtype = amp_dtype.lower()
     amp_torch_dtype = torch.float16 if amp_dtype == "float16" else torch.bfloat16
-    scaler = torch.amp.GradScaler(device="cuda", enabled=use_amp and amp_torch_dtype == torch.float16)
+    if scaler is None:
+        scaler = torch.amp.GradScaler(device="cuda", enabled=use_amp and amp_torch_dtype == torch.float16)
     current_lr = None
     train_loss_ema = None
     val_pass_count = 0
@@ -476,7 +480,8 @@ def train_loop(
             and train_iteration % ckpting_save_iter == 0
             and ckpting_save_folder is not None
         ):
-            checkpoint_callback(train_iteration, model, optimizer, last_val_metrics)
+            amp_scaler = scaler if scaler is not None and scaler.is_enabled() else None
+            checkpoint_callback(train_iteration, model, optimizer, last_val_metrics, amp_scaler)
 
         if step_callback is not None:
             step_callback(

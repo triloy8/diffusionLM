@@ -12,6 +12,7 @@ from .manifest import (
     load_manifest,
     load_model_from_manifest,
     load_optimizer_shard,
+    load_scaler_shard,
     load_rng_state,
 )
 from .state import restore_rng_state
@@ -137,6 +138,7 @@ class CheckpointManager:
         *,
         ddp_model: torch.nn.Module,
         optimizer: torch.optim.Optimizer,
+        scaler: Optional[torch.amp.GradScaler] = None,
         train_batcher: Optional[Any],
         val_batcher: Optional[Any],
         generator: Optional[torch.Generator],
@@ -174,6 +176,17 @@ class CheckpointManager:
                 s3=self._s3_uploader,
             )
             optimizer.load_state_dict(optimizer_state)
+            if scaler is not None:
+                scaler_state = load_scaler_shard(
+                    manifest,
+                    self.resume_run_dir,
+                    self._rank,
+                    map_location=device,
+                    root_parent=self._runs_path.parent,
+                    s3=self._s3_uploader,
+                )
+                if scaler_state is not None:
+                    scaler.load_state_dict(scaler_state)
 
         rng_state = load_rng_state(
             manifest,
@@ -203,11 +216,12 @@ class CheckpointManager:
             torch.distributed.all_gather_object(gathered, payload)
             return gathered
 
-        def _checkpoint_callback(step_idx, module, opt, metrics):
+        def _checkpoint_callback(step_idx, module, opt, metrics, amp_scaler):
             self.coordinator.save_version(
                 step_idx,
                 model=module,
                 optimizer=opt,
+                scaler=amp_scaler,
                 metrics=metrics,
                 all_gather=_gather_objects,
             )

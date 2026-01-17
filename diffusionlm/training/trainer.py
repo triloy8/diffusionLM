@@ -265,9 +265,16 @@ def train_transformer_ddp(local_rank, args, cfg_dc):
         if isinstance(module, Linear):
             module.register_forward_hook(get_activation_norm_hook(name))
 
+    amp_enabled = bool(getattr(cfg, "amp_enabled", False))
+    amp_dtype = str(getattr(cfg, "amp_dtype", "float16")).lower()
+    use_amp = amp_enabled and str(cfg.device).startswith("cuda") and torch.cuda.is_available()
+    amp_torch_dtype = torch.float16 if amp_dtype == "float16" else torch.bfloat16
+    scaler = torch.amp.GradScaler(device="cuda", enabled=use_amp and amp_torch_dtype == torch.float16)
+
     start_iteration = checkpoint_manager.maybe_resume(
         ddp_model=ddp_model,
         optimizer=optimizer,
+        scaler=scaler,
         train_batcher=train_batcher,
         val_batcher=val_batcher,
         generator=torch_generator,
@@ -429,6 +436,7 @@ def train_transformer_ddp(local_rank, args, cfg_dc):
         batch_generator=torch_generator,
         logger=logger,
         train_loss_ema_decay=float(getattr(cfg, "train_loss_ema_decay", 0.0)),
+        scaler=scaler,
         activation_norms=activation_norms,
         log_activation_norms=bool(getattr(cfg, "log_activation_norms", False)),
         log_weight_norms=bool(getattr(cfg, "log_weight_norms", False)),

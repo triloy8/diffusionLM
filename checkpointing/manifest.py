@@ -186,6 +186,7 @@ class CheckpointCoordinator:
         *,
         model: torch.nn.Module,
         optimizer: torch.optim.Optimizer,
+        scaler: Optional[torch.amp.GradScaler] = None,
         metrics: Optional[Dict[str, Any]],
         all_gather: Optional[Any] = None,
     ) -> None:
@@ -196,6 +197,7 @@ class CheckpointCoordinator:
         model_path = version_dir / "model.safetensors"
         opt_path = version_dir / f"opt_shard_rank{self.rank:04d}.bin"
         rng_path = version_dir / f"rng_rank{self.rank:04d}.json"
+        scaler_path = version_dir / f"scaler_rank{self.rank:04d}.bin"
 
         if self.rank == 0:
             from safetensors.torch import save_file
@@ -206,6 +208,9 @@ class CheckpointCoordinator:
 
         torch.save(optimizer.state_dict(), opt_path)
         self._maybe_upload(opt_path)
+        if scaler is not None:
+            torch.save(scaler.state_dict(), scaler_path)
+            self._maybe_upload(scaler_path)
 
         rng_payload = self._save_rng_payload()
         save_json(rng_path, rng_payload)
@@ -213,6 +218,10 @@ class CheckpointCoordinator:
 
         optimizer_entry = file_info(opt_path, self.runs_root_parent)
         optimizer_entry["rank"] = self.rank
+        scaler_entry = None
+        if scaler is not None:
+            scaler_entry = file_info(scaler_path, self.runs_root_parent)
+            scaler_entry["rank"] = self.rank
         shard_info = {
             "rank": self.rank,
             "optimizer": optimizer_entry,
@@ -220,6 +229,7 @@ class CheckpointCoordinator:
                 "rank": self.rank,
                 "key": path_to_key(rng_path, self.runs_root_parent),
             },
+            "amp_scaler": scaler_entry,
             "exact": bool(rng_payload.get("exact", False)),
         }
 
@@ -236,6 +246,8 @@ class CheckpointCoordinator:
 
         optimizer_shards = [s["optimizer"] for s in all_shards]
         optimizer_shards.sort(key=lambda s: int(s.get("rank", 0)))
+        scaler_shards = [s.get("amp_scaler") for s in all_shards if s.get("amp_scaler") is not None]
+        scaler_shards.sort(key=lambda s: int(s.get("rank", 0)))
         rng_keys = [s["rng"] for s in all_shards]
         rng_keys.sort(key=lambda s: int(s.get("rank", 0)))
         exact_resume = all(bool(s.get("exact", False)) for s in all_shards)
@@ -253,6 +265,14 @@ class CheckpointCoordinator:
                 "sharding": "custom",
                 "shards": optimizer_shards,
             },
+            "amp_scaler": (
+                {
+                    "sharding": "custom",
+                    "shards": scaler_shards,
+                }
+                if scaler_shards
+                else None
+            ),
             "rng": {
                 "per_rank": True,
                 "keys": rng_keys,
@@ -441,6 +461,33 @@ def load_optimizer_shard(
             break
     if match is None:
         raise FileNotFoundError(f"optimizer shard for rank {rank} not found in manifest")
+    base = root_parent if root_parent is not None else run_dir.parent
+    shard_path = base / match["key"]
+    if root_parent is not None:
+        ensure_local(shard_path, root_parent, s3)
+    return torch.load(shard_path, map_location=map_location)
+
+
+def load_scaler_shard(
+    manifest: Dict[str, Any],
+    run_dir: Path,
+    rank: int,
+    map_location: Optional[str] = None,
+    *,
+    root_parent: Optional[Path] = None,
+    s3: Optional[S3Uploader] = None,
+) -> Optional[Dict[str, Any]]:
+    scaler_group = manifest.get("amp_scaler")
+    if not scaler_group:
+        return None
+    shards = scaler_group.get("shards", [])
+    match = None
+    for shard in shards:
+        if int(shard.get("rank", -1)) == int(rank):
+            match = shard
+            break
+    if match is None:
+        return None
     base = root_parent if root_parent is not None else run_dir.parent
     shard_path = base / match["key"]
     if root_parent is not None:
