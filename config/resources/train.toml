@@ -38,6 +38,7 @@ grad_accum_steps = 1
 train_loss_ema_decay = 0.99
 amp_enabled = true
 amp_dtype = "bfloat16"
+objective = "ar" # diffusion/ar
 
 [compile]
 enabled = false
@@ -87,7 +88,7 @@ temperature = 0.3
 top_p = 0.95
 cfg_scale = 0.0
 remasking = "low_confidence"
-generation_mode = "diffusion"
+generation_mode = "ar"
 logits_eos_inf = false
 confidence_eos_eot_inf = false
 seed = 3410

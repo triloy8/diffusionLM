@@ -7,8 +7,8 @@ from diffusionlm.training.optim import (
     build_optimizer_param_groups,
     resolve_optimizer_cls,
 )
-from diffusionlm.training.data import get_batch, DiffusionBatch
-from diffusionlm.training.loss import diffusion_cross_entropy
+from diffusionlm.training.data import get_batch, get_autoregressive_batch
+from diffusionlm.training.loss import diffusion_cross_entropy, autoregressive_cross_entropy
 from checkpointing import CheckpointManager
 from diffusionlm.training.schedule import lr_cosine_schedule
 from diffusionlm.inference.generate import autoregressive_generate, diffusion_generate
@@ -285,19 +285,38 @@ def train_transformer_ddp(local_rank, args, cfg_dc):
     mask_token_id = getattr(cfg, "mask_token_id", cfg.vocab_size - 1)
     noise_epsilon = getattr(cfg, "noise_epsilon", 1e-3)
     random_trunc_prob = getattr(cfg, "random_trunc_prob", 0.01)
+    training_objective = str(getattr(cfg, "training_objective", "diffusion")).lower()
+    if training_objective not in {"diffusion", "ar"}:
+        raise ValueError("training_objective must be one of: diffusion, ar")
 
     setattr(cfg, "mask_token_id", mask_token_id)
     setattr(cfg, "noise_epsilon", noise_epsilon)
     setattr(cfg, "random_trunc_prob", random_trunc_prob)
 
-    batch_getter = partial(
-        get_batch,
-        mask_token_id=mask_token_id,
-        noise_epsilon=noise_epsilon,
-        random_trunc_prob=random_trunc_prob,
-    )
+    if training_objective == "ar":
+        batch_getter = partial(
+            get_autoregressive_batch,
+            random_trunc_prob=random_trunc_prob,
+        )
+    else:
+        batch_getter = partial(
+            get_batch,
+            mask_token_id=mask_token_id,
+            noise_epsilon=noise_epsilon,
+            random_trunc_prob=random_trunc_prob,
+        )
 
     def _compute_loss(logits: torch.Tensor, batch) -> torch.Tensor:
+        if training_objective == "ar":
+            targets = getattr(batch, "targets", None)
+            if targets is None and isinstance(batch, dict):
+                targets = batch.get("targets")
+            if targets is None:
+                raise ValueError("Autoregressive batch must provide targets.")
+            loss_mask = getattr(batch, "loss_mask", None)
+            if loss_mask is None and isinstance(batch, dict):
+                loss_mask = batch.get("loss_mask")
+            return autoregressive_cross_entropy(logits, targets, loss_mask=loss_mask)
         return diffusion_cross_entropy(
             logits,
             batch.clean_targets,
@@ -305,6 +324,14 @@ def train_transformer_ddp(local_rank, args, cfg_dc):
             batch.p_mask,
             loss_mask=getattr(batch, "loss_mask", None),
         )
+
+    def _extract_inputs(batch) -> torch.Tensor:
+        inputs = getattr(batch, "inputs", None)
+        if inputs is None and isinstance(batch, dict):
+            inputs = batch.get("inputs")
+        if inputs is None:
+            raise ValueError("Autoregressive batch must provide inputs.")
+        return inputs
 
     def _sync():
         ddp_model.finish_gradient_synchronization()
@@ -435,6 +462,7 @@ def train_transformer_ddp(local_rank, args, cfg_dc):
         gradient_clipping=gradient_clipping,
         checkpoint_callback=checkpoint_callback,
         compute_loss=_compute_loss,
+        extract_model_inputs=_extract_inputs if training_objective == "ar" else None,
         batch_generator=torch_generator,
         logger=logger,
         train_loss_ema_decay=float(getattr(cfg, "train_loss_ema_decay", 0.0)),
@@ -498,6 +526,7 @@ def build_run_config(cfg, cfg_dc):
         "amp_dtype": str(getattr(cfg, "amp_dtype", "float16")),
         "val_log_every": int(getattr(cfg, "val_log_every", 0)),
         "val_log_samples": int(getattr(cfg, "val_log_samples", 0)),
+        "training_objective": str(getattr(cfg, "training_objective", "diffusion")),
     }
 
     seed_value = getattr(cfg, "rng_seed", getattr(cfg, "seed", None))

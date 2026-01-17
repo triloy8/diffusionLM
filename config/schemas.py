@@ -214,6 +214,7 @@ class TrainingConfig(_BaseConfig):
     train_loss_ema_decay: float = 0.0
     amp_enabled: bool = False
     amp_dtype: str = "float16"
+    objective: str = "diffusion"
 
     @model_validator(mode="after")
     def _validate_training(self):
@@ -229,6 +230,9 @@ class TrainingConfig(_BaseConfig):
         self.amp_dtype = self.amp_dtype.lower()
         if self.amp_dtype not in ALLOWED_AMP_DTYPES:
             raise ValueError(f"amp_dtype must be one of {sorted(ALLOWED_AMP_DTYPES)}")
+        self.objective = self.objective.lower()
+        if self.objective not in {"diffusion", "ar"}:
+            raise ValueError("objective must be one of: diffusion, ar")
         return self
 
 

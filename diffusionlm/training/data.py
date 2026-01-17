@@ -17,6 +17,15 @@ class DiffusionBatch:
     metadata: Dict[str, Any]
 
 
+@dataclass
+class AutoregressiveBatch:
+    inputs: torch.Tensor
+    targets: torch.Tensor
+    attention_mask: torch.Tensor | None
+    loss_mask: torch.Tensor | None
+    metadata: Dict[str, Any]
+
+
 def _rand_uniform(shape, *, device: torch.device, generator: torch.Generator | None = None):
     if generator is not None:
         return torch.rand(shape, generator=generator, device=device)
@@ -29,17 +38,16 @@ def _rand_int(high: int, *, device: torch.device, generator: torch.Generator | N
     return random.randint(1, high)
 
 
-def get_batch(
+def _draw_clean_targets(
     dataset,
     batch_size: int,
     context_length: int,
     device: str,
     *,
-    mask_token_id: int,
-    noise_epsilon: float = 1e-3,
     random_trunc_prob: float = 0.01,
+    min_length: int | None = None,
     generator: torch.Generator | None = None,
-) -> DiffusionBatch:
+) -> tuple[torch.Tensor, torch.Tensor | None, bool]:
     device_obj = torch.device(device)
     rng_device = generator.device if generator is not None and hasattr(generator, "device") else torch.device("cpu")
 
@@ -59,11 +67,38 @@ def get_batch(
         if bool((trunc_flag < random_trunc_prob).item()):
             max_len = clean_targets.shape[1]
             trunc_len = _rand_int(max_len, device=rng_device, generator=generator)
+            if min_length is not None and max_len >= min_length and trunc_len < min_length:
+                trunc_len = min_length
             clean_targets = clean_targets[:, :trunc_len]
             random_trunc_applied = True
 
     if attention_mask is not None and random_trunc_applied:
         attention_mask = attention_mask[:, : clean_targets.shape[1]]
+
+    return clean_targets, attention_mask, random_trunc_applied
+
+
+def get_batch(
+    dataset,
+    batch_size: int,
+    context_length: int,
+    device: str,
+    *,
+    mask_token_id: int,
+    noise_epsilon: float = 1e-3,
+    random_trunc_prob: float = 0.01,
+    generator: torch.Generator | None = None,
+) -> DiffusionBatch:
+    clean_targets, attention_mask, random_trunc_applied = _draw_clean_targets(
+        dataset,
+        batch_size,
+        context_length,
+        device,
+        random_trunc_prob=random_trunc_prob,
+        min_length=2,
+        generator=generator,
+    )
+    device_obj = clean_targets.device
 
     batch_size, seq_len = clean_targets.shape
 
@@ -97,4 +132,52 @@ def get_batch(
     )
 
 
-__all__ = ["DiffusionBatch", "get_batch"]
+def get_autoregressive_batch(
+    dataset,
+    batch_size: int,
+    context_length: int,
+    device: str,
+    *,
+    random_trunc_prob: float = 0.01,
+    generator: torch.Generator | None = None,
+) -> AutoregressiveBatch:
+    clean_targets, attention_mask, random_trunc_applied = _draw_clean_targets(
+        dataset,
+        batch_size,
+        context_length,
+        device,
+        random_trunc_prob=random_trunc_prob,
+        generator=generator,
+    )
+    if clean_targets.shape[1] < 2:
+        raise ValueError("context_length must be >= 2 for autoregressive training")
+
+    inputs = clean_targets[:, :-1]
+    targets = clean_targets[:, 1:]
+    loss_mask = attention_mask[:, 1:] if attention_mask is not None else None
+
+    seq_len = inputs.shape[1]
+    causal_mask = torch.ones((seq_len, seq_len), device=inputs.device, dtype=torch.bool).tril()
+    if attention_mask is not None:
+        key_mask = attention_mask[:, :-1]
+        query_mask = attention_mask[:, :-1]
+        causal_mask = causal_mask[None, :, :] & key_mask[:, None, :] & query_mask[:, :, None]
+    else:
+        causal_mask = causal_mask[None, :, :].expand(inputs.shape[0], -1, -1)
+
+    token_count = int(loss_mask.sum().item()) if loss_mask is not None else int(targets.numel())
+    metadata: Dict[str, Any] = {
+        "random_truncation_applied": random_trunc_applied,
+        "sequence_length": seq_len,
+        "token_count": token_count,
+    }
+
+    return AutoregressiveBatch(
+        inputs=inputs,
+        targets=targets,
+        attention_mask=causal_mask,
+        loss_mask=loss_mask,
+        metadata=metadata,
+    )
+
+__all__ = ["DiffusionBatch", "AutoregressiveBatch", "get_batch", "get_autoregressive_batch"]

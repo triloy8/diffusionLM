@@ -43,4 +43,20 @@ def diffusion_cross_entropy(
     return weighted.sum() / max(denom, 1)
 
 
-__all__ = ["cross_entropy", "diffusion_cross_entropy"]
+def autoregressive_cross_entropy(
+    logits: Tensor,
+    targets: Tensor,
+    *,
+    loss_mask: Tensor | None = None,
+) -> Tensor:
+    per_token = cross_entropy(logits, targets, reduction="none")
+    if loss_mask is not None:
+        loss_mask_f = loss_mask.to(per_token.dtype)
+        per_token = per_token * loss_mask_f
+        denom = loss_mask_f.sum().item()
+    else:
+        denom = targets.shape[0] * targets.shape[1]
+    return per_token.sum() / max(denom, 1)
+
+
+__all__ = ["cross_entropy", "diffusion_cross_entropy", "autoregressive_cross_entropy"]
