@@ -17,15 +17,17 @@ parameters:
   logging.dataset:
     value: TinyStories
   training.batch_size:
-    value: 48
+    value: 256
   training.max_train_iteration:
     value: 2000
   training.max_val_iteration:
     value: 10
   training.val_freq_iteration:
-    value: 100
+    value: 250
   training.grad_accum_steps:
     value: 1
+  training.objective:
+    value: ar
   checkpointing.ckpting_save_iter:
     value: 1000
   model.context_length:
@@ -34,6 +36,16 @@ parameters:
     value: 2048
   model.d_model:
     value: 512
+  model.num_layers:
+    value: 4
+  model.num_heads:
+    value: 16
+  model.rope_theta:
+    value: 10000.0
+  model.attention_backend:
+    value: torch_sdpa
+  model.attention_sdp_backend:
+    value: flash
   data.dataset_name:
     value: roneneldan/TinyStories
   data.dataset_config:
@@ -59,38 +71,34 @@ parameters:
   model.dtype:
     value: float32
   model.vocab_size:
-    value: 50258
-  model.mask_token_id:
-    value: 50257
+    value: 8000
   model.eot_token_id:
-    value: 50256
+    value: 7999
   model.noise_epsilon:
     value: 0.001
   model.random_trunc_prob:
-    value: 0.01
+    value: 0.0
   optimizer.optimizer_name:
     value: adamw
   optimizer.betas:
     value: [0.9, 0.95]
   optimizer.eps:
     value: 1e-8
+  optimizer.weight_decay:
+    value: 0.1
   optimizer.grad_clip_max_l2_norm:
     value: 1.0
-  model.num_heads:
-    value: 16
-  model.num_layers:
-    value: 8
-  model.rope_theta:
-    value: 10000.0
+  optimizer.lr_schedule:
+    value: constant
   optimizer.cosine_cycle_iters:
     value: 40000
   optimizer.initial_learning_rate:
     value: 0.0001
   optimizer.warmup_iters:
-    value: 500
-  optimizer.weight_decay:
-    value: 0.001
+    value: 0
+  optimizer.min_learning_rate:
+    value: 0.00025
   optimizer.max_learning_rate:
     distribution: log_uniform_values
-    min: 0.0003
+    min: 0.0001
     max: 0.003
