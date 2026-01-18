@@ -1,7 +1,7 @@
 [tokenizer]
-merges_path = "./data/merges_8k.txt"
-vocab_path = "./data/vocab_8k.json"
-special_tokens_path = "./data/special_tokens_8k.json"
+merges_path = "./data/merges_simplestories_8k.txt"
+vocab_path = "./data/vocab_simplestories_8k.json"
+special_tokens_path = "./data/special_tokens_simplestories_8k.json"
 
 [model]
 vocab_size = 8000

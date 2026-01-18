@@ -17,9 +17,9 @@ parameters:
   logging.dataset:
     value: TinyStories
   training.batch_size:
-    value: 256
+    value: 64
   training.max_train_iteration:
-    value: 600
+    value: 2000
   training.max_val_iteration:
     value: 10
   training.val_freq_iteration:
@@ -37,9 +37,9 @@ parameters:
   model.d_model:
     value: 512
   model.num_layers:
-    value: 4
+    value: 12
   model.num_heads:
-    value: 16
+    value: 8
   model.rope_theta:
     value: 10000.0
   model.attention_backend:
@@ -47,15 +47,15 @@ parameters:
   model.attention_sdp_backend:
     value: flash
   data.dataset_name:
-    value: roneneldan/TinyStories
+    value: SimpleStories/SimpleStories
   data.dataset_config:
     value: ""
   data.train_split:
     value: train
   data.val_split:
-    value: validation
+    value: test
   data.text_field:
-    value: text
+    value: story
   data.pipeline_mode:
     value: packed
   data.pad_token_id:
@@ -69,7 +69,7 @@ parameters:
   model.device:
     value: cuda
   model.dtype:
-    value: float32
+    value: bfloat16
   model.vocab_size:
     value: 8000
   model.eot_token_id:
@@ -89,9 +89,9 @@ parameters:
   optimizer.grad_clip_max_l2_norm:
     value: 1.0
   optimizer.lr_schedule:
-    value: constant
+    value: cosine
   optimizer.cosine_cycle_iters:
-    value: 40000
+    value: 60000
   optimizer.initial_learning_rate:
     value: 0.0001
   optimizer.warmup_iters:
