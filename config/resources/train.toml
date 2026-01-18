@@ -81,7 +81,7 @@ val_log_samples = 1
 
 [train_infer]
 infer_every = 1000
-prompts = ["Once upon a time,", "One day,"]
+prompts = ["Silently,", "Suddenly,"]
 steps = 256
 total_length = 512
 block_length = 128
