@@ -29,7 +29,7 @@ grad_clip_max_l2_norm = 1.0
 lr_schedule = "cosine" # constant/cosine
 
 [training]
-batch_size = 64
+batch_size = 128
 max_train_iteration = 60000
 max_val_iteration = 10
 val_freq_iteration = 250
@@ -59,7 +59,7 @@ text_field = "story"
 pipeline_mode = "packed" # rows/packed
 pad_token_id = 50256
 pad_random_shift = true
-shuffle_buffer_size = 0
+shuffle_buffer_size = 30000
 shuffle_seed = 3407
 
 [data.tokenizer]
