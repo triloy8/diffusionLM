@@ -1,52 +1,52 @@
 [tokenizer]
-merges_path = "./data/merges.txt"
-vocab_path = "./data/vocab.json"
-special_tokens_path = "./data/special_tokens.json"
+merges_path = "./data/merges_8k.txt"
+vocab_path = "./data/vocab_8k.json"
+special_tokens_path = "./data/special_tokens_8k.json"
 
 [model]
-vocab_size = 50259
+vocab_size = 8000
 context_length = 512
-d_model = 768
-num_layers = 8
+d_model = 512
+num_layers = 4
 num_heads = 16
-d_ff = 3072
+d_ff = 2048
 rope_theta = 10000.0
-attention_backend = "custom"
-attention_sdp_backend = "auto"
+attention_backend = "torch_sdpa"
+attention_sdp_backend = "flash"
 device = "cuda"
-dtype = "bfloat16"
-mask_token_id = 50258
+dtype = "float16"
+# mask_token_id = 50258
 noise_epsilon = 0.001
 random_trunc_prob = 0
 
 [checkpoint]
-ckpt_path = "./runs/2025-12-31_17-22-13/versions/v050000/model.safetensors"
+ckpt_path = "./runs/2026-01-18_09-39-02/versions/v007000/model.safetensors"
 
 [inference]
 prompt = "Once upon a time,"
 steps = 256
-total_length = 256
+total_length = 512
 block_length = 128
 temperature = 0.5
 top_p = 0.95
 mask_id = 50258
 seed = 3411
-eos_token_id = 50257
+eos_token_id = 7999
 cfg_scale = 0.0
 remasking = "low_confidence"
 logits_eos_inf = false
 confidence_eos_eot_inf = false
-generation_mode = "diffusion"
+generation_mode = "ar"
 
 [sweep]
-output_path = "./runs/2025-12-31_17-22-13/sweep_infer.jsonl"
-html_output_path = "./runs/2025-12-31_17-22-13/sweep_infer.html"
+output_path = "./runs/2026-01-18_09-39-02/sweep_infer_7k.jsonl"
+html_output_path = "./runs/2026-01-18_09-39-02/sweep_infer_7k.html"
 print_every = 1
 # limit = 12
 
 # Parameter grids, any omitted list falls back to [inference.*]
 # steps = [256, 512]
-temperatures = [1.0, 1.2, 1.4]
+temperatures = [0.2, 0.4, 0.6]
 # remasking = ["random", "low_confidence"]
 # top_ps = [0.85, 0.9, 0.95]
 seeds = [3407, 3408, 3409, 3410, 3411, 3412, 3413, 3414, 3415, 3416]

@@ -19,7 +19,7 @@ parameters:
   training.batch_size:
     value: 256
   training.max_train_iteration:
-    value: 2000
+    value: 600
   training.max_val_iteration:
     value: 10
   training.val_freq_iteration:
@@ -101,4 +101,4 @@ parameters:
   optimizer.max_learning_rate:
     distribution: log_uniform_values
     min: 0.0001
-    max: 0.003
+    max: 0.002
