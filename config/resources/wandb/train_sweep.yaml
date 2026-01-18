@@ -23,7 +23,7 @@ parameters:
   training.max_val_iteration:
     value: 10
   training.val_freq_iteration:
-    value: 250
+    value: 100
   training.grad_accum_steps:
     value: 1
   training.objective:
