@@ -20,7 +20,7 @@ noise_epsilon = 0.001
 random_trunc_prob = 0
 
 [checkpoint]
-ckpt_path = "./runs/2026-01-18_09-39-02/versions/v007000/model.safetensors"
+ckpt_path = "./runs/2026-01-18_09-39-02/versions/v010000/model.safetensors"
 
 [inference]
 prompt = "Once upon a time,"
@@ -39,8 +39,8 @@ confidence_eos_eot_inf = false
 generation_mode = "ar"
 
 [sweep]
-output_path = "./runs/2026-01-18_09-39-02/sweep_infer_7k.jsonl"
-html_output_path = "./runs/2026-01-18_09-39-02/sweep_infer_7k.html"
+output_path = "./runs/2026-01-18_09-39-02/sweep_infer_10k.jsonl"
+html_output_path = "./runs/2026-01-18_09-39-02/sweep_infer_10k.html"
 print_every = 1
 # limit = 12
 
