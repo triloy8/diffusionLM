@@ -39,6 +39,7 @@ def build_train_namespace(cfg_dc, config_path: str) -> argparse.Namespace:
         random_trunc_prob=cfg_dc.model.random_trunc_prob,
         log_activation_norms=bool(getattr(cfg_dc.logging, "log_activation_norms", False)) if cfg_dc.logging else False,
         log_weight_norms=bool(getattr(cfg_dc.logging, "log_weight_norms", False)) if cfg_dc.logging else False,
+        log_grad_norms=bool(getattr(cfg_dc.logging, "log_grad_norms", False)) if cfg_dc.logging else False,
         log_p_mask_bucket_loss=bool(getattr(cfg_dc.logging, "log_p_mask_bucket_loss", False))
         if cfg_dc.logging
         else False,

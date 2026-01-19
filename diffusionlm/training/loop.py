@@ -356,7 +356,7 @@ def train_loop(
                 l2_val = float(l2_norm.item())
                 if reduce_metric is not None:
                     l2_val = float(reduce_metric(l2_val))
-                logger.log({"phase": "train", "metrics.grad_l2_norm": l2_val}, step=train_iteration)
+                logger.log({"phase": "train", "metrics.grad/l2_norm": l2_val}, step=train_iteration)
             # Optional DDP gradient synchronization before optimizer step
             if sync_gradients is not None:
                 sync_gradients()
