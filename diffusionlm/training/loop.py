@@ -305,6 +305,21 @@ def train_loop(
                         },
                         step=train_iteration,
                     )
+                if "p_mask_stats" in batch_metadata:
+                    p_mask_stats = batch_metadata["p_mask_stats"]
+                    if isinstance(p_mask_stats, dict):
+                        logger.log(
+                            {
+                                "phase": "train",
+                                "metrics.p_mask/mean": float(p_mask_stats.get("mean", 0.0)),
+                                "metrics.p_mask/min": float(p_mask_stats.get("min", 0.0)),
+                                "metrics.p_mask/max": float(p_mask_stats.get("max", 0.0)),
+                                "metrics.p_mask/std": float(p_mask_stats.get("std", 0.0)),
+                                "metrics.inv_p_mask/mean": float(p_mask_stats.get("inv_mean", 0.0)),
+                                "metrics.inv_p_mask/max": float(p_mask_stats.get("inv_max", 0.0)),
+                            },
+                            step=train_iteration,
+                        )
                 if "random_truncation_applied" in batch_metadata:
                     logger.log(
                         {

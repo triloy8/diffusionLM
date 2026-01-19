@@ -119,6 +119,14 @@ def get_batch(
         "sequence_length": seq_len,
         "mask_ratio": float(mask.float().mean().detach().cpu().item()),
         "token_count": token_count,
+        "p_mask_stats": {
+            "mean": float(p_mask.mean().detach().cpu().item()),
+            "min": float(p_mask.min().detach().cpu().item()),
+            "max": float(p_mask.max().detach().cpu().item()),
+            "std": float(p_mask.std(unbiased=False).detach().cpu().item()),
+            "inv_mean": float((1.0 / p_mask).mean().detach().cpu().item()),
+            "inv_max": float((1.0 / p_mask).max().detach().cpu().item()),
+        },
     }
 
     return DiffusionBatch(
