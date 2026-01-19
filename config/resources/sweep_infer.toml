@@ -4,7 +4,7 @@ vocab_path = "./data/vocab_simplestories_8k.json"
 special_tokens_path = "./data/special_tokens_simplestories_8k.json"
 
 [model]
-vocab_size = 8000
+vocab_size = 8001
 context_length = 512
 d_model = 512
 num_layers = 4
@@ -15,7 +15,7 @@ attention_backend = "torch_sdpa"
 attention_sdp_backend = "flash"
 device = "cuda"
 dtype = "float16"
-# mask_token_id = 50258
+mask_token_id = 8000
 noise_epsilon = 0.001
 random_trunc_prob = 0
 
@@ -36,7 +36,7 @@ cfg_scale = 0.0
 remasking = "low_confidence"
 logits_eos_inf = false
 confidence_eos_eot_inf = false
-generation_mode = "ar"
+generation_mode = "diffusion"
 
 [sweep]
 output_path = "./runs/2026-01-18_09-39-02/sweep_infer_10k.jsonl"

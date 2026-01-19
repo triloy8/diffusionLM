@@ -1,5 +1,5 @@
 [model]
-vocab_size = 8000
+vocab_size = 8001
 context_length = 512
 d_model = 512
 num_layers = 12
@@ -10,7 +10,7 @@ attention_backend = "torch_sdpa"
 attention_sdp_backend = "flash"
 device = "cuda"
 dtype = "float32"
-# mask_token_id = 50257
+mask_token_id = 8000
 eot_token_id = 7999
 noise_epsilon = 0.001
 random_trunc_prob = 0.0 # 0.01
@@ -39,7 +39,7 @@ grad_accum_steps = 1
 train_loss_ema_decay = 0.99
 amp_enabled = true
 amp_dtype = "bfloat16"
-objective = "ar" # diffusion/ar
+objective = "diffusion" # diffusion/ar
 
 [compile]
 enabled = false
@@ -89,14 +89,14 @@ temperature = 0.2
 top_p = 0.95
 cfg_scale = 0.0
 remasking = "low_confidence"
-generation_mode = "ar"
+generation_mode = "diffusion"
 logits_eos_inf = false
 confidence_eos_eot_inf = false
 seed = 3410
 
 [wandb]
 entity = "yiltro8-org"
-project = "ar_lm_simplestories"
+project = "diffusion_lm_simplestories"
 
 [ddp]
 backend = "nccl"               # gloo/nccl
