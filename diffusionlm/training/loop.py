@@ -350,6 +350,7 @@ def train_loop(
             )
         accum_count += 1
         if accum_count >= accum_steps:
+            pre_clip_l2 = None
             if logger is not None and log_grad_norms:
                 grads = [p.grad for p in model.parameters() if p.grad is not None]
                 l2_norm = torch.norm(torch.stack([g.detach().norm(2) for g in grads]))
@@ -357,12 +358,36 @@ def train_loop(
                 if reduce_metric is not None:
                     l2_val = float(reduce_metric(l2_val))
                 logger.log({"phase": "train", "metrics.grad/l2_norm": l2_val}, step=train_iteration)
+                pre_clip_l2 = l2_norm
             # Optional DDP gradient synchronization before optimizer step
             if sync_gradients is not None:
                 sync_gradients()
             if scaler.is_enabled():
                 scaler.unscale_(optimizer)
             gradient_clipping(parameters=model.parameters(), max_l2_norm=grad_clip_max_l2_norm)
+            if logger is not None and log_grad_norms:
+                grads = [p.grad for p in model.parameters() if p.grad is not None]
+                if grads:
+                    post_l2_norm = torch.norm(torch.stack([g.detach().norm(2) for g in grads]))
+                    post_l2_val = float(post_l2_norm.item())
+                    if reduce_metric is not None:
+                        post_l2_val = float(reduce_metric(post_l2_val))
+                    clipped = 0.0
+                    clip_ratio = 1.0
+                    if pre_clip_l2 is not None:
+                        pre_val = float(pre_clip_l2.item())
+                        clipped = float(pre_val > grad_clip_max_l2_norm)
+                        if pre_val > 0.0:
+                            clip_ratio = post_l2_val / pre_val
+                    logger.log(
+                        {
+                            "phase": "train",
+                            "metrics.grad/l2_norm_post_clip": post_l2_val,
+                            "metrics.grad/clipped": clipped,
+                            "metrics.grad/clip_ratio": float(clip_ratio),
+                        },
+                        step=train_iteration,
+                    )
             if scaler.is_enabled():
                 scaler.step(optimizer)
                 scaler.update()
