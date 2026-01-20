@@ -12,7 +12,7 @@ device = "cuda"
 dtype = "float32"
 mask_token_id = 8000
 eot_token_id = 7999
-noise_epsilon = 0.05
+noise_epsilon = 0.001
 random_trunc_prob = 0.0 # 0.01
 
 [optimizer]
