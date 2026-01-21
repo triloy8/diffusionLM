@@ -95,7 +95,6 @@ def toy_training_bundle(device) -> TrainingBundle:
         best_metric_name="val_loss",
         best_mode="min",
         run_id="test_run",
-        remote=None,
     )
 
     tokenizer_cfg = TokenizerConfig(

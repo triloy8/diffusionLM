@@ -204,8 +204,10 @@ def test_train_tokenizer_loader(tmp_path: Path):
 def test_optimizer_initial_lr_defaults_to_max(tmp_path: Path):
     vocab = tmp_path / "vocab.json"
     merges = tmp_path / "merges.txt"
+    special_tokens = tmp_path / "special_tokens.json"
     vocab.write_text("{}")
     merges.write_text("")
+    special_tokens.write_text("{}")
     cfg_path = tmp_path / "train_defaults.toml"
     write(cfg_path, f"""
     [model]
@@ -247,6 +249,7 @@ def test_optimizer_initial_lr_defaults_to_max(tmp_path: Path):
     [data.tokenizer]
     vocab_path = "{vocab.as_posix()}"
     merges_path = "{merges.as_posix()}"
+    special_tokens_path = "{special_tokens.as_posix()}"
     """)
     cfg = load_train_config(cfg_path)
     assert cfg.optimizer.initial_learning_rate == pytest.approx(cfg.optimizer.max_learning_rate)
