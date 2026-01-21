@@ -2,20 +2,20 @@
 
 ## What Is This?
 
-This project started life as a from‑scratch diffusion language model inspired by the LLaDA guidelines and has since grown into a mini deployable stack. The earlier `transformerLM` prototype evolved into a bidirectional core, and the repository now bundles the supporting pieces (tokenizer, streaming data pipeline, CLI, benchmarks, logging, orchestration scripts) needed to train and serve diffusion LMs end to end.
+This repo started as a from‑scratch diffusion language model inspired by the LLaDA guidelines and has since evolved into two pieces:
+- `diffusionlm`: the model, tokenizer, and inference utilities.
+- `trainkit`: a generic training stack (loop, DDP, checkpointing, logging, streaming).
+
+See `trainkit/README.md` for training‑specific details.
 
 ## Overview
 
 - From‑scratch model: decoder‑only Transformer LM (RMSNorm, SwiGLU, RoPE, SDPA/MHA), implemented directly with PyTorch modules.
-- From‑scratch training: AdamW optimizer, cosine LR schedule, gradient clipping, checkpointing.
 - From‑scratch tokenizer: byte‑level BPE training and IO, producing `vocab.json` and `merges.txt`.
 - Diffusion inference: bidirectional decoding with configurable mask scheduling (steps, block length, temperature).
-- Streaming data: Hugging Face `datasets` streaming pipeline with on‑the‑fly tokenization (legacy memmap builder retained for archival conversions).
-- CLI + TOML configs: consistent, simple entry points.
-- Logging: console JSON or Weights & Biases.
-- Distributed training (DDP): minimal wrapper with async gradient buckets, optimizer state sharding, rank-zero logging, and aggregated metrics.
-- Benchmarking: tokenizer and inference throughput checks plus optional perplexity summaries.
-- Profiling: small helpers for memory and runtime inspection.
+- Training stack lives in `trainkit` (see `trainkit/README.md`).
+- CLI + TOML configs: consistent entry points built around config schemas.
+- Benchmarking + profiling: tokenizer/inference throughput checks and memory/runtime inspection.
 
 ## Installation
 
@@ -45,13 +45,7 @@ uv run diffusionlm-train --config config/resources/train.toml
 ```
 
 Notes:
-- CPU uses `gloo`; CUDA uses `nccl`. Set `[model].device` and `[ddp].backend` accordingly.
-- Prefer `[logging].backend = "console"` for local runs.
-- Optimizer state sharding is enabled by default in the training entry point to reduce per-rank optimizer memory.
-- Choose the optimizer via `[optimizer].optimizer_name` (`"adamw"` default, `"muon"` experimental) while keeping the rest of the `[optimizer]` schedule knobs unchanged.
-- When using Muon, configure per-group hyperparameters under `[optimizer.muon.*]` (hidden, head, embed, scalar) so each param group carries its own learning-rate range and optimizer settings; AdamW ignores those subtables.
-- To fully skip validation (e.g., when no separate split exists), set `[training].skip_validation = true`; otherwise the loop will run `max_val_iteration` batches every `val_freq_iteration` steps.
-- Gradient accumulation is controlled by `[training].grad_accum_steps`, `max_train_iteration` is still counted in micro-steps (each accumulation step), so scale it by `grad_accum_steps` if you want to keep the same number of optimizer steps.
+- See `trainkit/README.md` for training/runtime behavior (DDP backend, logging, optimizer options, validation, accumulation).
 
 - Generate text:
 
@@ -79,11 +73,6 @@ Training now streams data directly from Hugging Face Datasets. To prepare your e
 5. **Row boundaries**: each streamed row is tokenized, appended with `eot_token_id`, and packed into fixed-length `context_length` blocks with rollover (no padding).
 6. **Pipeline mode**: set `[data].pipeline_mode = "packed"` (default) to concatenate rows, or `"rows"` to keep each row as its own sequence with padding. Row mode requires `[data].pad_token_id` and applies an attention mask so padded tokens are ignored.
 
-### Legacy memmap pipeline
-
-
-This is no longer needed for training but remains available if you must export datasets in the historical format.
-
 ## Remote Orchestration
 
 The `Justfile` plus helper scripts under `scripts/` provide a thin remote control plane focused on Prime Intellect hosts; set `PRIME_HOST`/`REMOTE_ROOT` to point at the target machine and path. All available recipes:
@@ -106,16 +95,6 @@ The `Justfile` plus helper scripts under `scripts/` provide a thin remote contro
     (Attention is unmasked/bidirectional by default.)
   - Notes: dtype helpers under `diffusionlm/utils/dtypes.py`.
 
-- trainkit
-  - Purpose: Training infrastructure (loop, optimizer, schedule, checkpointing, DDP, logging, streaming batch construction).
-  - Key files: `trainkit/trainer.py`, `trainkit/training/loop.py`, `trainkit/training/optim.py`, `trainkit/training/schedule.py`, `trainkit/checkpointing/manager.py`.
-  - Notes: Wired by `cli/train.py` with a diffusionlm objective adapter.
-
-- trainkit.objectives
-  - Purpose: Diffusion/AR batching and losses.
-  - Key files: `trainkit/objectives/data.py`, `trainkit/objectives/loss.py`, `trainkit/objectives/diffusion.py`.
-  - Notes: `[model]` config includes `mask_token_id`, `noise_epsilon`, and `random_trunc_prob` for diffusion-aware batching.
-
 - diffusionlm.inference
   - Purpose: Sampling utilities and simple generation helpers.
   - Key files: `diffusionlm/inference/generate.py`, `diffusionlm/inference/sampling.py`, `diffusionlm/inference/predictor.py`.
@@ -131,14 +110,6 @@ The `Justfile` plus helper scripts under `scripts/` provide a thin remote contro
   - Purpose: Command‑line entry points wrapping configs and orchestration.
   - Key files: `cli/train.py`, `cli/infer.py`, `cli/train_tokenizer.py`, `cli/utils.py`.
   - Scripts: exposed in `pyproject.toml` under `[project.scripts]`.
-
-- trainkit.logger
-  - Purpose: Pluggable logging backends (console JSON and Weights & Biases).
-  - Key files: `trainkit/logger/base.py`, `trainkit/logger/console_logger.py`, `trainkit/logger/wandb_logger.py`, `trainkit/logger/noop.py`, `trainkit/logger/rank_zero.py`.
-
-- trainkit.ddp
-  - Purpose: Minimal DDP wrapper, optimizer state sharding, and helpers (process group setup/cleanup, broadcast, all-reduce, metric reduction).
-  - Key files: `trainkit/ddp/ddp.py`, `trainkit/ddp/optimizer_state_sharding.py`, `trainkit/ddp/utils.py`.
 
 - benchmarking
   - Purpose: Quick throughput checks for inference and tokenizer.
@@ -183,40 +154,9 @@ The `Justfile` plus helper scripts under `scripts/` provide a thin remote contro
 
 ## Logging
 
-- Backends:
-  - `console` (default): prints structured JSON lines with metrics like `metrics.loss`, `metrics.lr`, `metrics.grad_l2_norm`, plus optional activation/weight norms.
-  - `wandb`: logs to Weights & Biases and uploads artifacts (checkpoints, tokenizer files, optional inference outputs).
-- Configure in `config/resources/train.toml` under `[logging]`:
-
-```toml
-[logging]
-backend = "console"   # or "wandb"
-run_name = ""         # optional; defaults to timestamp
-architecture = "TransformerLM"
-dataset = "TinyStoriesV2-GPT4"
-
-# Optional if using Wandb
-[wandb]
-entity = "your-entity"
-project = "your-project"
-```
-
-- Training logs can optionally include activation/weight norms via `[logging]`:
-  - Keys: `log_activation_norms`, `log_weight_norms`.
-
-- Inference logs include sampling params and truncated text:
-  - Keys: `params.temperature`, `params.p`, `params.eos_token_id`, `text.prompt`, `text.output`, `metrics.latency_ms`.
-- Training logs now include per-parameter-group learning rates (in addition to `metrics.lr`):
-  - Keys: `metrics.lr/head`, `metrics.lr/embed`, `metrics.lr/scalar`, `metrics.lr/hidden`.
-- Tip (console backend): Pipe to `jq` for readability:
-  - `uv run diffusionlm-train --config config/resources/train.toml | jq -r "."`
-
-### DDP Policy
-- Rank-zero logging: only rank 0 constructs a real logger and emits logs; other ranks are no-ops via `RankZeroLogger`.
-- Aggregated metrics: scalar train/val metrics are all-reduced (mean) across ranks before logging.
-- Synchronized run name: rank 0 generates the `run_name` and broadcasts it so all ranks agree on the checkpoint directory.
-- Checkpoints: only rank 0 writes checkpoints and logs artifacts.
-- Optimizer sharding: `OptimizerStateSharding` keeps optimizer state on the owning rank and re-broadcasts parameters after each step.
+Training logging details live in `trainkit/README.md`. Inference logs include sampling params
+and truncated text (keys: `params.temperature`, `params.p`, `params.eos_token_id`,
+`text.prompt`, `text.output`, `metrics.latency_ms`).
 
 ## Profiling
 
