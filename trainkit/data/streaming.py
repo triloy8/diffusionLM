@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Iterable, Iterator, Optional
+from typing import Iterable, Iterator, Optional, Protocol
 import time
 import random
 
@@ -8,8 +8,12 @@ from datasets import load_dataset
 from datasets.utils import logging as hf_logging
 import torch
 
-from diffusionlm.tokenizer.tokenizer import Tokenizer
-from logger import Logger
+from trainkit.logger import Logger
+
+
+class TokenizerLike(Protocol):
+    def encode(self, text: str) -> list[int]:
+        ...
 
 
 class HFTokenIteratorFactory:
@@ -22,7 +26,7 @@ class HFTokenIteratorFactory:
         dataset_config: Optional[str],
         split: str,
         text_field: str,
-        tokenizer: Tokenizer,
+        tokenizer: TokenizerLike,
         context_length: int,
         eot_token_id: int,
         shuffle_buffer_size: int = 0,

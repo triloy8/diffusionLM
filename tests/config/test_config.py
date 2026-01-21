@@ -10,12 +10,10 @@ from pydantic import ValidationError
 from config import (
     load_train_config,
     load_infer_config,
-    load_make_data_config,
     load_train_tokenizer_config,
     asdict_pretty,
     TrainConfig,
     InferConfig,
-    MakeDataConfig,
     TrainTokenizerConfig,
     BenchInferConfig,
     BenchTokenizerConfig,
@@ -179,32 +177,11 @@ def test_infer_config_happy_and_errors(tmp_path: Path):
     assert any(err["loc"] == ("model", "unknown") for err in exc.value.errors())
 
 
-def test_make_data_and_train_tokenizer_loaders(tmp_path: Path):
+def test_train_tokenizer_loader(tmp_path: Path):
     merges = tmp_path / "merges.txt"
     vocab = tmp_path / "vocab.json"
     merges.write_text("")
     vocab.write_text("{}")
-
-    # make-data
-    input_txt = tmp_path / "input.txt"
-    input_txt.write_text("hello")
-    out_bin = tmp_path / "out.bin"
-    make_cfg = tmp_path / "make.toml"
-    write(make_cfg, f"""
-    [input]
-    input_filename = "{input_txt.as_posix()}"
-    total_tokens = 10
-
-    [output]
-    output_filename = "{out_bin.as_posix()}"
-
-    [tokenizer]
-    merges_path = "{merges.as_posix()}"
-    vocab_path = "{vocab.as_posix()}"
-    special_tokens_path = "{special_tokens.as_posix()}"
-    """)
-    cfg_mk = load_make_data_config(make_cfg)
-    assert cfg_mk.input.input_filename.exists()
 
     # train-tokenizer
     corpus = tmp_path / "corpus.txt"
@@ -308,12 +285,6 @@ def _patch_bench_infer(cfg: dict, tmp_path: Path) -> dict:
     return _patch_infer_like(cfg, tmp_path)
 
 
-def _patch_make_data(cfg: dict, tmp_path: Path) -> dict:
-    cfg["input"]["input_filename"] = _write_text(tmp_path / "input.txt", "hello")
-    _patch_tokenizer(cfg["tokenizer"], tmp_path)
-    return cfg
-
-
 def _patch_train_tokenizer(cfg: dict, tmp_path: Path) -> dict:
     cfg["input"]["input_path"] = _write_text(tmp_path / "corpus.txt", "hello")
     return cfg
@@ -329,7 +300,6 @@ RESOURCE_CASES = [
     ("infer.toml", InferConfig, _patch_infer_like),
     ("bench_infer.toml", BenchInferConfig, _patch_bench_infer),
     ("bench_tokenizer.toml", BenchTokenizerConfig, _patch_bench_tokenizer),
-    ("make_data.toml", MakeDataConfig, _patch_make_data),
     ("train_tokenizer.toml", TrainTokenizerConfig, _patch_train_tokenizer),
 ]
 

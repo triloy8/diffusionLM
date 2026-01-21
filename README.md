@@ -81,11 +81,6 @@ Training now streams data directly from Hugging Face Datasets. To prepare your e
 
 ### Legacy memmap pipeline
 
-The old `.dat` memmap builder still lives under `databuilder/` for archival conversions:
-
-```bash
-uv run diffusionlm-make-data --config config/resources/make_data.toml
-```
 
 This is no longer needed for training but remains available if you must export datasets in the historical format.
 
@@ -111,10 +106,15 @@ The `Justfile` plus helper scripts under `scripts/` provide a thin remote contro
     (Attention is unmasked/bidirectional by default.)
   - Notes: dtype helpers under `diffusionlm/utils/dtypes.py`.
 
-- diffusionlm.training
-  - Purpose: Training loop, loss, optimizer, schedule, checkpointing, and streaming batch construction.
-  - Key files: `diffusionlm/training/trainer.py`, `diffusionlm/training/loop.py`, `diffusionlm/training/optim.py`, `diffusionlm/training/schedule.py`, `diffusionlm/training/data.py`.
-  - Notes: `[model]` config now includes `mask_token_id`, `noise_epsilon`, and `random_trunc_prob` for diffusion-aware batching.
+- trainkit
+  - Purpose: Training infrastructure (loop, optimizer, schedule, checkpointing, DDP, logging, streaming batch construction).
+  - Key files: `trainkit/trainer.py`, `trainkit/training/loop.py`, `trainkit/training/optim.py`, `trainkit/training/schedule.py`, `trainkit/checkpointing/manager.py`.
+  - Notes: Wired by `cli/train.py` with a diffusionlm objective adapter.
+
+- trainkit.objectives
+  - Purpose: Diffusion/AR batching and losses.
+  - Key files: `trainkit/objectives/data.py`, `trainkit/objectives/loss.py`, `trainkit/objectives/diffusion.py`.
+  - Notes: `[model]` config includes `mask_token_id`, `noise_epsilon`, and `random_trunc_prob` for diffusion-aware batching.
 
 - diffusionlm.inference
   - Purpose: Sampling utilities and simple generation helpers.
@@ -126,23 +126,19 @@ The `Justfile` plus helper scripts under `scripts/` provide a thin remote contro
   - Key files: `diffusionlm/tokenizer/bpe_trainer.py`, `diffusionlm/tokenizer/tokenizer.py`, `diffusionlm/tokenizer/pretokenize.py`, `diffusionlm/tokenizer/io.py`.
   - Artifacts: `vocab.json`, `merges.txt` (with optional special tokens).
 
-- databuilder
-  - Purpose: Legacy dataset helpers for writing `.dat` memmaps (kept for archival conversions).
-  - Key files: `databuilder/dataset_builder.py`.
-  - Usage: driven via `diffusionlm-make-data` and `config/resources/make_data.toml`.
 
 - cli
   - Purpose: Command‑line entry points wrapping configs and orchestration.
-  - Key files: `cli/train.py`, `cli/infer.py`, `cli/make_data.py`, `cli/train_tokenizer.py`, `cli/utils.py`.
+  - Key files: `cli/train.py`, `cli/infer.py`, `cli/train_tokenizer.py`, `cli/utils.py`.
   - Scripts: exposed in `pyproject.toml` under `[project.scripts]`.
 
-- logger
+- trainkit.logger
   - Purpose: Pluggable logging backends (console JSON and Weights & Biases).
-  - Key files: `logger/base.py`, `logger/console_logger.py`, `logger/wandb_logger.py`, `logger/noop.py`, `logger/rank_zero.py`.
+  - Key files: `trainkit/logger/base.py`, `trainkit/logger/console_logger.py`, `trainkit/logger/wandb_logger.py`, `trainkit/logger/noop.py`, `trainkit/logger/rank_zero.py`.
 
-- ddp
+- trainkit.ddp
   - Purpose: Minimal DDP wrapper, optimizer state sharding, and helpers (process group setup/cleanup, broadcast, all-reduce, metric reduction).
-  - Key files: `ddp/ddp.py`, `ddp/optimizer_state_sharding.py`, `ddp/utils.py`.
+  - Key files: `trainkit/ddp/ddp.py`, `trainkit/ddp/optimizer_state_sharding.py`, `trainkit/ddp/utils.py`.
 
 - benchmarking
   - Purpose: Quick throughput checks for inference and tokenizer.

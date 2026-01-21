@@ -4,15 +4,13 @@ import torch
 import pytest
 
 from diffusionlm.models import TransformerLM
-from diffusionlm.training import (
-    cross_entropy,
-    AdamW,
-    lr_cosine_schedule,
-    gradient_clipping,
-    get_batch,
-)
-from diffusionlm.training.streaming import StreamingBatcher
-from checkpointing import (
+from trainkit.objectives.loss import cross_entropy
+from trainkit.objectives.data import get_batch
+from trainkit.training.optim import AdamW
+from trainkit.training.schedule import lr_cosine_schedule
+from trainkit.training.grad import gradient_clipping
+from trainkit.data.streaming import StreamingBatcher
+from trainkit.checkpointing import (
     CheckpointCoordinator,
     load_manifest,
     load_model_from_manifest,

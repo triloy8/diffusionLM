@@ -1,40 +1,26 @@
-from diffusionlm.models import (
-    TransformerLM,
-    Linear,
-)
-from diffusionlm.models.attention import set_sdp_backend
-from diffusionlm.training.optim import (
-    build_optimizer_param_groups,
-    resolve_optimizer_cls,
-)
-from diffusionlm.training.data import get_batch, get_autoregressive_batch
-from diffusionlm.training.loss import diffusion_cross_entropy, autoregressive_cross_entropy
-from checkpointing import CheckpointManager
-from diffusionlm.training.schedule import lr_cosine_schedule, lr_constant_schedule
-from diffusionlm.inference.generate import autoregressive_generate, diffusion_generate
-from diffusionlm.training.grad import gradient_clipping
-from diffusionlm.training.loop import train_loop
-from diffusionlm.training.streaming import HFTokenIteratorFactory, StreamingBatcher, RowBatcher
+from __future__ import annotations
 
 from datetime import datetime
 from pathlib import Path
+from typing import Callable, Optional
 import numpy as np
 import os
 import random
 import time
 import torch
 from contextlib import nullcontext
-# import torch.distributed as dist
-from functools import partial
-# from datasets import load_dataset
 
-from diffusionlm.utils.dtypes import DTYPES
 from config import asdict_pretty
-from logger import Logger
-from logger import ConsoleLogger, WandbLogger, RankZeroLogger
-from ddp import DDP, OptimizerStateSharding
-from ddp.utils import broadcast_string, setup_process_group, cleanup_process_group, allreduce_mean
-from diffusionlm.tokenizer.tokenizer import Tokenizer
+from trainkit.checkpointing import CheckpointManager
+from trainkit.data import HFTokenIteratorFactory, StreamingBatcher, RowBatcher, TokenizerLike
+from trainkit.ddp import DDP, OptimizerStateSharding
+from trainkit.ddp.utils import broadcast_string, setup_process_group, cleanup_process_group, allreduce_mean
+from trainkit.logger import Logger, ConsoleLogger, WandbLogger, RankZeroLogger
+from trainkit.objectives import Objective
+from trainkit.training.grad import gradient_clipping
+from trainkit.training.loop import train_loop
+from trainkit.training.optim import build_optimizer_param_groups, resolve_optimizer_cls
+from trainkit.training.schedule import lr_cosine_schedule, lr_constant_schedule
 
 
 def _seed_everything(seed: int, device: str | torch.device, *, rank: int = 0) -> torch.Generator:
@@ -92,7 +78,15 @@ def _prepare_optimizer_setup(cfg, model):
     return optimizer_cls, param_groups, kwargs
 
 
-def train_transformer_ddp(local_rank, args, cfg_dc):
+def train_ddp(
+    local_rank: int,
+    args,
+    cfg_dc,
+    model_builder: Callable[[object], torch.nn.Module],
+    tokenizer_builder: Callable[[object], TokenizerLike],
+    objective_builder: Callable[[object, TokenizerLike], Objective],
+    activation_module_filter: Optional[Callable[[torch.nn.Module], bool]] = None,
+) -> None:
     cfg = args
 
     num_nodes = int(getattr(cfg, "num_nodes", 1))
@@ -141,19 +135,7 @@ def train_transformer_ddp(local_rank, args, cfg_dc):
     checkpoint_manager.prepare_run(torch_generator)
     ckpting_save_folder = checkpoint_manager.run_dir
 
-    set_sdp_backend(getattr(cfg, "attention_sdp_backend", "auto"))
-    model = TransformerLM(
-        vocab_size=cfg.vocab_size,
-        context_length=cfg.context_length,
-        d_model=cfg.d_model,
-        num_layers=cfg.num_layers,
-        num_heads=cfg.num_heads,
-        d_ff=cfg.d_ff,
-        rope_theta=cfg.rope_theta,
-        attention_backend=cfg.attention_backend,
-        device=cfg.device,
-        dtype=DTYPES[cfg.dtype],
-    )
+    model = model_builder(cfg)
 
     if bool(getattr(cfg, "compile_enabled", False)):
         if not hasattr(torch, "compile"):
@@ -178,11 +160,8 @@ def train_transformer_ddp(local_rank, args, cfg_dc):
         **optimizer_kwargs,
     )
 
-    tokenizer = Tokenizer.from_files(
-        str(args.tokenizer_vocab_path),
-        str(args.tokenizer_merges_path),
-        str(args.tokenizer_special_tokens_path),
-    )
+    tokenizer = tokenizer_builder(args)
+    objective = objective_builder(cfg, tokenizer)
     shuffle_seed = getattr(args, "shuffle_seed", None)
     if shuffle_seed is None:
         shuffle_seed = getattr(args, "rng_seed", getattr(cfg, "seed", None))
@@ -253,18 +232,18 @@ def train_transformer_ddp(local_rank, args, cfg_dc):
         val_batcher=val_batcher,
     )
 
-    # activation norm utils
     activation_norms = {}
 
-    def get_activation_norm_hook(name):
-        def hook(module, input, output):
-            activation_norms[name] = output.norm().item()
+    if activation_module_filter is not None:
+        def get_activation_norm_hook(name):
+            def hook(module, input, output):
+                activation_norms[name] = output.norm().item()
 
-        return hook
+            return hook
 
-    for name, module in model.named_modules():
-        if isinstance(module, Linear):
-            module.register_forward_hook(get_activation_norm_hook(name))
+        for name, module in model.named_modules():
+            if activation_module_filter(module):
+                module.register_forward_hook(get_activation_norm_hook(name))
 
     amp_enabled = bool(getattr(cfg, "amp_enabled", False))
     amp_dtype = str(getattr(cfg, "amp_dtype", "float16")).lower()
@@ -281,59 +260,6 @@ def train_transformer_ddp(local_rank, args, cfg_dc):
         generator=torch_generator,
         device=str(cfg.device),
     )
-
-    mask_token_id = getattr(cfg, "mask_token_id", None)
-    if mask_token_id is None:
-        mask_token_id = cfg.vocab_size - 1
-    noise_epsilon = getattr(cfg, "noise_epsilon", 1e-3)
-    random_trunc_prob = getattr(cfg, "random_trunc_prob", 0.01)
-    training_objective = str(getattr(cfg, "training_objective", "diffusion")).lower()
-    if training_objective not in {"diffusion", "ar"}:
-        raise ValueError("training_objective must be one of: diffusion, ar")
-
-    setattr(cfg, "mask_token_id", mask_token_id)
-    setattr(cfg, "noise_epsilon", noise_epsilon)
-    setattr(cfg, "random_trunc_prob", random_trunc_prob)
-
-    if training_objective == "ar":
-        batch_getter = partial(
-            get_autoregressive_batch,
-            random_trunc_prob=random_trunc_prob,
-        )
-    else:
-        batch_getter = partial(
-            get_batch,
-            mask_token_id=mask_token_id,
-            noise_epsilon=noise_epsilon,
-            random_trunc_prob=random_trunc_prob,
-        )
-
-    def _compute_loss(logits: torch.Tensor, batch) -> torch.Tensor:
-        if training_objective == "ar":
-            targets = getattr(batch, "targets", None)
-            if targets is None and isinstance(batch, dict):
-                targets = batch.get("targets")
-            if targets is None:
-                raise ValueError("Autoregressive batch must provide targets.")
-            loss_mask = getattr(batch, "loss_mask", None)
-            if loss_mask is None and isinstance(batch, dict):
-                loss_mask = batch.get("loss_mask")
-            return autoregressive_cross_entropy(logits, targets, loss_mask=loss_mask)
-        return diffusion_cross_entropy(
-            logits,
-            batch.clean_targets,
-            batch.mask,
-            batch.p_mask,
-            loss_mask=getattr(batch, "loss_mask", None),
-        )
-
-    def _extract_inputs(batch) -> torch.Tensor:
-        inputs = getattr(batch, "inputs", None)
-        if inputs is None and isinstance(batch, dict):
-            inputs = batch.get("inputs")
-        if inputs is None:
-            raise ValueError("Autoregressive batch must provide inputs.")
-        return inputs
 
     def _sync():
         ddp_model.finish_gradient_synchronization()
@@ -357,7 +283,6 @@ def train_transformer_ddp(local_rank, args, cfg_dc):
             return
         if train_iteration % infer_every != 0:
             return
-
         was_training = model.training
         model.eval()
         rows = []
@@ -379,7 +304,10 @@ def train_transformer_ddp(local_rank, args, cfg_dc):
         autocast_ctx = torch.autocast("cuda", dtype=amp_torch_dtype) if use_amp else nullcontext()
         with torch.no_grad(), autocast_ctx:
             for idx, prompt in enumerate(prompts):
-                prompt_ids = tokenizer.encode(prompt)
+                try:
+                    prompt_ids = objective.encode(prompt)
+                except NotImplementedError:
+                    return
                 prompt_len = len(prompt_ids)
                 if infer_total_length < prompt_len:
                     rows.append({"prompt": prompt, "output": "", "latency_ms": 0.0, "error": "prompt_too_long"})
@@ -392,19 +320,8 @@ def train_transformer_ddp(local_rank, args, cfg_dc):
                     generator.manual_seed(int(base_seed) + int(train_iteration) + int(idx))
                 t0 = time.perf_counter()
                 if gen_length > 0:
-                    if generation_mode == "ar":
-                        out_indices = autoregressive_generate(
-                            model,
-                            in_indices,
-                            gen_length=int(gen_length),
-                            temperature=float(temperature),
-                            top_p=(None if top_p is None else float(top_p)),
-                            eos_token_id=(None if eos_token_id is None else int(eos_token_id)),
-                            logits_eos_inf=bool(logits_eos_inf),
-                            generator=generator,
-                        )
-                    elif generation_mode == "diffusion":
-                        out_indices = diffusion_generate(
+                    try:
+                        out_indices = objective.generate(
                             model,
                             in_indices,
                             mask_id=int(mask_id),
@@ -419,13 +336,17 @@ def train_transformer_ddp(local_rank, args, cfg_dc):
                             logits_eos_inf=bool(logits_eos_inf),
                             confidence_eos_eot_inf=bool(confidence_eos_eot_inf),
                             generator=generator,
+                            generation_mode=generation_mode,
                         )
-                    else:
-                        raise ValueError(f"Unsupported generation_mode: {generation_mode}")
+                    except NotImplementedError:
+                        return
                 else:
                     out_indices = in_indices
                 elapsed_ms = float((time.perf_counter() - t0) * 1000.0)
-                output = tokenizer.decode(out_indices[0].tolist())
+                try:
+                    output = objective.decode(out_indices[0].tolist())
+                except NotImplementedError:
+                    return
                 rows.append(
                     {
                         "prompt": prompt,
@@ -439,6 +360,13 @@ def train_transformer_ddp(local_rank, args, cfg_dc):
             model.train()
 
     lr_schedule = lr_constant_schedule if getattr(cfg, "lr_schedule", "cosine") == "constant" else lr_cosine_schedule
+
+    val_sample_decode = None
+    try:
+        objective.decode([])
+        val_sample_decode = objective.decode
+    except NotImplementedError:
+        val_sample_decode = None
 
     train_loop(
         ddp_model,
@@ -461,12 +389,9 @@ def train_transformer_ddp(local_rank, args, cfg_dc):
         grad_clip_max_l2_norm=cfg.grad_clip_max_l2_norm,
         ckpting_save_iter=cfg.ckpting_save_iter,
         ckpting_save_folder=ckpting_save_folder,
-        get_batch=batch_getter,
         lr_cosine_schedule=lr_schedule,
         gradient_clipping=gradient_clipping,
-        checkpoint_callback=checkpoint_callback,
-        compute_loss=_compute_loss,
-        extract_model_inputs=_extract_inputs if training_objective == "ar" else None,
+        objective=objective,
         batch_generator=torch_generator,
         logger=logger,
         train_loss_ema_decay=float(getattr(cfg, "train_loss_ema_decay", 0.0)),
@@ -475,11 +400,10 @@ def train_transformer_ddp(local_rank, args, cfg_dc):
         log_activation_norms=bool(getattr(cfg, "log_activation_norms", False)),
         log_weight_norms=bool(getattr(cfg, "log_weight_norms", False)),
         log_p_mask_bucket_loss=bool(getattr(cfg, "log_p_mask_bucket_loss", False)),
-        p_mask_bucket_edges=getattr(cfg, "p_mask_bucket_edges", None),
         log_grad_norms=bool(getattr(cfg, "log_grad_norms", False)),
         val_log_every=val_log_every,
         val_log_samples=val_log_samples,
-        val_sample_decode=tokenizer.decode,
+        val_sample_decode=val_sample_decode,
         sync_gradients=_sync,
         reduce_metric=allreduce_mean,
         is_rank_zero=is_rank_zero,
@@ -529,8 +453,6 @@ def build_run_config(cfg, cfg_dc):
         "grad_accum_steps": int(getattr(cfg, "grad_accum_steps", 1)),
         "amp_enabled": bool(getattr(cfg, "amp_enabled", False)),
         "amp_dtype": str(getattr(cfg, "amp_dtype", "float16")),
-        "val_log_every": int(getattr(cfg, "val_log_every", 0)),
-        "val_log_samples": int(getattr(cfg, "val_log_samples", 0)),
         "training_objective": str(getattr(cfg, "training_objective", "diffusion")),
     }
 

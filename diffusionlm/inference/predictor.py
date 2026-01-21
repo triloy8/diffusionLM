@@ -7,9 +7,9 @@ from safetensors.torch import load_file
 from diffusionlm.tokenizer.tokenizer import Tokenizer
 from diffusionlm.models import TransformerLM
 from diffusionlm.models.attention import set_sdp_backend
-from diffusionlm.inference.generate import autoregressive_generate, diffusion_generate
+from trainkit.inference.generate import autoregressive_generate, diffusion_generate
 from diffusionlm.utils.dtypes import DTYPES
-from logger import Logger
+from trainkit.logger import Logger
 
 
 def infer_transformer(args, *, logger: Optional[Logger] = None, artifact_path: Optional[str] = None):

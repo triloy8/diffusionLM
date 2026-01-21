@@ -3,7 +3,7 @@ from __future__ import annotations
 import math
 
 import torch
-from diffusionlm.inference.sampling import add_gumbel_noise, compute_transfer_schedule, softmax, top_p_filter
+from trainkit.inference.sampling import add_gumbel_noise, compute_transfer_schedule, softmax, top_p_filter
 
 
 @torch.no_grad()

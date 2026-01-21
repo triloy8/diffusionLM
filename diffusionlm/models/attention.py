@@ -4,7 +4,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 from diffusionlm.models.layers import Linear
-from diffusionlm.inference.sampling import softmax
+from trainkit.inference.sampling import softmax
 
 ALLOWED_ATTENTION_BACKENDS = {"custom", "torch_sdpa"}
 ALLOWED_SDP_BACKENDS = {"auto", "flash", "mem_efficient", "math"}

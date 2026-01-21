@@ -4,7 +4,9 @@ from pathlib import Path
 import torch.multiprocessing as mp
 
 from config import load_train_config
-from diffusionlm.training.trainer import train_transformer_ddp
+from diffusionlm.builders import build_model, build_tokenizer, build_activation_filter
+from trainkit.objectives import build_objective
+from trainkit.trainer import train_ddp
 from cli.utils import add_config_args, load_config_or_print
 
 
@@ -116,7 +118,19 @@ def main():
     ns = build_train_namespace(cfg_dc, str(args_cfg.config))
 
     nprocs = max(1, int(cfg_dc.ddp.num_gpus_per_node))
-    mp.spawn(train_transformer_ddp, args=(ns, cfg_dc), nprocs=nprocs, join=True)
+    mp.spawn(
+        train_ddp,
+        args=(
+            ns,
+            cfg_dc,
+            build_model,
+            build_tokenizer,
+            build_objective,
+            build_activation_filter(),
+        ),
+        nprocs=nprocs,
+        join=True,
+    )
 
 
 if __name__ == "__main__":

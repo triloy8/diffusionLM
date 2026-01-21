@@ -1,13 +1,10 @@
-import os
 from pathlib import Path
 import torch
 from contextlib import nullcontext
-from torch._utils import _flatten_dense_tensors, _unflatten_dense_tensors
 import numpy as np
 from typing import Optional, Callable
-from logger import Logger
-from diffusionlm.training.data import DiffusionBatch
-from diffusionlm.training.loss import cross_entropy
+from trainkit.logger import Logger
+from trainkit.objectives import Objective
 
 
 def train_loop(
@@ -39,15 +36,12 @@ def train_loop(
     ckpting_save_iter: int,
     ckpting_save_folder: Path | str | None,
     # helpers
-    get_batch,
     lr_cosine_schedule,
     gradient_clipping,
-    compute_loss,
+    objective: Objective,
     checkpoint_callback: Optional[
         Callable[[int, torch.nn.Module, torch.optim.Optimizer, Optional[dict], Optional[torch.amp.GradScaler]], None]
     ] = None,
-    prepare_batch: Optional[Callable[[object], object]] = None,
-    extract_model_inputs: Optional[Callable[[object], torch.Tensor]] = None,
     batch_generator: torch.Generator | None = None,
     # logging
     logger: Optional[Logger] = None,
@@ -59,7 +53,6 @@ def train_loop(
     log_weight_norms: bool = False,
     log_grad_norms: bool = False,
     log_p_mask_bucket_loss: bool = False,
-    p_mask_bucket_edges: list[float] | None = None,
     val_log_every: int = 0,
     val_log_samples: int = 0,
     val_sample_decode: Optional[Callable[[list[int]], str]] = None,
@@ -72,89 +65,14 @@ def train_loop(
     start_iteration: int = 0,
     skip_validation: bool = False,
 ):
-    """A minimal training loop extracted into a reusable function.
-
-    `compute_loss` consumes model logits and the prepared batch object.
-    """
-    if compute_loss is None:
-        raise ValueError("compute_loss must be provided.")
-
-    prepare = prepare_batch or (lambda batch: batch)
-
-    def _inputs(batch_obj: object) -> torch.Tensor:
-        if extract_model_inputs is not None:
-            return extract_model_inputs(batch_obj)
-        if hasattr(batch_obj, "noisy_inputs"):
-            return getattr(batch_obj, "noisy_inputs")
-        if isinstance(batch_obj, dict) and "noisy_inputs" in batch_obj:
-            return batch_obj["noisy_inputs"]
-        raise ValueError("Prepared batch must expose `noisy_inputs` for model input.")
+    """A minimal training loop extracted into a reusable function."""
+    if objective is None:
+        raise ValueError("objective adapter must be provided.")
 
     def _attention_mask(batch_obj: object) -> Optional[torch.Tensor]:
-        if hasattr(batch_obj, "attention_mask"):
-            return getattr(batch_obj, "attention_mask")
-        if isinstance(batch_obj, dict) and "attention_mask" in batch_obj:
-            return batch_obj["attention_mask"]
-        return None
-
-    def _resolve_p_mask_edges(edges: list[float] | None) -> list[float]:
-        if edges is None:
-            return [i / 10.0 for i in range(11)]
-        cleaned = sorted({float(e) for e in edges})
-        if len(cleaned) < 2:
-            return [0.0, 1.0]
-        return cleaned
-
-    def _p_mask_bucket_payload(logits: torch.Tensor, batch_obj: object) -> Optional[dict]:
-        if not hasattr(batch_obj, "p_mask") or not hasattr(batch_obj, "mask") or not hasattr(batch_obj, "clean_targets"):
+        if objective.attention_mask is None:
             return None
-        p_mask = getattr(batch_obj, "p_mask", None)
-        mask = getattr(batch_obj, "mask", None)
-        targets = getattr(batch_obj, "clean_targets", None)
-        if p_mask is None or mask is None or targets is None:
-            return None
-        loss_mask = getattr(batch_obj, "loss_mask", None)
-        edges = _resolve_p_mask_edges(p_mask_bucket_edges)
-        if len(edges) < 2:
-            return None
-        with torch.no_grad():
-            per_token = cross_entropy(logits, targets, reduction="none")
-            mask_f = mask.to(per_token.dtype)
-            if loss_mask is not None:
-                loss_mask_f = loss_mask.to(per_token.dtype)
-                mask_f = mask_f * loss_mask_f
-            else:
-                loss_mask_f = None
-            weighted = (per_token * mask_f) / p_mask
-            if loss_mask_f is not None:
-                denom = loss_mask_f.sum(dim=1)
-            else:
-                denom = torch.full(
-                    (targets.shape[0],),
-                    targets.shape[1],
-                    device=per_token.device,
-                    dtype=per_token.dtype,
-                )
-            per_example_loss = weighted.sum(dim=1) / denom.clamp_min(1)
-            p_mask_vals = p_mask.view(-1)
-            if len(edges) > 2:
-                boundaries = torch.tensor(edges[1:-1], device=p_mask_vals.device, dtype=p_mask_vals.dtype)
-                bucket_ids = torch.bucketize(p_mask_vals, boundaries)
-            else:
-                bucket_ids = torch.zeros_like(p_mask_vals, dtype=torch.long)
-            payload = {}
-            for i in range(len(edges) - 1):
-                in_bucket = bucket_ids == i
-                count = int(in_bucket.sum().item())
-                if count == 0:
-                    continue
-                mean_val = float(per_example_loss[in_bucket].mean().item())
-                if reduce_metric is not None:
-                    mean_val = float(reduce_metric(mean_val))
-                label = f"{edges[i]:.2f}-{edges[i + 1]:.2f}"
-                payload[f"metrics.p_mask_bucket_loss/{label}"] = mean_val
-                payload[f"metrics.p_mask_bucket_count/{label}"] = count
-            return payload if payload else None
+        return objective.attention_mask(batch_obj)
 
     train_iteration = start_iteration
     tokens_seen = 0
@@ -170,33 +88,9 @@ def train_loop(
     val_pass_count = 0
     last_val_metrics: Optional[dict] = None
 
-    def _format_sample_tokens(tokens: list[int]) -> object:
-        if val_sample_decode is None:
-            return tokens
-        return val_sample_decode(tokens)
-
-    def _extract_sample_payload(val_inputs, val_logits, val_batch, max_samples: int) -> Optional[dict]:
-        if max_samples <= 0:
-            return None
-        count = min(int(max_samples), int(val_inputs.shape[0]))
-        if count <= 0:
-            return None
-        targets = getattr(val_batch, "clean_targets", None)
-        if targets is None and isinstance(val_batch, dict):
-            targets = val_batch.get("clean_targets")
-        if targets is None:
-            return None
-        inputs_list = val_inputs[:count].detach().cpu().tolist()
-        preds_list = val_logits[:count].argmax(dim=-1).detach().cpu().tolist()
-        targets_list = targets[:count].detach().cpu().tolist()
-        return {
-            "inputs": inputs_list,
-            "predictions": preds_list,
-            "targets": targets_list,
-        }
     while True:
         model.train()
-        raw_train_batch = get_batch(
+        raw_train_batch = objective.get_batch(
             dataset=train_data,
             batch_size=batch_size,
             context_length=context_length,
@@ -204,8 +98,8 @@ def train_loop(
             generator=batch_generator,
         )
 
-        train_batch = prepare(raw_train_batch)
-        train_inputs = _inputs(train_batch)
+        train_batch = raw_train_batch
+        train_inputs = objective.model_inputs(train_batch)
         train_attn_mask = _attention_mask(train_batch)
 
         # schedule (set LR for this iteration before forward/step)
@@ -241,7 +135,7 @@ def train_loop(
                 train_logits = model(train_inputs, attention_mask=train_attn_mask)
             else:
                 train_logits = model(train_inputs)
-            train_loss = compute_loss(train_logits, train_batch)
+            train_loss = objective.compute_loss(train_logits, train_batch)
         scaled_loss = train_loss / accum_steps
         if logger is not None and device.startswith("cuda") and torch.cuda.is_available():
             logger.log(
@@ -330,10 +224,10 @@ def train_loop(
                         },
                         step=train_iteration,
                     )
-            if log_p_mask_bucket_loss:
-                bucket_payload = _p_mask_bucket_payload(train_logits, train_batch)
-                if bucket_payload:
-                    logger.log({"phase": "train", **bucket_payload}, step=train_iteration)
+            if log_p_mask_bucket_loss and objective.extra_metrics is not None:
+                extra_payload = objective.extra_metrics(train_logits, train_batch, reduce_metric)
+                if extra_payload:
+                    logger.log({"phase": "train", **extra_payload}, step=train_iteration)
 
         # activation norms (if hooks populate activation_norms)
         if logger is not None and log_activation_norms and activation_norms is not None and len(activation_norms) > 0:
@@ -455,26 +349,26 @@ def train_loop(
             sample_payload = None
             while True:
                 with torch.no_grad():
-                    raw_val_batch = get_batch(
+                    raw_val_batch = objective.get_batch(
                         dataset=val_data,
                         batch_size=batch_size,
                         context_length=context_length,
                         device=device,
                         generator=batch_generator,
                     )
-                    val_batch = prepare(raw_val_batch)
-                    val_inputs = _inputs(val_batch)
+                    val_batch = raw_val_batch
+                    val_inputs = objective.model_inputs(val_batch)
                     val_attn_mask = _attention_mask(val_batch)
                     with autocast_ctx:
                         if val_attn_mask is not None:
                             val_logits = model(val_inputs, attention_mask=val_attn_mask)
                         else:
                             val_logits = model(val_inputs)
-                        val_loss = compute_loss(val_logits, val_batch)
+                        val_loss = objective.compute_loss(val_logits, val_batch)
                     running_val_loss += float(val_loss.item())
                     val_tokens += int(val_inputs.numel())
                     if log_samples_now and sample_payload is None:
-                        sample_payload = _extract_sample_payload(
+                        sample_payload = objective.val_samples(
                             val_inputs,
                             val_logits,
                             val_batch,
@@ -499,16 +393,18 @@ def train_loop(
             last_val_metrics = {"val_loss": vloss_val}
             if log_samples_now and sample_payload is not None and logger is not None:
                 rows = []
-                for inputs, preds, targets in zip(
-                    sample_payload["inputs"],
-                    sample_payload["predictions"],
-                    sample_payload["targets"],
-                ):
+                for row in sample_payload:
                     rows.append(
                         {
-                            "noisy_input": _format_sample_tokens(list(inputs)),
-                            "prediction": _format_sample_tokens(list(preds)),
-                            "target": _format_sample_tokens(list(targets)),
+                            "noisy_input": row["inputs"]
+                            if val_sample_decode is None
+                            else val_sample_decode(row["inputs"]),
+                            "prediction": row["predictions"]
+                            if val_sample_decode is None
+                            else val_sample_decode(row["predictions"]),
+                            "target": row["targets"]
+                            if val_sample_decode is None
+                            else val_sample_decode(row["targets"]),
                         }
                     )
                 logger.log_table("val/samples", rows, step=train_iteration)

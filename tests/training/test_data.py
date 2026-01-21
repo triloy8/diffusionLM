@@ -1,7 +1,7 @@
 import numpy as np
 import torch
 
-from diffusionlm.training.data import get_batch
+from trainkit.objectives.data import get_batch
 
 
 class DummyBatcher:

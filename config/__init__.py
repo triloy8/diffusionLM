@@ -21,9 +21,6 @@ from .schemas import (
     SweepConfig,
     InferConfig,
     SweepInferConfig,
-    MakeDataInputConfig,
-    MakeDataOutputConfig,
-    MakeDataConfig,
     TrainTokenizerInputConfig,
     TrainTokenizerOutputConfig,
     TrainTokenizerConfig,
@@ -35,7 +32,7 @@ from .schemas import (
     BenchTokenizerConfig,
 )
 from .io import asdict_pretty
-from .train import load_train_config, load_make_data_config, load_train_tokenizer_config
+from .train import load_train_config, load_train_tokenizer_config
 from .infer import load_infer_config
 from .sweep_infer import load_sweep_infer_config
 from .bench_infer import load_bench_infer_config
@@ -63,9 +60,6 @@ __all__ = [
     "SweepConfig",
     "InferConfig",
     "SweepInferConfig",
-    "MakeDataInputConfig",
-    "MakeDataOutputConfig",
-    "MakeDataConfig",
     "TrainTokenizerInputConfig",
     "TrainTokenizerOutputConfig",
     "TrainTokenizerConfig",
@@ -77,7 +71,6 @@ __all__ = [
     "BenchTokenizerConfig",
     # Loaders
     "load_train_config",
-    "load_make_data_config",
     "load_train_tokenizer_config",
     "load_infer_config",
     "load_sweep_infer_config",

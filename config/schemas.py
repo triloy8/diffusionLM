@@ -576,29 +576,6 @@ class SweepInferConfig(_BaseConfig):
         return self
 
 
-class MakeDataInputConfig(_BaseConfig):
-    input_filename: Path
-    total_tokens: int
-
-    @model_validator(mode="after")
-    def _validate_make_input(self):
-        if not self.input_filename.exists():
-            raise FileNotFoundError(f"input_filename not found: {self.input_filename}")
-        if self.total_tokens <= 0:
-            raise ValueError("total_tokens must be > 0")
-        return self
-
-
-class MakeDataOutputConfig(_BaseConfig):
-    output_filename: Path
-
-
-class MakeDataConfig(_BaseConfig):
-    input: MakeDataInputConfig
-    output: MakeDataOutputConfig
-    tokenizer: TokenizerConfig
-
-
 class TrainTokenizerInputConfig(_BaseConfig):
     input_path: Path
     vocab_size: int

@@ -3,7 +3,6 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Tuple
-from functools import partial
 import tempfile
 
 import numpy as np
@@ -11,23 +10,24 @@ import random
 import torch
 import torch.distributed as dist
 
-from diffusionlm.training.loop import train_loop
-from diffusionlm.training.data import get_batch, DiffusionBatch
-from diffusionlm.training.grad import gradient_clipping
-from diffusionlm.training.loss import diffusion_cross_entropy
-from diffusionlm.training.schedule import lr_cosine_schedule
-from diffusionlm.training.optim import AdamW
-from checkpointing import (
+from trainkit.objectives import Objective
+from trainkit.training.loop import train_loop
+from trainkit.objectives.data import get_batch, DiffusionBatch
+from trainkit.training.grad import gradient_clipping
+from trainkit.objectives.loss import diffusion_cross_entropy
+from trainkit.training.schedule import lr_cosine_schedule
+from trainkit.training.optim import AdamW
+from trainkit.checkpointing import (
     CheckpointCoordinator,
     load_manifest,
     load_model_from_manifest,
     load_optimizer_shard,
     load_rng_state,
 )
-from checkpointing.state import restore_rng_state
+from trainkit.checkpointing.state import restore_rng_state
 
-from ddp import DDP, OptimizerStateSharding
-from ddp.utils import setup_process_group, cleanup_process_group, allreduce_mean
+from trainkit.ddp import DDP, OptimizerStateSharding
+from trainkit.ddp.utils import setup_process_group, cleanup_process_group, allreduce_mean
 
 from tests.fixtures import TrainingBundle
 
@@ -207,17 +207,32 @@ def _run_loop(
     noise_epsilon = getattr(training_cfg, "noise_epsilon", 1e-3)
     random_trunc_prob = getattr(training_cfg, "random_trunc_prob", 0.01)
 
-    batch_getter = partial(
-        get_batch,
-        mask_token_id=mask_token_id,
-        noise_epsilon=noise_epsilon,
-        random_trunc_prob=random_trunc_prob,
-    )
+    class _DiffusionObjective(Objective):
+        def __init__(self) -> None:
+            super().__init__("diffusion")
 
-    def _compute_loss(logits: torch.Tensor, batch) -> torch.Tensor:
-        if isinstance(batch, DiffusionBatch):
+        def get_batch(self, *, dataset, batch_size, context_length, device, generator=None):
+            return get_batch(
+                dataset=dataset,
+                batch_size=batch_size,
+                context_length=context_length,
+                device=device,
+                mask_token_id=mask_token_id,
+                noise_epsilon=noise_epsilon,
+                random_trunc_prob=random_trunc_prob,
+                generator=generator,
+            )
+
+        def model_inputs(self, batch: DiffusionBatch) -> torch.Tensor:
+            return batch.noisy_inputs
+
+        def attention_mask(self, batch: DiffusionBatch):
+            return batch.attention_mask
+
+        def compute_loss(self, logits: torch.Tensor, batch: DiffusionBatch) -> torch.Tensor:
             return diffusion_cross_entropy(logits, batch.clean_targets, batch.mask, batch.p_mask)
-        raise ValueError("Expected DiffusionBatch in training runner.")
+
+    objective = _DiffusionObjective()
 
     train_loop(
         module,
@@ -237,10 +252,9 @@ def _run_loop(
         grad_clip_max_l2_norm=optimizer_cfg.grad_clip_max_l2_norm,
         ckpting_save_iter=bundle.train_config.checkpointing.ckpting_save_iter,
         ckpting_save_folder=None,
-        get_batch=batch_getter,
         lr_cosine_schedule=lr_cosine_schedule,
         gradient_clipping=gradient_clipping,
-        compute_loss=_compute_loss,
+        objective=objective,
         batch_generator=generator,
         logger=None,
         activation_norms=None,

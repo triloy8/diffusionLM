@@ -1,6 +1,6 @@
 import torch
 
-from diffusionlm.training.streaming import HFTokenIteratorFactory, StreamingBatcher
+from trainkit.data.streaming import HFTokenIteratorFactory, StreamingBatcher
 
 
 class DummyTokenizer:

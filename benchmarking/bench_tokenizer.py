@@ -7,7 +7,7 @@ from typing import List, Tuple
 from cli.utils import add_config_args, load_config_or_print
 from config import load_bench_tokenizer_config
 from diffusionlm.tokenizer import PythonTokenizer, RustTokenizer
-from logger import ConsoleLogger
+from trainkit.logger import ConsoleLogger
 
 from .common import measure, mean
 

@@ -1,7 +1,7 @@
 import torch
 
-from diffusionlm.inference.generate import diffusion_generate
-from diffusionlm.inference.sampling import compute_transfer_schedule, add_gumbel_noise
+from trainkit.inference.generate import diffusion_generate
+from trainkit.inference.sampling import compute_transfer_schedule, add_gumbel_noise
 
 
 class DummyModel(torch.nn.Module):

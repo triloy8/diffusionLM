@@ -1,6 +1,6 @@
 import torch
 
-from diffusionlm.training.loss import cross_entropy, diffusion_cross_entropy
+from trainkit.objectives.loss import cross_entropy, diffusion_cross_entropy
 
 
 def test_diffusion_cross_entropy_matches_weighted_average():

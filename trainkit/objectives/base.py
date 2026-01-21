@@ -1,0 +1,68 @@
+from __future__ import annotations
+
+from abc import ABC, abstractmethod
+from typing import Any, Callable, Optional
+
+import torch
+
+
+class Objective(ABC):
+    """Objective interface for trainkit."""
+
+    name: str
+
+    def __init__(self, name: str) -> None:
+        self.name = name
+
+    @abstractmethod
+    def get_batch(
+        self,
+        *,
+        dataset: Any,
+        batch_size: int,
+        context_length: int,
+        device: str,
+        generator: torch.Generator | None = None,
+    ) -> Any:
+        ...
+
+    @abstractmethod
+    def model_inputs(self, batch: Any) -> torch.Tensor:
+        ...
+
+    @abstractmethod
+    def attention_mask(self, batch: Any) -> Optional[torch.Tensor]:
+        ...
+
+    @abstractmethod
+    def compute_loss(self, logits: torch.Tensor, batch: Any) -> torch.Tensor:
+        ...
+
+    def extra_metrics(
+        self,
+        logits: torch.Tensor,
+        batch: Any,
+        reduce_metric: Optional[Callable[[float], float]],
+    ) -> Optional[dict]:
+        return None
+
+    def val_samples(
+        self,
+        inputs: torch.Tensor,
+        logits: torch.Tensor,
+        batch: Any,
+        max_samples: int,
+    ) -> Optional[list[dict]]:
+        return None
+
+    def encode(self, text: str) -> list[int]:
+        raise NotImplementedError
+
+    def decode(self, tokens: list[int]) -> str:
+        raise NotImplementedError
+
+    def generate(self, model, prompt_indices: torch.Tensor, **kwargs) -> torch.Tensor:
+        raise NotImplementedError
+
+
+__all__ = ["Objective"]
