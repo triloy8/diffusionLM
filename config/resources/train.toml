@@ -21,8 +21,8 @@ betas = [0.9, 0.95] # adamw
 eps = 1e-8 # adamw
 weight_decay = 0.1 # adamw
 initial_learning_rate = 1e-4 # adamw, unused in cosine scheduler
-max_learning_rate = 0.00076 # adamw, used by const schedule
-min_learning_rate = 0.000076 # adamw
+max_learning_rate = 0.00094 # adamw, used by const schedule
+min_learning_rate = 0.0094 # adamw
 warmup_iters = 600
 cosine_cycle_iters = 60000
 grad_clip_max_l2_norm = 3.0
@@ -30,7 +30,7 @@ lr_schedule = "cosine" # constant/cosine
 
 [training]
 batch_size = 128
-max_train_iteration = 60000
+max_train_iteration = 1000
 max_val_iteration = 10
 val_freq_iteration = 250
 seed = 3407
