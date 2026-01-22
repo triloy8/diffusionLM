@@ -1,5 +1,5 @@
 program: cli/sweep_train.py
-project: diffusion_adamw_lr_simplesstories_2
+project: diffusion_adamw_lr_simplesstories_3
 command:
   - ${env}
   - uv
@@ -101,4 +101,4 @@ parameters:
   optimizer.max_learning_rate:
     distribution: log_uniform_values
     min: 0.0001
-    max: 0.0015
+    max: 0.001
