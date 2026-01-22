@@ -25,12 +25,12 @@ max_learning_rate = 0.0094 # adamw, used by const schedule
 min_learning_rate = 0.00094 # adamw
 warmup_iters = 600
 cosine_cycle_iters = 60000
-grad_clip_max_l2_norm = 3.0
+grad_clip_max_l2_norm = 1.0
 lr_schedule = "cosine" # constant/cosine
 
 [training]
 batch_size = 128
-max_train_iteration = 1000
+max_train_iteration = 60000
 max_val_iteration = 10
 val_freq_iteration = 250
 seed = 3407
