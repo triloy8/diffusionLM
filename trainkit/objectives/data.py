@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 import torch
 import random
 
@@ -87,6 +87,8 @@ def get_batch(
     mask_token_id: int,
     noise_epsilon: float = 1e-3,
     random_trunc_prob: float = 0.01,
+    p_mask_override: Optional[float] = None,
+    deterministic_mask: bool = False,
     generator: torch.Generator | None = None,
 ) -> DiffusionBatch:
     clean_targets, attention_mask, random_trunc_applied = _draw_clean_targets(
@@ -102,10 +104,19 @@ def get_batch(
 
     batch_size, seq_len = clean_targets.shape
 
-    t = _rand_uniform((batch_size,), device=device_obj, generator=generator)
-    p_mask = (1.0 - noise_epsilon) * t[:, None] + noise_epsilon
-    mask_rand = _rand_uniform((batch_size, seq_len), device=device_obj, generator=generator)
-    mask = mask_rand < p_mask
+    if p_mask_override is not None:
+        p_mask = torch.full((batch_size, 1), float(p_mask_override), device=device_obj)
+    else:
+        t = _rand_uniform((batch_size,), device=device_obj, generator=generator)
+        p_mask = (1.0 - noise_epsilon) * t[:, None] + noise_epsilon
+
+    if deterministic_mask:
+        mask_len = (p_mask.view(-1) * seq_len).floor().to(torch.long)
+        positions = torch.arange(seq_len, device=device_obj)
+        mask = positions[None, :] < mask_len[:, None]
+    else:
+        mask_rand = _rand_uniform((batch_size, seq_len), device=device_obj, generator=generator)
+        mask = mask_rand < p_mask
     if attention_mask is not None:
         mask = mask & attention_mask
 

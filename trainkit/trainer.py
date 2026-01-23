@@ -374,6 +374,10 @@ def train_ddp(
     except NotImplementedError:
         val_sample_decode = None
 
+    repeat_masking_seed = getattr(cfg, "repeat_masking_seed", None)
+    if repeat_masking_seed is not None:
+        repeat_masking_seed = int(repeat_masking_seed) + global_rank
+
     train_loop(
         ddp_model,
         optimizer,
@@ -399,6 +403,7 @@ def train_ddp(
         gradient_clipping=gradient_clipping,
         objective=objective,
         batch_generator=torch_generator,
+        repeat_masking_seed=repeat_masking_seed,
         logger=logger,
         train_loss_ema_decay=float(getattr(cfg, "train_loss_ema_decay", 0.0)),
         scaler=scaler,

@@ -16,6 +16,8 @@ class DiffusionObjective(Objective):
         self.mask_token_id = int(getattr(cfg, "mask_token_id", cfg.vocab_size - 1))
         self.noise_epsilon = float(getattr(cfg, "noise_epsilon", 1e-3))
         self.random_trunc_prob = float(getattr(cfg, "random_trunc_prob", 0.01))
+        self.p_mask_override = getattr(cfg, "p_mask_override", None)
+        self.deterministic_mask = bool(getattr(cfg, "deterministic_mask", False))
         self.p_mask_bucket_edges = getattr(cfg, "p_mask_bucket_edges", None)
 
     def get_batch(self, *, dataset, batch_size: int, context_length: int, device: str, generator=None):
@@ -27,6 +29,8 @@ class DiffusionObjective(Objective):
             mask_token_id=self.mask_token_id,
             noise_epsilon=self.noise_epsilon,
             random_trunc_prob=self.random_trunc_prob,
+            p_mask_override=self.p_mask_override,
+            deterministic_mask=self.deterministic_mask,
             generator=generator,
         )
 

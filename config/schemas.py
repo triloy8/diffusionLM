@@ -212,12 +212,15 @@ class TrainingConfig(_BaseConfig):
     max_val_iteration: int
     val_freq_iteration: int
     seed: Optional[int] = None
+    repeat_masking_seed: Optional[int] = None
     skip_validation: bool = False
     grad_accum_steps: int = 1
     train_loss_ema_decay: float = 0.0
     amp_enabled: bool = False
     amp_dtype: str = "float16"
     objective: str = "diffusion"
+    p_mask_override: Optional[float] = None
+    deterministic_mask: bool = False
 
     @model_validator(mode="after")
     def _validate_training(self):
@@ -228,6 +231,8 @@ class TrainingConfig(_BaseConfig):
             raise ValueError("grad_accum_steps must be > 0")
         if self.seed is not None and self.seed < 0:
             raise ValueError("seed must be >= 0 when provided")
+        if self.repeat_masking_seed is not None and self.repeat_masking_seed < 0:
+            raise ValueError("repeat_masking_seed must be >= 0 when provided")
         if self.train_loss_ema_decay < 0 or self.train_loss_ema_decay >= 1:
             raise ValueError("train_loss_ema_decay must be in [0, 1)")
         self.amp_dtype = self.amp_dtype.lower()
@@ -236,6 +241,8 @@ class TrainingConfig(_BaseConfig):
         self.objective = self.objective.lower()
         if self.objective not in {"diffusion", "ar"}:
             raise ValueError("objective must be one of: diffusion, ar")
+        if self.p_mask_override is not None and not (0 < self.p_mask_override <= 1):
+            raise ValueError("p_mask_override must be in (0, 1] when provided")
         return self
 
 

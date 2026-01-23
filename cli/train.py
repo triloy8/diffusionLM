@@ -63,6 +63,9 @@ def build_train_namespace(cfg_dc, config_path: str) -> argparse.Namespace:
         amp_enabled=bool(getattr(cfg_dc.training, "amp_enabled", False)),
         amp_dtype=str(getattr(cfg_dc.training, "amp_dtype", "float16")),
         training_objective=str(getattr(cfg_dc.training, "objective", "diffusion")),
+        repeat_masking_seed=getattr(cfg_dc.training, "repeat_masking_seed", None),
+        p_mask_override=getattr(cfg_dc.training, "p_mask_override", None),
+        deterministic_mask=bool(getattr(cfg_dc.training, "deterministic_mask", False)),
         # compile
         compile_enabled=bool(getattr(cfg_dc.compile, "enabled", False)) if cfg_dc.compile else False,
         compile_backend=getattr(cfg_dc.compile, "backend", "inductor") if cfg_dc.compile else "inductor",

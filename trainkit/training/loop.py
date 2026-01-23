@@ -43,6 +43,7 @@ def train_loop(
         Callable[[int, torch.nn.Module, torch.optim.Optimizer, Optional[dict], Optional[torch.amp.GradScaler]], None]
     ] = None,
     batch_generator: torch.Generator | None = None,
+    repeat_masking_seed: int | None = None,
     # logging
     logger: Optional[Logger] = None,
     train_loss_ema_decay: float = 0.0,
@@ -90,12 +91,17 @@ def train_loop(
 
     while True:
         model.train()
+        step_generator = batch_generator
+        if repeat_masking_seed is not None:
+            generator_device = "cuda" if device.startswith("cuda") and torch.cuda.is_available() else "cpu"
+            step_generator = torch.Generator(device=generator_device)
+            step_generator.manual_seed(int(repeat_masking_seed))
         raw_train_batch = objective.get_batch(
             dataset=train_data,
             batch_size=batch_size,
             context_length=context_length,
             device=device,
-            generator=batch_generator,
+            generator=step_generator,
         )
 
         train_batch = raw_train_batch
