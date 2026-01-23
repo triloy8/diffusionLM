@@ -20,7 +20,7 @@ from trainkit.objectives import Objective
 from trainkit.training.grad import gradient_clipping
 from trainkit.training.loop import train_loop
 from trainkit.training.optim import build_optimizer_param_groups, resolve_optimizer_cls
-from trainkit.training.schedule import lr_cosine_schedule, lr_constant_schedule
+from trainkit.training.schedule import lr_cosine_schedule, lr_constant_schedule, lr_constant_with_warmup_schedule
 
 
 def _seed_everything(seed: int, device: str | torch.device, *, rank: int = 0) -> torch.Generator:
@@ -359,7 +359,13 @@ def train_ddp(
         if was_training:
             model.train()
 
-    lr_schedule = lr_constant_schedule if getattr(cfg, "lr_schedule", "cosine") == "constant" else lr_cosine_schedule
+    lr_schedule_name = str(getattr(cfg, "lr_schedule", "cosine")).lower()
+    if lr_schedule_name == "constant":
+        lr_schedule = lr_constant_schedule
+    elif lr_schedule_name == "constant_with_warmup":
+        lr_schedule = lr_constant_with_warmup_schedule
+    else:
+        lr_schedule = lr_cosine_schedule
 
     val_sample_decode = None
     try:

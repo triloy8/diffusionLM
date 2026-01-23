@@ -121,8 +121,8 @@ class OptimizerConfig(_BaseConfig):
         if self.optimizer_name not in ALLOWED_OPTIMIZERS:
             raise ValueError(f"optimizer_name must be one of {sorted(ALLOWED_OPTIMIZERS)}")
         self.lr_schedule = self.lr_schedule.lower()
-        if self.lr_schedule not in {"cosine", "constant"}:
-            raise ValueError("lr_schedule must be one of: cosine, constant")
+        if self.lr_schedule not in {"cosine", "constant", "constant_with_warmup"}:
+            raise ValueError("lr_schedule must be one of: cosine, constant, constant_with_warmup")
         if len(self.betas) != 2 or not (0 <= self.betas[0] < 1 and 0 <= self.betas[1] < 1):
             raise ValueError("optimizer betas must be 2 values in [0, 1)")
         if self.eps <= 0:

@@ -22,4 +22,16 @@ def lr_constant_schedule(
 ) -> float:
     return float(max_learning_rate)
 
-__all__ = ["lr_cosine_schedule", "lr_constant_schedule"]
+
+def lr_constant_with_warmup_schedule(
+    it: int,
+    max_learning_rate: float,
+    _min_learning_rate: float,
+    warmup_iters: int,
+    _cosine_cycle_iters: int,
+) -> float:
+    if it < warmup_iters:
+        return (it / warmup_iters) * max_learning_rate if warmup_iters > 0 else float(max_learning_rate)
+    return float(max_learning_rate)
+
+__all__ = ["lr_cosine_schedule", "lr_constant_schedule", "lr_constant_with_warmup_schedule"]

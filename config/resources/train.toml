@@ -26,7 +26,7 @@ min_learning_rate = 0.002 # adamw
 warmup_iters = 600
 cosine_cycle_iters = 60000
 grad_clip_max_l2_norm = 3.0
-lr_schedule = "constant" # constant/cosine
+lr_schedule = "constant_with_warmup" # constant/cosine/constant_with_warmup
 
 [training]
 batch_size = 128
