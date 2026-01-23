@@ -41,7 +41,7 @@ amp_enabled = true
 amp_dtype = "bfloat16"
 objective = "diffusion" # diffusion/ar
 repeat_masking_seed = 3407
-# p_mask_override = 0.3
+p_mask_override = 0.3
 deterministic_mask = false
 
 [compile]
