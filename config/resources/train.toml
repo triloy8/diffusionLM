@@ -13,16 +13,16 @@ dtype = "float32"
 mask_token_id = 8000
 eot_token_id = 7999
 noise_epsilon = 0.001
-random_trunc_prob = 0.0 # 0.01
+random_trunc_prob = 0.01 # 0.01
 
 [optimizer]
 optimizer_name = "adamw"
 betas = [0.9, 0.95] # adamw
 eps = 1e-8 # adamw
-weight_decay = 0.0 # adamw
-initial_learning_rate = 0.0006 # adamw, unused in cosine scheduler
-max_learning_rate = 0.0006 # adamw, used by const schedule
-min_learning_rate = 0.0006 # adamw
+weight_decay = 0.01 # adamw
+initial_learning_rate = 0.0008 # adamw, unused in cosine scheduler
+max_learning_rate = 0.0008 # adamw, used by const schedule
+min_learning_rate = 0.0008 # adamw
 warmup_iters = 200
 cosine_cycle_iters = 60000
 grad_clip_max_l2_norm = 3.0
@@ -62,7 +62,7 @@ text_field = "story"
 pipeline_mode = "packed" # rows/packed
 pad_token_id = 50256
 pad_random_shift = false
-shuffle_buffer_size = 0
+shuffle_buffer_size = 10000
 shuffle_seed = 3407
 
 [data.tokenizer]
