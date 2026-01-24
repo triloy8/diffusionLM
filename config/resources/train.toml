@@ -23,38 +23,38 @@ weight_decay = 0.0 # adamw
 initial_learning_rate = 0.0009 # adamw, unused in cosine scheduler
 max_learning_rate = 0.0009 # adamw, used by const schedule
 min_learning_rate = 0.0009 # adamw
-warmup_iters = 100
+warmup_iters = 200
 cosine_cycle_iters = 60000
 grad_clip_max_l2_norm = 3.0
-lr_schedule = "constant_with_warmup" # constant/cosine/constant_with_warmup
+lr_schedule = "cosine" # constant/cosine/constant_with_warmup
 
 [optimizer.muon.hidden]
 initial_learning_rate = 0.01 # unused in cosine scheduler
-max_learning_rate = 0.008482556352527051
-min_learning_rate = 0.0014
-momentum = 0.90
+max_learning_rate = 0.025
+min_learning_rate = 0.0025
+momentum = 0.92
 weight_decay = 0.01
 
 [optimizer.muon.head]
 initial_learning_rate = 0.003 # unused in cosine scheduler
-max_learning_rate = 0.0020340489553250783
-min_learning_rate = 0.0003
+max_learning_rate = 0.005
+min_learning_rate = 0.0005
 betas = [0.9, 0.95]
 eps = 1e-10
 weight_decay = 0.02
 
 [optimizer.muon.embed]
 initial_learning_rate = 0.01 # unused in cosine scheduler
-max_learning_rate = 0.033960882005712546
-min_learning_rate = 0.0023
+max_learning_rate = 0.038
+min_learning_rate = 0.0038
 betas = [0.9, 0.95]
 eps = 1e-10
 weight_decay = 0.01
 
 [optimizer.muon.scalar]
 initial_learning_rate = 0.0008 # unused in cosine scheduler
-max_learning_rate = 0.0006981352112226846
-min_learning_rate = 0.00004
+max_learning_rate = 0.0012
+min_learning_rate = 0.00012
 betas = [0.9, 0.95]
 eps = 1e-10
 weight_decay = 0.02
