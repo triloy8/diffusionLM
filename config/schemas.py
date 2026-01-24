@@ -38,8 +38,6 @@ class MuonHiddenConfig(_BaseConfig):
             raise ValueError(f"{label}: learning rates must be > 0")
         if self.min_learning_rate > self.max_learning_rate:
             raise ValueError(f"{label}: min_learning_rate must be <= max_learning_rate")
-        if not (self.min_learning_rate <= self.initial_learning_rate <= self.max_learning_rate):
-            raise ValueError(f"{label}: initial_learning_rate must be within [min, max]")
 
 
 class MuonAdamGroupConfig(_BaseConfig):
@@ -56,8 +54,6 @@ class MuonAdamGroupConfig(_BaseConfig):
             raise ValueError("muon group learning rates must be > 0")
         if self.min_learning_rate > self.max_learning_rate:
             raise ValueError("muon group min_learning_rate must be <= max_learning_rate")
-        if not (self.min_learning_rate <= self.initial_learning_rate <= self.max_learning_rate):
-            raise ValueError("muon group initial_learning_rate must be within [min, max]")
         if len(self.betas) != 2 or not (0 <= self.betas[0] < 1 and 0 <= self.betas[1] < 1):
             raise ValueError("muon group betas must be 2 values in [0, 1)")
         if self.eps <= 0:
@@ -144,6 +140,16 @@ class OptimizerConfig(_BaseConfig):
         if self.optimizer_name == "muon":
             if self.muon is None:
                 raise ValueError("Muon optimizer requires muon configuration")
+            if self.lr_schedule not in {"constant", "constant_with_warmup"}:
+                hidden_cfg = self.muon.hidden
+                if not (hidden_cfg.min_learning_rate <= hidden_cfg.initial_learning_rate <= hidden_cfg.max_learning_rate):
+                    raise ValueError("muon.hidden.initial_learning_rate must be within [min, max]")
+                for name in ("head", "embed", "scalar"):
+                    group_cfg = getattr(self.muon, name)
+                    if not (
+                        group_cfg.min_learning_rate <= group_cfg.initial_learning_rate <= group_cfg.max_learning_rate
+                    ):
+                        raise ValueError(f"muon.{name}.initial_learning_rate must be within [min, max]")
         return self
 
 
