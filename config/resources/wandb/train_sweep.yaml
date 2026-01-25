@@ -21,7 +21,7 @@ parameters:
   training.objective:
     value: diffusion
   training.max_train_iteration:
-    value: 60000
+    value: 1500
   training.max_val_iteration:
     value: 10
   training.val_freq_iteration:
