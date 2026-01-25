@@ -1,5 +1,5 @@
 program: cli/sweep_train.py
-project: diffusion_muon_lr_simplestories
+project: diffusion_adamw_lr_simplestories_4
 command:
   - ${env}
   - uv
@@ -17,15 +17,15 @@ parameters:
   logging.dataset:
     value: SimpleStories
   training.batch_size:
-    value: 128
+    value: 64
   training.objective:
     value: diffusion
   training.max_train_iteration:
-    value: 1000
+    value: 2000
   training.max_val_iteration:
     value: 10
   training.val_freq_iteration:
-    value: 100
+    value: 250
   training.grad_accum_steps:
     value: 1
   checkpointing.ckpting_save_iter:
@@ -33,11 +33,11 @@ parameters:
   model.context_length:
     value: 512
   model.d_ff:
-    value: 2048
+    value: 3072
   model.d_model:
-    value: 512
+    value: 768
   model.num_layers:
-    value: 12
+    value: 18
   model.num_heads:
     value: 8
   model.rope_theta:
@@ -58,12 +58,10 @@ parameters:
     value: story
   data.pipeline_mode:
     value: packed
-  data.pad_token_id:
-    value: 50256
   data.pad_random_shift:
     value: false
   data.shuffle_buffer_size:
-    value: 0
+    value: 10000
   data.shuffle_seed:
     value: 3407
   model.device:
@@ -79,74 +77,26 @@ parameters:
   model.noise_epsilon:
     value: 0.001
   model.random_trunc_prob:
-    value: 0.0
+    value: 0.01
   optimizer.optimizer_name:
-    value: muon
+    value: adamw
   optimizer.betas:
     value: [0.9, 0.95]
   optimizer.eps:
     value: 1e-8
   optimizer.weight_decay:
-    value: 0.0
+    value: 0.005
   optimizer.grad_clip_max_l2_norm:
     value: 3.0
   optimizer.lr_schedule:
-    value: constant_with_warmup
+    value: cosine
   optimizer.cosine_cycle_iters:
     value: 60000
   optimizer.warmup_iters:
-    value: 100
-  optimizer.muon.hidden.initial_learning_rate:
-    value: 0.01
-  optimizer.muon.hidden.min_learning_rate:
-    value: 0.0014
-  optimizer.muon.hidden.max_learning_rate:
+    value: 1000
+  optimizer.initial_learning_rate:
+    value: 0.001
+  optimizer.max_learning_rate:
     distribution: log_uniform_values
-    min: 0.008
-    max: 0.03
-  optimizer.muon.hidden.momentum:
-    value: 0.90
-  optimizer.muon.hidden.weight_decay:
-    value: 0.01
-  optimizer.muon.head.initial_learning_rate:
-    value: 0.003
-  optimizer.muon.head.min_learning_rate:
-    value: 0.0003
-  optimizer.muon.head.max_learning_rate:
-    distribution: log_uniform_values
-    min: 0.0015
-    max: 0.006
-  optimizer.muon.head.betas:
-    value: [0.9, 0.95]
-  optimizer.muon.head.eps:
-    value: 1e-10
-  optimizer.muon.head.weight_decay:
-    value: 0.02
-  optimizer.muon.embed.initial_learning_rate:
-    value: 0.01
-  optimizer.muon.embed.min_learning_rate:
-    value: 0.0023
-  optimizer.muon.embed.max_learning_rate:
-    distribution: log_uniform_values
-    min: 0.01
-    max: 0.04
-  optimizer.muon.embed.betas:
-    value: [0.9, 0.95]
-  optimizer.muon.embed.eps:
-    value: 1e-10
-  optimizer.muon.embed.weight_decay:
-    value: 0.01
-  optimizer.muon.scalar.initial_learning_rate:
-    value: 0.0008
-  optimizer.muon.scalar.min_learning_rate:
-    value: 0.00004
-  optimizer.muon.scalar.max_learning_rate:
-    distribution: log_uniform_values
-    min: 0.0004
+    min: 0.0005
     max: 0.002
-  optimizer.muon.scalar.betas:
-    value: [0.9, 0.95]
-  optimizer.muon.scalar.eps:
-    value: 1e-10
-  optimizer.muon.scalar.weight_decay:
-    value: 0.02
