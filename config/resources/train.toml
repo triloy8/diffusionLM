@@ -100,7 +100,7 @@ seed = 3410
 
 [wandb]
 entity = "yiltro8-org"
-project = "diffusion_muon_simplestories"
+project = "diffusion_adamw_lr_simplestories_5"
 
 [ddp]
 backend = "nccl"               # gloo/nccl
