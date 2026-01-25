@@ -17,15 +17,15 @@ parameters:
   logging.dataset:
     value: SimpleStories
   training.batch_size:
-    value: 64
+    value: 128
   training.objective:
     value: diffusion
   training.max_train_iteration:
-    value: 1500
+    value: 2000
   training.max_val_iteration:
     value: 10
   training.val_freq_iteration:
-    value: 250
+    value: 100
   training.grad_accum_steps:
     value: 2
   checkpointing.ckpting_save_iter:
@@ -33,11 +33,11 @@ parameters:
   model.context_length:
     value: 512
   model.d_ff:
-    value: 3072
+    value: 2048
   model.d_model:
-    value: 768
+    value: 512
   model.num_layers:
-    value: 18
+    value: 12
   model.num_heads:
     value: 8
   model.rope_theta:
@@ -58,10 +58,12 @@ parameters:
     value: story
   data.pipeline_mode:
     value: packed
+  data.pad_token_id:
+    value: 50256
   data.pad_random_shift:
-    value: false
+    value: true
   data.shuffle_buffer_size:
-    value: 10000
+    value: 30000
   data.shuffle_seed:
     value: 3407
   model.device:
@@ -77,7 +79,7 @@ parameters:
   model.noise_epsilon:
     value: 0.001
   model.random_trunc_prob:
-    value: 0.01
+    value: 0.0
   optimizer.optimizer_name:
     value: adamw
   optimizer.betas:
@@ -85,16 +87,18 @@ parameters:
   optimizer.eps:
     value: 1e-8
   optimizer.weight_decay:
-    value: 0.005
+    value: 0.1
   optimizer.grad_clip_max_l2_norm:
     value: 3.0
   optimizer.lr_schedule:
     value: cosine
   optimizer.cosine_cycle_iters:
-    value: 60000
+    value: 120000
+  optimizer.initial_learning_rate:
+    value: 0.0001
   optimizer.warmup_iters:
-    value: 1000
+    value: 1200
   optimizer.max_learning_rate:
     distribution: log_uniform_values
     min: 0.0001
-    max: 0.003
+    max: 0.001
