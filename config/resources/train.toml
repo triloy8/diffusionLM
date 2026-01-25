@@ -2,7 +2,7 @@
 vocab_size = 8001
 context_length = 512
 d_model = 768
-num_layers = 24
+num_layers = 18
 num_heads = 8
 d_ff = 3072
 rope_theta = 10000.0
