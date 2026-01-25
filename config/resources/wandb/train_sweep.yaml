@@ -98,5 +98,5 @@ parameters:
     value: 1200
   optimizer.max_learning_rate:
     distribution: log_uniform_values
-    min: 0.0009
-    max: 0.005
+    min: 0.0001
+    max: 0.01
