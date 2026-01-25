@@ -21,7 +21,7 @@ parameters:
   training.objective:
     value: diffusion
   training.max_train_iteration:
-    value: 2000
+    value: 5000
   training.max_val_iteration:
     value: 10
   training.val_freq_iteration:
@@ -97,7 +97,7 @@ parameters:
   optimizer.initial_learning_rate:
     value: 0.0001
   optimizer.warmup_iters:
-    value: 20
+    value: 1200
   optimizer.max_learning_rate:
     distribution: log_uniform_values
     min: 0.0009
