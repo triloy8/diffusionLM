@@ -1,5 +1,5 @@
 program: cli/sweep_train.py
-project: diffusion_adamw_lr_simplestories_4
+project: diffusion_adamw_lr_simplestories_5
 command:
   - ${env}
   - uv
