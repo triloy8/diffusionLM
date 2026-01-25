@@ -17,7 +17,7 @@ parameters:
   logging.dataset:
     value: SimpleStories
   training.batch_size:
-    value: 512
+    value: 256
   training.objective:
     value: diffusion
   training.max_train_iteration:
