@@ -298,6 +298,7 @@ class DataConfig(_BaseConfig):
     pad_random_shift: bool = False
     shuffle_buffer_size: int = 0
     shuffle_seed: Optional[int] = None
+    cache_all: bool = False
 
     @model_validator(mode="after")
     def _validate_data(self):
@@ -650,6 +651,7 @@ class BenchDataConfig(_BaseConfig):
     pad_token_id: Optional[int] = None
     shuffle_buffer_size: int = 0
     shuffle_seed: Optional[int] = None
+    cache_all: bool = False
 
     @model_validator(mode="after")
     def _validate_bench_data(self):

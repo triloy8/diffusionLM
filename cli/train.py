@@ -88,6 +88,7 @@ def build_train_namespace(cfg_dc, config_path: str) -> argparse.Namespace:
         pad_random_shift=bool(getattr(cfg_dc.data, "pad_random_shift", False)),
         shuffle_buffer_size=cfg_dc.data.shuffle_buffer_size,
         shuffle_seed=cfg_dc.data.shuffle_seed,
+        cache_all=bool(getattr(cfg_dc.data, "cache_all", False)),
         rng_seed=cfg_dc.training.seed,
         muon_cfg=cfg_dc.optimizer.muon,
         # ddp

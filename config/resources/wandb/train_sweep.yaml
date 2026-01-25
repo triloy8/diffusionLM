@@ -17,7 +17,7 @@ parameters:
   logging.dataset:
     value: SimpleStories
   training.batch_size:
-    value: 128
+    value: 512
   training.objective:
     value: diffusion
   training.max_train_iteration:
@@ -27,7 +27,7 @@ parameters:
   training.val_freq_iteration:
     value: 100
   training.grad_accum_steps:
-    value: 2
+    value: 1
   checkpointing.ckpting_save_iter:
     value: 1000
   model.context_length:
@@ -93,11 +93,9 @@ parameters:
   optimizer.lr_schedule:
     value: cosine
   optimizer.cosine_cycle_iters:
-    value: 120000
-  optimizer.initial_learning_rate:
-    value: 0.0001
+    value: 60000
   optimizer.warmup_iters:
-    value: 1200
+    value: 600
   optimizer.max_learning_rate:
     distribution: log_uniform_values
     min: 0.0009

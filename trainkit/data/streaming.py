@@ -31,6 +31,7 @@ class HFTokenIteratorFactory:
         eot_token_id: int,
         shuffle_buffer_size: int = 0,
         shuffle_seed: Optional[int] = None,
+        cache_all: bool = False,
         world_size: int = 1,
         rank: int = 0,
         pad_newline: bool = True,
@@ -48,6 +49,7 @@ class HFTokenIteratorFactory:
         self.eot_token_id = int(eot_token_id)
         self.shuffle_buffer_size = max(0, shuffle_buffer_size)
         self.shuffle_seed = shuffle_seed if shuffle_seed is not None else 0
+        self.cache_all = bool(cache_all)
         self.world_size = max(1, world_size)
         self.rank = max(0, min(rank, self.world_size - 1))
         self.pad_newline = pad_newline
@@ -60,14 +62,22 @@ class HFTokenIteratorFactory:
 
     def _load_dataset(self):
         if self.dataset_config:
-            return load_dataset(self.dataset_name, self.dataset_config, split=self.split, streaming=True)
-        return load_dataset(self.dataset_name, split=self.split, streaming=True)
+            return load_dataset(
+                self.dataset_name,
+                self.dataset_config,
+                split=self.split,
+                streaming=not self.cache_all,
+            )
+        return load_dataset(self.dataset_name, split=self.split, streaming=not self.cache_all)
 
     def _apply_shuffle(self, dataset):
         if self.shuffle_buffer_size <= 0:
             return dataset
         seed = self.shuffle_seed + self._epoch
-        return dataset.shuffle(buffer_size=self.shuffle_buffer_size, seed=seed)
+        try:
+            return dataset.shuffle(buffer_size=self.shuffle_buffer_size, seed=seed)
+        except TypeError:
+            return dataset.shuffle(seed=seed)
 
     def _manual_shard(self, iterable: Iterable) -> Iterator:
         for idx, example in enumerate(iterable):
