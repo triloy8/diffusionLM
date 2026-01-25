@@ -76,6 +76,7 @@ def train_loop(
         return objective.attention_mask(batch_obj)
 
     train_iteration = start_iteration
+    optimizer_step = int(start_iteration) // max(1, int(grad_accum_steps))
     tokens_seen = 0
     accum_steps = max(1, int(grad_accum_steps))
     accum_count = 0
@@ -117,7 +118,7 @@ def train_loop(
                 group_min_lr = float(param_group.get("min_lr", min_learning_rate))
                 group_warmup = int(param_group.get("warmup_iters", warmup_iters))
                 group_cosine = int(param_group.get("cosine_cycle_iters", cosine_cycle_iters))
-                new_lr = lr_cosine_schedule(train_iteration, group_max_lr, group_min_lr, group_warmup, group_cosine)
+                new_lr = lr_cosine_schedule(optimizer_step, group_max_lr, group_min_lr, group_warmup, group_cosine)
                 param_group["lr"] = new_lr
                 group_name = str(param_group.get("name", f"group_{idx}"))
                 group_lrs[f"metrics.lr/{group_name}"] = float(new_lr)
@@ -309,6 +310,7 @@ def train_loop(
             else:
                 optimizer.step()
             accum_count = 0
+            optimizer_step += 1
 
         # weight norms
         if logger is not None and log_weight_norms and accum_count == 0:
