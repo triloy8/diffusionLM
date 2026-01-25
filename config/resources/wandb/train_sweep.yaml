@@ -63,7 +63,7 @@ parameters:
   data.pad_random_shift:
     value: true
   data.shuffle_buffer_size:
-    value: 30000
+    value: 0
   data.shuffle_seed:
     value: 3407
   model.device:
