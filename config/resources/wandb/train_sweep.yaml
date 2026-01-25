@@ -94,8 +94,6 @@ parameters:
     value: 60000
   optimizer.warmup_iters:
     value: 1000
-  optimizer.initial_learning_rate:
-    value: 0.001
   optimizer.max_learning_rate:
     distribution: log_uniform_values
     min: 0.0005
