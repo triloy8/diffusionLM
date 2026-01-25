@@ -21,7 +21,7 @@ parameters:
   training.objective:
     value: diffusion
   training.max_train_iteration:
-    value: 3000
+    value: 60000
   training.max_val_iteration:
     value: 10
   training.val_freq_iteration:
@@ -91,10 +91,10 @@ parameters:
   optimizer.lr_schedule:
     value: cosine
   optimizer.cosine_cycle_iters:
-    value: 3000
+    value: 60000
   optimizer.warmup_iters:
-    value: 500
+    value: 1000
   optimizer.max_learning_rate:
     distribution: log_uniform_values
-    min: 0.0003
-    max: 0.0012
+    min: 0.0001
+    max: 0.003
