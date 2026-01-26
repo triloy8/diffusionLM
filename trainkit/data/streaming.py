@@ -102,6 +102,13 @@ class HFTokenIteratorFactory:
         dataset = self._apply_shuffle(dataset)
         rows = iter(self._apply_shard(dataset))
         self._epoch += 1
+        if self._logger is not None:
+            self._logger.log(
+                {
+                    "metrics.data/stream_epoch": int(self._epoch),
+                    "metrics.data/stream_reset": 1,
+                }
+            )
         while True:
             row_fetch_start = time.monotonic()
             try:
