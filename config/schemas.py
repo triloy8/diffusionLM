@@ -225,6 +225,7 @@ class TrainingConfig(_BaseConfig):
     amp_enabled: bool = False
     amp_dtype: str = "float16"
     objective: str = "diffusion"
+    eot_mask_loss: bool = False
     p_mask_override: Optional[float] = None
     deterministic_mask: bool = False
 

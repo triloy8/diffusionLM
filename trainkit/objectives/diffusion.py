@@ -154,6 +154,10 @@ class MegaDlmDiffusionObjective(Objective):
         super().__init__("megadlm-diffusion")
         self._tokenizer = tokenizer
         self.mask_token_id = int(getattr(cfg, "mask_token_id", cfg.vocab_size - 1))
+        self.eot_token_id = getattr(cfg, "eot_token_id", None)
+        if self.eot_token_id is not None:
+            self.eot_token_id = int(self.eot_token_id)
+        self.eot_mask_loss = bool(getattr(cfg, "eot_mask_loss", False))
         self.random_trunc_prob = float(getattr(cfg, "random_trunc_prob", 0.01))
         self.p_mask_bucket_edges = getattr(cfg, "p_mask_bucket_edges", None)
 
@@ -164,6 +168,8 @@ class MegaDlmDiffusionObjective(Objective):
             context_length=context_length,
             device=device,
             mask_token_id=self.mask_token_id,
+            eot_token_id=self.eot_token_id,
+            eot_mask_loss=self.eot_mask_loss,
             random_trunc_prob=self.random_trunc_prob,
             generator=generator,
         )

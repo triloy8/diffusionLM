@@ -158,6 +158,8 @@ def get_megadlm_diffusion_batch(
     device: str,
     *,
     mask_token_id: int,
+    eot_token_id: int | None = None,
+    eot_mask_loss: bool = False,
     random_trunc_prob: float = 0.01,
     generator: torch.Generator | None = None,
 ) -> DiffusionBatch:
@@ -213,6 +215,12 @@ def get_megadlm_diffusion_batch(
     noisy_inputs = torch.where(mask, mask_token_tensor, clean_targets)
 
     loss_mask = attention_mask
+    if eot_mask_loss and eot_token_id is not None:
+        eot_mask = clean_targets != int(eot_token_id)
+        if loss_mask is None:
+            loss_mask = eot_mask
+        else:
+            loss_mask = loss_mask & eot_mask
     token_count = int(loss_mask.sum().item()) if loss_mask is not None else int(clean_targets.numel())
     metadata: Dict[str, Any] = {
         "random_truncation_applied": random_trunc_applied,
