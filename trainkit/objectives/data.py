@@ -151,6 +151,95 @@ def get_batch(
     )
 
 
+def get_megadlm_diffusion_batch(
+    dataset,
+    batch_size: int,
+    context_length: int,
+    device: str,
+    *,
+    mask_token_id: int,
+    random_trunc_prob: float = 0.01,
+    generator: torch.Generator | None = None,
+) -> DiffusionBatch:
+    clean_targets, attention_mask, random_trunc_applied = _draw_clean_targets(
+        dataset,
+        batch_size,
+        context_length,
+        device,
+        random_trunc_prob=random_trunc_prob,
+        min_length=2,
+        generator=generator,
+    )
+    device_obj = clean_targets.device
+    batch_size, seq_len = clean_targets.shape
+
+    t = _rand_uniform((batch_size,), device=device_obj, generator=generator)
+    p_mask = t[:, None]
+    mask = _rand_uniform((batch_size, seq_len), device=device_obj, generator=generator) < p_mask
+    if attention_mask is not None:
+        mask = mask & attention_mask
+
+    # Ensure at least one masked position per row.
+    zero_masked = mask.sum(dim=1) == 0
+    if bool(zero_masked.any().item()):
+        if attention_mask is not None:
+            valid_positions = attention_mask.to(torch.bool)
+        else:
+            valid_positions = torch.ones_like(mask, dtype=torch.bool)
+        for row in zero_masked.nonzero(as_tuple=False).view(-1):
+            valid_idx = valid_positions[row].nonzero(as_tuple=False).view(-1)
+            if valid_idx.numel() == 0:
+                continue
+            if generator is not None:
+                choice = torch.randint(
+                    0,
+                    valid_idx.numel(),
+                    (1,),
+                    device=valid_idx.device,
+                    generator=generator,
+                ).item()
+            else:
+                choice = int(torch.randint(0, valid_idx.numel(), (1,), device=valid_idx.device).item())
+            mask[row, valid_idx[choice]] = True
+
+    if attention_mask is not None:
+        denom = attention_mask.to(torch.float32).sum(dim=1).clamp_min(1.0)
+    else:
+        denom = torch.full((batch_size,), float(seq_len), device=device_obj)
+    p_mask = (mask.to(torch.float32).sum(dim=1) / denom).clamp_min(1.0 / max(seq_len, 1))
+    p_mask = p_mask[:, None]
+
+    mask_token_tensor = torch.full_like(clean_targets, fill_value=mask_token_id)
+    noisy_inputs = torch.where(mask, mask_token_tensor, clean_targets)
+
+    loss_mask = attention_mask
+    token_count = int(loss_mask.sum().item()) if loss_mask is not None else int(clean_targets.numel())
+    metadata: Dict[str, Any] = {
+        "random_truncation_applied": random_trunc_applied,
+        "sequence_length": seq_len,
+        "mask_ratio": float(mask.float().mean().detach().cpu().item()),
+        "token_count": token_count,
+        "p_mask_stats": {
+            "mean": float(p_mask.mean().detach().cpu().item()),
+            "min": float(p_mask.min().detach().cpu().item()),
+            "max": float(p_mask.max().detach().cpu().item()),
+            "std": float(p_mask.std(unbiased=False).detach().cpu().item()),
+            "inv_mean": float((1.0 / p_mask).mean().detach().cpu().item()),
+            "inv_max": float((1.0 / p_mask).max().detach().cpu().item()),
+        },
+    }
+
+    return DiffusionBatch(
+        noisy_inputs=noisy_inputs,
+        clean_targets=clean_targets,
+        mask=mask,
+        p_mask=p_mask,
+        attention_mask=attention_mask,
+        loss_mask=loss_mask,
+        metadata=metadata,
+    )
+
+
 def get_autoregressive_batch(
     dataset,
     batch_size: int,

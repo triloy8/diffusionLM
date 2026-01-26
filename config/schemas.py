@@ -245,8 +245,8 @@ class TrainingConfig(_BaseConfig):
         if self.amp_dtype not in ALLOWED_AMP_DTYPES:
             raise ValueError(f"amp_dtype must be one of {sorted(ALLOWED_AMP_DTYPES)}")
         self.objective = self.objective.lower()
-        if self.objective not in {"diffusion", "ar"}:
-            raise ValueError("objective must be one of: diffusion, ar")
+        if self.objective not in {"diffusion", "megadlm-diffusion", "ar"}:
+            raise ValueError("objective must be one of: diffusion, megadlm-diffusion, ar")
         if self.p_mask_override is not None and not (0 < self.p_mask_override <= 1):
             raise ValueError("p_mask_override must be in (0, 1] when provided")
         return self
