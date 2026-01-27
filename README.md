@@ -1,8 +1,8 @@
 <div align="center">
-<h1>Transformer Language Model</h1>
+<h1>🤖 Transformer Language Model</h1>
 </div>
 
-## What Is This?
+## ✨ What Is This?
 
 A from‑scratch Transformer LM stack with flexible objectives: diffusion or autoregressive, chosen via config. The repo is split into:
 - `transformerlm`: model, tokenizer, and inference utilities.
@@ -10,7 +10,7 @@ A from‑scratch Transformer LM stack with flexible objectives: diffusion or aut
 
 See `trainkit/README.md` for training‑specific details.
 
-## Overview
+## 🧭 Overview
 
 - From‑scratch model: decoder‑only Transformer LM (RMSNorm, SwiGLU, RoPE, SDPA/MHA), implemented directly with PyTorch modules.
 - From‑scratch tokenizer: byte‑level BPE training and IO, producing `vocab.json` and `merges.txt`.
@@ -19,7 +19,7 @@ See `trainkit/README.md` for training‑specific details.
 - CLI + TOML configs: consistent entry points built around config schemas.
 - Benchmarking + profiling: tokenizer/inference throughput checks and memory/runtime inspection.
 
-## Usage
+## ▶️ Usage
 
 This project expects [`uv`](https://github.com/astral-sh/uv) for running entry points and scripts.
 
@@ -54,7 +54,7 @@ uv run transformerlm-train --config config/resources/train.toml --print-config
 ```
 > Config loaders use Pydantic validation, so missing/extra keys or bad values raise `pydantic.ValidationError` with detailed paths.
 
-## Datasets & Tokenizer Assets
+## 📦 Datasets & Tokenizer Assets
 
 To prepare your environment:
 
@@ -66,7 +66,7 @@ To prepare your environment:
    - `"packed"` or `"rows"`: streams from `datasets.load_dataset` using `dataset_name`, `train_split`, `val_split`, `text_field`.
 3. **Offline caching (streaming)**: set `HF_DATASETS_CACHE=/path/to/cache`, run once with network access, then set `HF_DATASETS_OFFLINE=1`. Private datasets need `huggingface-cli login` or `HF_TOKEN`.
 
-## Remote Orchestration
+## 🛰️ Remote Orchestration
 
 The `Justfile` plus helper scripts under `scripts/` provide a thin remote control plane focused on Prime Intellect hosts; set `PRIME_HOST`/`REMOTE_ROOT` to point at the target machine and path. All available recipes:
 - `just bootstrap-remote` runs `scripts/bootstrap_remote.sh` over SSH to install uv/just/tmux, clone the repo, and prepare `data/`, `runs/`, and `env/` directories on the remote.
@@ -80,7 +80,7 @@ The `Justfile` plus helper scripts under `scripts/` provide a thin remote contro
 - `just sync-env` uploads your local `env/wandb.env` (copy `env/wandb.env.example` and populate `WANDB_API_KEY`) so the remote training session can authenticate with W&B.
 - `just auto-train` runs the full bootstrap + data + env sync + training workflow (`bootstrap-remote`, `data-remote`, `sync-env`, `train`) in one shot.
 
-## Modules
+## 🧩 Modules
 
 - `transformerlm.models`: core Transformer layers + attention (`transformerlm/models/transformer.py`).
 - `transformerlm.inference`: sampling + generation helpers (`transformerlm/inference/predictor.py`).
@@ -91,14 +91,14 @@ The `Justfile` plus helper scripts under `scripts/` provide a thin remote contro
 - `profiling`: memory/runtime helpers (`profiling/nvtx.py`).
 - `utils`: shared small helpers (`transformerlm/utils/dtypes.py`).
 
-## Benchmarking
+## 🧪 Benchmarking
 
 - Benchmarks live under `benchmarking/` and use TOML configs in `config/resources/`.
 - Run (latency): `uv run transformerlm-bench-infer --config config/resources/bench_infer.toml`
 - Output: stdout only (latency, tokens/sec, diffusion stats).
 
 
-## Tests
+## ✅ Tests
 
 - Run tests: `uv run pytest`
 - Markers:
@@ -109,7 +109,7 @@ The `Justfile` plus helper scripts under `scripts/` provide a thin remote contro
   - Select a file/test: `uv run pytest tests/tokenizer/test_tokenizer.py -q`
   - Filter by name: `uv run pytest -k tokenizer`
 
-## Profiling
+## ⏱️ Profiling
 
 - Tools:
   - NVTX ranges for GPU timeline annotation (via `profiling/nvtx.py`).
