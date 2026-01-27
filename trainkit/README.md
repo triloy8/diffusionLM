@@ -1,6 +1,6 @@
 # Trainkit
 
-Generic training infrastructure extracted from `diffusionlm`. It is model‑agnostic and expects
+Generic training infrastructure extracted from `transformerlm`. It is model‑agnostic and expects
 callers to supply model/tokenizer/objective builders.
 
 ## What It Provides
@@ -13,13 +13,13 @@ callers to supply model/tokenizer/objective builders.
 
 ## Repo Wiring
 
-The CLI entry points live in `cli/` and pass builders from `diffusionlm` into
+The CLI entry points live in `cli/` and pass builders from `transformerlm` into
 `trainkit.trainer.train_ddp`:
 
-- Model and tokenizer builders: `diffusionlm/builders.py`
+- Model and tokenizer builders: `transformerlm/builders.py`
 - Objective selection: `trainkit.objectives.build_objective`
 
-This keeps `trainkit` reusable while `diffusionlm` stays focused on modeling and tokenization.
+This keeps `trainkit` reusable while `transformerlm` stays focused on modeling and tokenization.
 
 ## Runtime Notes
 
@@ -34,7 +34,7 @@ This keeps `trainkit` reusable while `diffusionlm` stays focused on modeling and
 ## Quick Usage (in this repo)
 
 ```bash
-uv run diffusionlm-train --config config/resources/train.toml
+uv run transformerlm-train --config config/resources/train.toml
 ```
 
 ## API Surface
@@ -71,7 +71,7 @@ project = "your-project"
 - Training logs include per-parameter-group learning rates (in addition to `metrics.lr`):
   - Keys: `metrics.lr/head`, `metrics.lr/embed`, `metrics.lr/scalar`, `metrics.lr/hidden`.
 - Tip (console backend): Pipe to `jq` for readability:
-  - `uv run diffusionlm-train --config config/resources/train.toml | jq -r "."`
+  - `uv run transformerlm-train --config config/resources/train.toml | jq -r "."`
 
 ## DDP Policy
 

@@ -1,7 +1,7 @@
 import torch
-from diffusionlm.models import MultiheadSelfAttentionRoPE, scaled_dot_product_attention
-from diffusionlm.models import RotaryPositionalEmbedding
-from diffusionlm.inference import softmax
+from transformerlm.models import MultiheadSelfAttentionRoPE, scaled_dot_product_attention
+from transformerlm.models import RotaryPositionalEmbedding
+from transformerlm.inference import softmax
 
 
 def test_full_attention_responds_to_future_tokens(device):

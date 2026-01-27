@@ -1,5 +1,5 @@
-from diffusionlm.tokenizer.pretokenize import gpt2_bytes_to_unicode
-from diffusionlm.tokenizer.io import (
+from transformerlm.tokenizer.pretokenize import gpt2_bytes_to_unicode
+from transformerlm.tokenizer.io import (
     find_chunk_boundaries,
     process_chunk_text,
 )

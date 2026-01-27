@@ -1,7 +1,7 @@
 import pytest
 
-from diffusionlm.tokenizer.tokenizer import Tokenizer
-from diffusionlm.tokenizer import gpt2_bytes_to_unicode
+from transformerlm.tokenizer.tokenizer import Tokenizer
+from transformerlm.tokenizer import gpt2_bytes_to_unicode
 
 
 def make_minimal_tokenizer():

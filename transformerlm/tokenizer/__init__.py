@@ -5,7 +5,7 @@ from .io import find_chunk_boundaries, process_chunk_text
 Tokenizer = PythonTokenizer
 
 try:  # pragma: no cover - optional dependency
-    from diffusionlm.tokenizer_rust import Tokenizer as RustTokenizer  # type: ignore[attr-defined]
+    from transformerlm.tokenizer_rust import Tokenizer as RustTokenizer  # type: ignore[attr-defined]
 except Exception:  # pragma: no cover - optional dependency
     RustTokenizer = None
 

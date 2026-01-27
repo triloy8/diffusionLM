@@ -3,7 +3,7 @@
 ## What Is This?
 
 This repo started as a from‑scratch diffusion language model inspired by the LLaDA guidelines and has since evolved into two pieces:
-- `diffusionlm`: the model, tokenizer, and inference utilities.
+- `transformerlm`: the model, tokenizer, and inference utilities.
 - `trainkit`: a generic training stack (loop, DDP, checkpointing, logging, streaming).
 
 See `trainkit/README.md` for training‑specific details.
@@ -25,7 +25,7 @@ Requires Python 3.11–3.12 and PyTorch. Using [`uv`](https://github.com/astral-
 
 ```bash
 # Print an example resolved config
-uv run diffusionlm-train --config config/resources/train.toml --print-config
+uv run transformerlm-train --config config/resources/train.toml --print-config
 ```
 
 ## Usage Examples
@@ -35,13 +35,13 @@ Entry points live in `cli/` and are driven by TOML configs in `config/resources/
 - Train the tokenizer (BPE):
 
 ```bash
-uv run diffusionlm-train-tokenizer --config config/resources/train_tokenizer.toml
+uv run transformerlm-train-tokenizer --config config/resources/train_tokenizer.toml
 ```
 
 - Start model training (DDP works for single GPU too):
 
 ```bash
-uv run diffusionlm-train --config config/resources/train.toml
+uv run transformerlm-train --config config/resources/train.toml
 ```
 
 Notes:
@@ -50,7 +50,7 @@ Notes:
 - Generate text:
 
 ```bash
-uv run diffusionlm-infer --config config/resources/infer.toml
+uv run transformerlm-infer --config config/resources/infer.toml
 ```
 
 _Note:_ `inference.total_length` should be the final sequence length (prompt + generated tokens) and must not exceed `model.context_length`; the generated span is computed automatically as `total_length - prompt_tokens`.
@@ -58,7 +58,7 @@ _Note:_ `inference.total_length` should be the final sequence length (prompt + g
 - Inspect effective configuration without running:
 
 ```bash
-uv run diffusionlm-train --config config/resources/train.toml --print-config
+uv run transformerlm-train --config config/resources/train.toml --print-config
 ```
 > Config loaders use Pydantic validation, so missing/extra keys or bad values raise `pydantic.ValidationError` with detailed paths.
 
@@ -79,30 +79,30 @@ The `Justfile` plus helper scripts under `scripts/` provide a thin remote contro
 - `just bootstrap-remote` runs `scripts/bootstrap_remote.sh` over SSH to install uv/just/tmux, clone the repo, and prepare `data/`, `runs/`, and `env/` directories on the remote.
 - `just data-remote` executes `scripts/fetch_data.sh` remotely to download the GPT‑2 tokenizer vocab/merges into the remote `data/` directory (streaming datasets are fetched via Hugging Face at runtime).
 - `just build-remote` syncs dependencies by running `uv sync` (with a frozen lockfile fallback) inside the remote checkout.
-- `just train config=<toml> extra="<args>"` launches `scripts/run_train_remote.sh` inside a tmux session (`diffusionlm-train`) after validating Weights & Biases credentials.
+- `just train config=<toml> extra="<args>"` launches `scripts/run_train_remote.sh` inside a tmux session (`transformerlm-train`) after validating Weights & Biases credentials.
 - `just infer command="<cmd>" args="<extra>"` calls `scripts/run_infer_remote.sh` to execute arbitrary inference or benchmarking commands; defaults derive from `CMD_INFER`.
 - `just nvitop` opens `nvitop` on the remote box for lightweight GPU monitoring (assumes it is installed by the bootstrap step).
-- `just attach-train` attaches your terminal to the `diffusionlm-train` tmux session, while `just kill-train` tears it down if you need to restart.
+- `just attach-train` attaches your terminal to the `transformerlm-train` tmux session, while `just kill-train` tears it down if you need to restart.
 - `just fetch any_file=<path>` pulls any file or directory from `${REMOTE_ROOT}/<path>` into the current working directory; `just list-runs` prints the remote run directory names.
 - `just sync-env` uploads your local `env/wandb.env` (copy `env/wandb.env.example` and populate `WANDB_API_KEY`) so the remote training session can authenticate with W&B.
 - `just auto-train` runs the full bootstrap + data + env sync + training workflow (`bootstrap-remote`, `data-remote`, `sync-env`, `train`) in one shot.
 
 ## Modules
 
-- diffusionlm.models
+- transformerlm.models
   - Purpose: Core Transformer components with bidirectional self-attention for diffusion-style language modelling.
-  - Key files: `diffusionlm/models/transformer.py`, `diffusionlm/models/attention.py`, `diffusionlm/models/layers.py`.
+  - Key files: `transformerlm/models/transformer.py`, `transformerlm/models/attention.py`, `transformerlm/models/layers.py`.
     (Attention is unmasked/bidirectional by default.)
-  - Notes: dtype helpers under `diffusionlm/utils/dtypes.py`.
+  - Notes: dtype helpers under `transformerlm/utils/dtypes.py`.
 
-- diffusionlm.inference
+- transformerlm.inference
   - Purpose: Sampling utilities and simple generation helpers.
-  - Key files: `diffusionlm/inference/generate.py`, `diffusionlm/inference/sampling.py`, `diffusionlm/inference/predictor.py`.
+  - Key files: `transformerlm/inference/generate.py`, `transformerlm/inference/sampling.py`, `transformerlm/inference/predictor.py`.
   - Notes: Inference configs provide `prompt`, `steps`, `total_length`, `block_length`, `temperature`, and `mask_id` for diffusion decoding.
 
-- diffusionlm.tokenizer
+- transformerlm.tokenizer
   - Purpose: From‑scratch byte‑level BPE trainer and tokenizer IO.
-  - Key files: `diffusionlm/tokenizer/bpe_trainer.py`, `diffusionlm/tokenizer/tokenizer.py`, `diffusionlm/tokenizer/pretokenize.py`, `diffusionlm/tokenizer/io.py`.
+  - Key files: `transformerlm/tokenizer/bpe_trainer.py`, `transformerlm/tokenizer/tokenizer.py`, `transformerlm/tokenizer/pretokenize.py`, `transformerlm/tokenizer/io.py`.
   - Artifacts: `vocab.json`, `merges.txt` (with optional special tokens).
 
 
@@ -128,7 +128,7 @@ The `Justfile` plus helper scripts under `scripts/` provide a thin remote contro
 
 - utils
   - Purpose: Small shared helpers.
-  - Key files: `diffusionlm/utils/dtypes.py`.
+  - Key files: `transformerlm/utils/dtypes.py`.
 
 ## Benchmarking
 
@@ -137,7 +137,7 @@ The `Justfile` plus helper scripts under `scripts/` provide a thin remote contro
 - Results are logged with the `ConsoleLogger` to stdout; no files are written.
 
 - Inference latency:
-- Run: `uv run diffusionlm-bench-infer --config config/resources/bench_infer.toml`
+- Run: `uv run transformerlm-bench-infer --config config/resources/bench_infer.toml`
   - Measures warmup and repeated diffusion reverse passes, logging latency, tokens/sec, and diffusion-specific metrics (steps, block length, average mask ratio). When the config includes a `[data]` section with streaming fields (`dataset_name`, `split`, `text_field`, optional shuffle settings), the benchmark can optionally stream validation tokens from Hugging Face Datasets for backward/perplexity summaries (`perplexity_*` knobs under `[benchmark]`).
 
 
@@ -173,7 +173,7 @@ and truncated text (keys: `params.temperature`, `params.p`, `params.eos_token_id
 ```bash
 TRANSFORMERLM_NVTX=1 TRANSFORMERLM_NVTX_LEVEL=fine \
   nsys profile -o result \
-  uv run diffusionlm-train --config config/resources/train.toml
+  uv run transformerlm-train --config config/resources/train.toml
 ```
 
 - Memory helpers (Python):

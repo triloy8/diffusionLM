@@ -2,7 +2,7 @@ from typing import BinaryIO
 import regex as re
 from collections import Counter
 import os
-from diffusionlm.tokenizer.pretokenize import PAT
+from transformerlm.tokenizer.pretokenize import PAT
 
 
 def find_chunk_boundaries(

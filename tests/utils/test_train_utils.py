@@ -3,7 +3,7 @@ import numpy as np
 import torch
 import pytest
 
-from diffusionlm.models import TransformerLM
+from transformerlm.models import TransformerLM
 from trainkit.objectives.loss import cross_entropy
 from trainkit.objectives.data import get_batch
 from trainkit.training.optim import AdamW

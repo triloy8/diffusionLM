@@ -8,7 +8,7 @@ pub mod tokenizer;
 #[cfg(test)]
 mod tests;
 
-#[pyclass(name = "Tokenizer", module = "diffusionlm.tokenizer_rust")]
+#[pyclass(name = "Tokenizer", module = "transformerlm.tokenizer_rust")]
 pub struct PyTokenizer {
     inner: tokenizer::Tokenizer,
 }

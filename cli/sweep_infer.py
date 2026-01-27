@@ -12,10 +12,10 @@ from safetensors.torch import load_file
 
 from config import load_sweep_infer_config
 from trainkit.inference.generate import autoregressive_generate, diffusion_generate
-from diffusionlm.models import TransformerLM
-from diffusionlm.models.attention import set_sdp_backend
-from diffusionlm.tokenizer.tokenizer import Tokenizer
-from diffusionlm.utils.dtypes import DTYPES
+from transformerlm.models import TransformerLM
+from transformerlm.models.attention import set_sdp_backend
+from transformerlm.tokenizer.tokenizer import Tokenizer
+from transformerlm.utils.dtypes import DTYPES
 from cli.utils import add_config_args, load_config_or_print
 
 

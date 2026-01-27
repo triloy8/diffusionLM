@@ -1,4 +1,4 @@
-from diffusionlm.tokenizer.pretokenize import gpt2_bytes_to_unicode, PAT
+from transformerlm.tokenizer.pretokenize import gpt2_bytes_to_unicode, PAT
 from typing import Iterable, Iterator
 import json
 import regex as re

@@ -1,7 +1,7 @@
 import argparse
 
 from config import load_train_tokenizer_config
-from diffusionlm.tokenizer.bpe_trainer import train_bpe
+from transformerlm.tokenizer.bpe_trainer import train_bpe
 from cli.utils import add_config_args, load_config_or_print
 from trainkit.logger import ConsoleLogger
 

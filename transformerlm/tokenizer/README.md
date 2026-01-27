@@ -7,7 +7,7 @@ This directory houses the byte-level GPT-2 tokenizer implementation (pure Python
 Tokenizer throughput lives under `benchmarking/bench_tokenizer.py`. It reads `config/resources/bench_tokenizer.toml` (or any compatible TOML) and runs encode/decode benchmarks for each available implementation.
 
 ```bash
-uv run diffusionlm-bench-tokenizer --config config/resources/bench_tokenizer.toml
+uv run transformerlm-bench-tokenizer --config config/resources/bench_tokenizer.toml
 ```
 
 - The script always benchmarks the pure-Python tokenizer.
@@ -16,13 +16,13 @@ uv run diffusionlm-bench-tokenizer --config config/resources/bench_tokenizer.tom
 
 ## Building the Rust Tokenizer
 
-The PyO3 tokenizer lives in `diffusionlm/tokenizer_rust/`. To build/install it into your current environment:
+The PyO3 tokenizer lives in `transformerlm/tokenizer_rust/`. To build/install it into your current environment:
 
 ```bash
 uvx maturin develop
 ```
 
-This compiles the Rust crate and installs `diffusionlm.tokenizer_rust` so Python can import `RustTokenizer`. Re-run the command whenever you change the Rust sources.
+This compiles the Rust crate and installs `transformerlm.tokenizer_rust` so Python can import `RustTokenizer`. Re-run the command whenever you change the Rust sources.
 
 ## Layout
 

@@ -1,8 +1,9 @@
 import torch
 import torch.nn as nn
+from profiling import nvtx
 
-from diffusionlm.models.layers import Embedding, RMSNorm, SwiGLU, Linear
-from diffusionlm.models.attention import MultiheadSelfAttentionRoPE
+from transformerlm.models.instrumented.layers import Embedding, RMSNorm, SwiGLU, Linear
+from transformerlm.models.instrumented.attention import MultiheadSelfAttentionRoPE
 
 
 class TransformerBlock(nn.Module):
@@ -33,10 +34,22 @@ class TransformerBlock(nn.Module):
 
     def forward(self, x: torch.Tensor, attention_mask: torch.Tensor | None = None) -> torch.Tensor:
         token_positions = torch.arange(x.shape[-2], device=x.device, dtype=torch.long)
-        ln1x = self.ln1(x)
-        x = x + self.attn(ln1x, token_positions, attention_mask=attention_mask)
-        ln2x = self.ln2(x)
-        x = x + self.ffn(ln2x)
+        # Attention path
+        with nvtx.range("model/block/attn"):
+            if nvtx.enabled("fine"):
+                with nvtx.range("model/block/ln1"):
+                    ln1x = self.ln1(x)
+            else:
+                ln1x = self.ln1(x)
+            x = x + self.attn(ln1x, token_positions, attention_mask=attention_mask)
+        # FFN path
+        with nvtx.range("model/block/ffn"):
+            if nvtx.enabled("fine"):
+                with nvtx.range("model/block/ln2"):
+                    ln2x = self.ln2(x)
+            else:
+                ln2x = self.ln2(x)
+            x = x + self.ffn(ln2x)
         return x
 
 
@@ -76,9 +89,17 @@ class TransformerLM(nn.Module):
         self.lm_head = Linear(d_model, vocab_size, device, dtype)
 
     def forward(self, in_indices: torch.Tensor, attention_mask: torch.Tensor | None = None) -> torch.Tensor:
-        output_seq = self.token_embeddings(in_indices)
-        for layer in self.layers:
-            output_seq = layer(output_seq, attention_mask=attention_mask)
-        normed_output_seq = self.ln_final(output_seq)
-        logits = self.lm_head(normed_output_seq)
-        return logits
+        with nvtx.range("model/forward"):
+            with nvtx.range("model/embedding"):
+                output_seq = self.token_embeddings(in_indices)
+            for i, layer in enumerate(self.layers):
+                with nvtx.range(f"model/layer[{i}]"):
+                    output_seq = layer(output_seq, attention_mask=attention_mask)
+            if nvtx.enabled("fine"):
+                with nvtx.range("model/ln_final"):
+                    normed_output_seq = self.ln_final(output_seq)
+            else:
+                normed_output_seq = self.ln_final(output_seq)
+            with nvtx.range("model/lm_head"):
+                logits = self.lm_head(normed_output_seq)
+            return logits

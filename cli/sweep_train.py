@@ -6,7 +6,7 @@ from pathlib import Path
 import torch.multiprocessing as mp
 
 from config import TrainConfig, asdict_pretty, load_train_config
-from diffusionlm.builders import build_model, build_tokenizer, build_activation_filter
+from transformerlm.builders import build_model, build_tokenizer, build_activation_filter
 from trainkit.objectives import build_objective
 from trainkit.trainer import train_ddp
 from cli.train import build_train_namespace
@@ -82,7 +82,7 @@ def main():
     if cfg_dc is None:
         return
     if cfg_dc.ddp is None:
-        raise ValueError("DDP config is required when using diffusionlm-sweep-train")
+        raise ValueError("DDP config is required when using transformerlm-sweep-train")
 
     config_json = os.environ.get("WANDB_CONFIG_JSON")
     overrides = None

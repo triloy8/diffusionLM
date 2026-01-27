@@ -2,7 +2,7 @@ set shell := ["bash", "-euo", "pipefail", "-c"]
 
 prime_host := env_var_or_default("PRIME_HOST", "prime-node")
 remote_root := env_var_or_default("REMOTE_ROOT", "~/diffusionLM")
-infer_command_default := env_var_or_default("CMD_INFER", "uv run diffusionlm-bench-infer --config config/resources/bench_infer.toml")
+infer_command_default := env_var_or_default("CMD_INFER", "uv run transformerlm-bench-infer --config config/resources/bench_infer.toml")
 
 bootstrap-remote:
 	ssh {{prime_host}} 'bash -s' < scripts/bootstrap_remote.sh
@@ -26,16 +26,16 @@ nvitop:
 	ssh -t {{prime_host}} 'export PATH="$HOME/.local/bin:$PATH"; uvx nvitop'
 
 attach-train:
-	ssh -t {{prime_host}} 'tmux attach -t diffusionlm-train'
+	ssh -t {{prime_host}} 'tmux attach -t transformerlm-train'
 
 attach-sweep:
-	ssh -t {{prime_host}} 'tmux attach -t diffusionlm-sweep-train'
+	ssh -t {{prime_host}} 'tmux attach -t transformerlm-sweep-train'
 
 kill-train:
-	ssh {{prime_host}} 'tmux kill-session -t diffusionlm-train 2>/dev/null || true'
+	ssh {{prime_host}} 'tmux kill-session -t transformerlm-train 2>/dev/null || true'
 
 kill-sweep:
-	ssh {{prime_host}} 'tmux kill-session -t diffusionlm-sweep-train 2>/dev/null || true'
+	ssh {{prime_host}} 'tmux kill-session -t transformerlm-sweep-train 2>/dev/null || true'
 
 fetch any_file:
 	echo "Fetching {{any_file}} from {{prime_host}}"

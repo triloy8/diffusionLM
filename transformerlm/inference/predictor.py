@@ -4,11 +4,11 @@ import torch
 import time
 from safetensors.torch import load_file
 
-from diffusionlm.tokenizer.tokenizer import Tokenizer
-from diffusionlm.models import TransformerLM
-from diffusionlm.models.attention import set_sdp_backend
+from transformerlm.tokenizer.tokenizer import Tokenizer
+from transformerlm.models import TransformerLM
+from transformerlm.models.attention import set_sdp_backend
 from trainkit.inference.generate import autoregressive_generate, diffusion_generate
-from diffusionlm.utils.dtypes import DTYPES
+from transformerlm.utils.dtypes import DTYPES
 from trainkit.logger import Logger
 
 

@@ -1,6 +1,6 @@
 import torch
 
-from diffusionlm.models import TransformerLM
+from transformerlm.models import TransformerLM
 
 
 def make_tiny_model(device):

@@ -1,5 +1,5 @@
 [project]
-name = "diffusionlm"
+name = "transformerlm"
 version = "1.0.0"
 description = "Diffusion LM mini stack: from-scratch core with tokenizer, streaming data, CLI, and lightweight benchmarks."
 readme = "README.md"
@@ -33,13 +33,13 @@ ignore = [
 ]
 
 [project.scripts]
-diffusionlm-train = "cli.train:main"
-diffusionlm-infer = "cli.infer:main"
-diffusionlm-sweep-infer = "cli.sweep_infer:main"
-diffusionlm-sweep-train = "cli.sweep_train:main"
-diffusionlm-train-tokenizer = "cli.train_tokenizer:main"
-diffusionlm-bench-infer = "benchmarking.bench_infer_latency:main"
-diffusionlm-bench-tokenizer = "benchmarking.bench_tokenizer:main"
+transformerlm-train = "cli.train:main"
+transformerlm-infer = "cli.infer:main"
+transformerlm-sweep-infer = "cli.sweep_infer:main"
+transformerlm-sweep-train = "cli.sweep_train:main"
+transformerlm-train-tokenizer = "cli.train_tokenizer:main"
+transformerlm-bench-infer = "benchmarking.bench_infer_latency:main"
+transformerlm-bench-tokenizer = "benchmarking.bench_tokenizer:main"
 
 [build-system]
 requires = ["maturin>=1.7,<2"]
@@ -47,9 +47,9 @@ build-backend = "maturin"
 
 [tool.maturin]
 bindings = "pyo3"
-module-name = "diffusionlm.tokenizer_rust"
+module-name = "transformerlm.tokenizer_rust"
 python-source = "."
-manifest-path = "diffusionlm/tokenizer_rust/Cargo.toml"
+manifest-path = "transformerlm/tokenizer_rust/Cargo.toml"
 
 [tool.pytest.ini_options]
 addopts = ["-q"]

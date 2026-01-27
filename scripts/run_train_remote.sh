@@ -45,12 +45,12 @@ if ! command -v tmux >/dev/null 2>&1; then
 	exit 1
 fi
 
-SESSION="diffusionlm-train"
+SESSION="transformerlm-train"
 if tmux has-session -t "${SESSION}" 2>/dev/null; then
 	tmux kill-session -t "${SESSION}"
 fi
 
-CMD="uv run diffusionlm-train --config \"${CONFIG}\" ${EXTRA_ARGS}"
+CMD="uv run transformerlm-train --config \"${CONFIG}\" ${EXTRA_ARGS}"
 tmux new -d -s "${SESSION}" \
 	"WANDB_API_KEY=${WANDB_API_KEY} \
 CHECKPOINTING_S3_BUCKET=${CHECKPOINTING_S3_BUCKET:-} \

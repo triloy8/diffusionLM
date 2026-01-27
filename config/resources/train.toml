@@ -75,7 +75,7 @@ special_tokens_path = "./data/special_tokens_simplestories_8k.json"
 
 [logging]
 backend = "wandb"
-architecture = "DiffusionLM"
+architecture = "TransformerLM"
 dataset = "SimpleStories"
 log_activation_norms = true
 log_weight_norms = true

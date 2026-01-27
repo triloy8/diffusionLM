@@ -47,7 +47,7 @@ fi
 echo "${AGENT_CMD}"
 AGENT_CMD="${AGENT_CMD/wandb/uv run wandb}"
 
-SESSION="diffusionlm-sweep-train"
+SESSION="transformerlm-sweep-train"
 if tmux has-session -t "${SESSION}" 2>/dev/null; then
 	tmux kill-session -t "${SESSION}"
 fi

@@ -4,7 +4,7 @@ from pathlib import Path
 import torch.multiprocessing as mp
 
 from config import load_train_config
-from diffusionlm.builders import build_model, build_tokenizer, build_activation_filter
+from transformerlm.builders import build_model, build_tokenizer, build_activation_filter
 from trainkit.objectives import build_objective
 from trainkit.trainer import train_ddp
 from cli.utils import add_config_args, load_config_or_print
@@ -123,7 +123,7 @@ def main():
     if cfg_dc is None:
         return
     if cfg_dc.ddp is None:
-        raise ValueError("DDP config is required when using diffusionlm-train")
+        raise ValueError("DDP config is required when using transformerlm-train")
 
     # Build an argparse-like namespace expected by existing code
     ns = build_train_namespace(cfg_dc, str(args_cfg.config))

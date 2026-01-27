@@ -2,10 +2,10 @@ from __future__ import annotations
 
 import torch
 
-from diffusionlm.models import TransformerLM, Linear
-from diffusionlm.models.attention import set_sdp_backend
-from diffusionlm.tokenizer.tokenizer import Tokenizer
-from diffusionlm.utils.dtypes import DTYPES
+from transformerlm.models import TransformerLM, Linear
+from transformerlm.models.attention import set_sdp_backend
+from transformerlm.tokenizer.tokenizer import Tokenizer
+from transformerlm.utils.dtypes import DTYPES
 
 
 def build_model(cfg) -> torch.nn.Module:

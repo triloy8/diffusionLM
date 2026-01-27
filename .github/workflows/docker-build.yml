@@ -66,8 +66,8 @@ jobs:
           context: .
           push: true
           tags: |
-            docker.io/triloy8/diffusionlm:main
-            docker.io/triloy8/diffusionlm:sha-${{ github.sha }}
+            docker.io/triloy8/transformerlm:main
+            docker.io/triloy8/transformerlm:sha-${{ github.sha }}
           provenance: false
           sbom: false
           cache-from: type=gha

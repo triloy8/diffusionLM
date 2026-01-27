@@ -10,10 +10,10 @@ from safetensors.torch import load_file
 
 from cli.utils import add_config_args, load_config_or_print
 from config import load_bench_infer_config
-from diffusionlm.tokenizer.tokenizer import Tokenizer
-from diffusionlm.models import TransformerLM
-from diffusionlm.models.attention import set_sdp_backend
-from diffusionlm.utils.dtypes import DTYPES
+from transformerlm.tokenizer.tokenizer import Tokenizer
+from transformerlm.models import TransformerLM
+from transformerlm.models.attention import set_sdp_backend
+from transformerlm.utils.dtypes import DTYPES
 from trainkit.inference.generate import diffusion_generate
 from trainkit.objectives.loss import cross_entropy, diffusion_cross_entropy
 from trainkit.training.optim import AdamW
