@@ -59,14 +59,14 @@ dataset_config = ""
 train_split = "train"
 val_split = "test"
 text_field = "story"
-pipeline_mode = "megatron" # rows/packed
+pipeline_mode = "packed" # rows/packed
 pad_token_id = 50256
 pad_random_shift = true
 shuffle_buffer_size = 0
-cache_all = true
+cache_all = false
 shuffle_seed = 3407
-megatron_train_prefix = "./data/simplestories_train_text_document"
-megatron_val_prefix = "./data/simplestories_test_text_document"
+# megatron_train_prefix = "./data/simplestories_train_text_document"
+# megatron_val_prefix = "./data/simplestories_test_text_document"
 
 [data.tokenizer]
 vocab_path = "./data/vocab_simplestories_8k.json"
