@@ -12,7 +12,7 @@ from contextlib import nullcontext
 
 from config import asdict_pretty
 from trainkit.checkpointing import CheckpointManager
-from trainkit.data import HFTokenIteratorFactory, StreamingBatcher, RowBatcher, TokenizerLike
+from trainkit.data import HFTokenIteratorFactory, StreamingBatcher, RowBatcher, TokenizerLike, MegatronPackedBatcher
 from trainkit.ddp import DDP, OptimizerStateSharding
 from trainkit.ddp.utils import broadcast_string, setup_process_group, cleanup_process_group, allreduce_mean
 from trainkit.logger import Logger, ConsoleLogger, WandbLogger, RankZeroLogger
@@ -171,46 +171,53 @@ def train_ddp(
     val_log_every = int(getattr(cfg, "val_log_every", 0))
     val_log_samples = int(getattr(cfg, "val_log_samples", 0))
     per_rank_seed = (int(shuffle_seed) if shuffle_seed is not None else 0) + global_rank
-    train_iterator_factory = HFTokenIteratorFactory(
-        dataset_name=str(args.dataset_name),
-        dataset_config=(str(args.dataset_config) if args.dataset_config is not None else None),
-        split=str(args.train_split),
-        text_field=str(args.text_field),
-        tokenizer=tokenizer,
-        context_length=int(cfg.context_length),
-        eot_token_id=int(eot_token_id),
-        shuffle_buffer_size=int(getattr(args, "shuffle_buffer_size", 0)),
-        shuffle_seed=per_rank_seed,
-        cache_all=bool(getattr(args, "cache_all", False)),
-        world_size=cfg.world_size,
-        rank=global_rank,
-        logger=logger,
-        hf_debug_logging=True,
-    )
-    val_iterator_factory = HFTokenIteratorFactory(
-        dataset_name=str(args.dataset_name),
-        dataset_config=(str(args.dataset_config) if args.dataset_config is not None else None),
-        split=str(args.val_split),
-        text_field=str(args.text_field),
-        tokenizer=tokenizer,
-        context_length=int(cfg.context_length),
-        eot_token_id=int(eot_token_id),
-        shuffle_buffer_size=0,
-        shuffle_seed=None,
-        cache_all=bool(getattr(args, "cache_all", False)),
-        world_size=cfg.world_size,
-        rank=global_rank,
-        logger=logger,
-        hf_debug_logging=True,
-    )
     pipeline_mode = str(getattr(args, "pipeline_mode", "packed")).lower()
     pad_token_id = getattr(args, "pad_token_id", None)
     pad_random_shift = bool(getattr(args, "pad_random_shift", False))
-    if pipeline_mode not in {"packed", "rows"}:
-        raise ValueError("pipeline_mode must be one of: packed, rows")
-    if pipeline_mode == "rows":
+    if pipeline_mode not in {"packed", "rows", "megatron"}:
+        raise ValueError("pipeline_mode must be one of: packed, rows, megatron")
+    if pipeline_mode == "megatron":
+        train_prefix = getattr(args, "megatron_train_prefix", None)
+        val_prefix = getattr(args, "megatron_val_prefix", None)
+        if train_prefix is None or val_prefix is None:
+            raise ValueError("megatron_train_prefix and megatron_val_prefix must be set when pipeline_mode='megatron'")
+        train_batcher = MegatronPackedBatcher(train_prefix, device=str(cfg.device), logger=logger)
+        val_batcher = MegatronPackedBatcher(val_prefix, device=str(cfg.device), logger=logger)
+    elif pipeline_mode == "rows":
         if pad_token_id is None:
             raise ValueError("pad_token_id must be set when pipeline_mode='rows'")
+        train_iterator_factory = HFTokenIteratorFactory(
+            dataset_name=str(args.dataset_name),
+            dataset_config=(str(args.dataset_config) if args.dataset_config is not None else None),
+            split=str(args.train_split),
+            text_field=str(args.text_field),
+            tokenizer=tokenizer,
+            context_length=int(cfg.context_length),
+            eot_token_id=int(eot_token_id),
+            shuffle_buffer_size=int(getattr(args, "shuffle_buffer_size", 0)),
+            shuffle_seed=per_rank_seed,
+            cache_all=bool(getattr(args, "cache_all", False)),
+            world_size=cfg.world_size,
+            rank=global_rank,
+            logger=logger,
+            hf_debug_logging=True,
+        )
+        val_iterator_factory = HFTokenIteratorFactory(
+            dataset_name=str(args.dataset_name),
+            dataset_config=(str(args.dataset_config) if args.dataset_config is not None else None),
+            split=str(args.val_split),
+            text_field=str(args.text_field),
+            tokenizer=tokenizer,
+            context_length=int(cfg.context_length),
+            eot_token_id=int(eot_token_id),
+            shuffle_buffer_size=0,
+            shuffle_seed=None,
+            cache_all=bool(getattr(args, "cache_all", False)),
+            world_size=cfg.world_size,
+            rank=global_rank,
+            logger=logger,
+            hf_debug_logging=True,
+        )
         train_batcher = RowBatcher(
             train_iterator_factory,
             device=str(cfg.device),
@@ -226,6 +233,38 @@ def train_ddp(
             logger=logger,
         )
     else:
+        train_iterator_factory = HFTokenIteratorFactory(
+            dataset_name=str(args.dataset_name),
+            dataset_config=(str(args.dataset_config) if args.dataset_config is not None else None),
+            split=str(args.train_split),
+            text_field=str(args.text_field),
+            tokenizer=tokenizer,
+            context_length=int(cfg.context_length),
+            eot_token_id=int(eot_token_id),
+            shuffle_buffer_size=int(getattr(args, "shuffle_buffer_size", 0)),
+            shuffle_seed=per_rank_seed,
+            cache_all=bool(getattr(args, "cache_all", False)),
+            world_size=cfg.world_size,
+            rank=global_rank,
+            logger=logger,
+            hf_debug_logging=True,
+        )
+        val_iterator_factory = HFTokenIteratorFactory(
+            dataset_name=str(args.dataset_name),
+            dataset_config=(str(args.dataset_config) if args.dataset_config is not None else None),
+            split=str(args.val_split),
+            text_field=str(args.text_field),
+            tokenizer=tokenizer,
+            context_length=int(cfg.context_length),
+            eot_token_id=int(eot_token_id),
+            shuffle_buffer_size=0,
+            shuffle_seed=None,
+            cache_all=bool(getattr(args, "cache_all", False)),
+            world_size=cfg.world_size,
+            rank=global_rank,
+            logger=logger,
+            hf_debug_logging=True,
+        )
         train_batcher = StreamingBatcher(train_iterator_factory, device=str(cfg.device), logger=logger)
         val_batcher = StreamingBatcher(val_iterator_factory, device=str(cfg.device), logger=logger)
     checkpoint_manager.attach_batchers(

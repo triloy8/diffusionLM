@@ -300,6 +300,8 @@ class DataConfig(_BaseConfig):
     shuffle_buffer_size: int = 0
     shuffle_seed: Optional[int] = None
     cache_all: bool = False
+    megatron_train_prefix: Optional[Path] = None
+    megatron_val_prefix: Optional[Path] = None
 
     @model_validator(mode="after")
     def _validate_data(self):
@@ -312,13 +314,16 @@ class DataConfig(_BaseConfig):
         if not self.text_field:
             raise ValueError("text_field must not be empty")
         self.pipeline_mode = self.pipeline_mode.lower()
-        if self.pipeline_mode not in {"packed", "rows"}:
-            raise ValueError("pipeline_mode must be one of: packed, rows")
+        if self.pipeline_mode not in {"packed", "rows", "megatron"}:
+            raise ValueError("pipeline_mode must be one of: packed, rows, megatron")
         if self.pipeline_mode == "rows":
             if self.pad_token_id is None:
                 raise ValueError("pad_token_id must be set when pipeline_mode='rows'")
             if self.pad_token_id < 0:
                 raise ValueError("pad_token_id must be >= 0")
+        if self.pipeline_mode == "megatron":
+            if self.megatron_train_prefix is None or self.megatron_val_prefix is None:
+                raise ValueError("megatron_train_prefix and megatron_val_prefix must be set when pipeline_mode='megatron'")
         if self.shuffle_buffer_size < 0:
             raise ValueError("shuffle_buffer_size must be >= 0")
         if self.shuffle_seed is not None and self.shuffle_seed < 0:

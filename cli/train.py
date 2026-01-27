@@ -90,6 +90,12 @@ def build_train_namespace(cfg_dc, config_path: str) -> argparse.Namespace:
         shuffle_buffer_size=cfg_dc.data.shuffle_buffer_size,
         shuffle_seed=cfg_dc.data.shuffle_seed,
         cache_all=bool(getattr(cfg_dc.data, "cache_all", False)),
+        megatron_train_prefix=(
+            str(cfg_dc.data.megatron_train_prefix) if cfg_dc.data.megatron_train_prefix is not None else None
+        ),
+        megatron_val_prefix=(
+            str(cfg_dc.data.megatron_val_prefix) if cfg_dc.data.megatron_val_prefix is not None else None
+        ),
         rng_seed=cfg_dc.training.seed,
         muon_cfg=cfg_dc.optimizer.muon,
         # ddp
