@@ -37,8 +37,7 @@ uv run transformerlm-train-tokenizer --config config/resources/train_tokenizer.t
 uv run transformerlm-train --config config/resources/train.toml
 ```
 
-Notes:
-- See `trainkit/README.md` for training/runtime behavior (DDP backend, logging, optimizer options, validation, accumulation).
+> See `trainkit/README.md` for training/runtime behavior (DDP backend, logging, optimizer options, validation, accumulation).
 
 - Generate text:
 
@@ -46,7 +45,7 @@ Notes:
 uv run transformerlm-infer --config config/resources/infer.toml
 ```
 
-_Note:_ `inference.total_length` should be the final sequence length (prompt + generated tokens) and must not exceed `model.context_length`; the generated span is computed automatically as `total_length - prompt_tokens`.
+> `inference.total_length` should be the final sequence length (prompt + generated tokens) and must not exceed `model.context_length`; the generated span is computed automatically as `total_length - prompt_tokens`.
 
 - Inspect effective configuration without running:
 
