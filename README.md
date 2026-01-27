@@ -19,18 +19,9 @@ See `trainkit/README.md` for training‑specific details.
 - CLI + TOML configs: consistent entry points built around config schemas.
 - Benchmarking + profiling: tokenizer/inference throughput checks and memory/runtime inspection.
 
-## Installation
+## Usage
 
-Requires Python 3.11–3.12 and PyTorch. Using [`uv`](https://github.com/astral-sh/uv) is recommended.
-
-- Quick run without installing the package:
-
-```bash
-# Print an example resolved config
-uv run transformerlm-train --config config/resources/train.toml --print-config
-```
-
-## Usage Examples
+This project expects [`uv`](https://github.com/astral-sh/uv) for running entry points and scripts.
 
 Entry points live in `cli/` and are driven by TOML configs in `config/resources/`.
 
