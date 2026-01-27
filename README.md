@@ -89,46 +89,14 @@ The `Justfile` plus helper scripts under `scripts/` provide a thin remote contro
 
 ## Modules
 
-- transformerlm.models
-  - Purpose: Core Transformer components with bidirectional self-attention for diffusion-style language modelling.
-  - Key files: `transformerlm/models/transformer.py`, `transformerlm/models/attention.py`, `transformerlm/models/layers.py`.
-    (Attention is unmasked/bidirectional by default.)
-  - Notes: dtype helpers under `transformerlm/utils/dtypes.py`.
-
-- transformerlm.inference
-  - Purpose: Sampling utilities and simple generation helpers.
-  - Key files: `transformerlm/inference/generate.py`, `transformerlm/inference/sampling.py`, `transformerlm/inference/predictor.py`.
-  - Notes: Inference configs provide `prompt`, `steps`, `total_length`, `block_length`, `temperature`, and `mask_id` for diffusion decoding.
-
-- transformerlm.tokenizer
-  - Purpose: From‑scratch byte‑level BPE trainer and tokenizer IO.
-  - Key files: `transformerlm/tokenizer/bpe_trainer.py`, `transformerlm/tokenizer/tokenizer.py`, `transformerlm/tokenizer/pretokenize.py`, `transformerlm/tokenizer/io.py`.
-  - Artifacts: `vocab.json`, `merges.txt` (with optional special tokens).
-
-
-- cli
-  - Purpose: Command‑line entry points wrapping configs and orchestration.
-  - Key files: `cli/train.py`, `cli/infer.py`, `cli/train_tokenizer.py`, `cli/utils.py`.
-  - Scripts: exposed in `pyproject.toml` under `[project.scripts]`.
-
-- benchmarking
-  - Purpose: Quick throughput checks for inference and tokenizer.
-  - Key files: `benchmarking/bench_infer_latency.py`.
-  - Configs: `config/resources/bench_infer.toml`.
-
-- config
-  - Purpose: Typed config schemas, loaders, validation, and example TOMLs.
-  - Key files: `config/train.py`, `config/infer.py`, `config/bench_infer.py`, `config/bench_tokenizer.py`, `config/io.py`, `config/schemas.py`.
-  - Examples: `config/resources/*.toml`.
-  - Validation: Schemas are implemented with Pydantic v2 (`extra="forbid"`), so malformed or misspelled fields raise `pydantic.ValidationError` with structured error paths; CLI `--print-config` output comes from `model_dump()` with file paths stringified.
-
-- profiling
-  - Purpose: Lightweight helpers for memory/runtime profiling, including NVTX ranges.
-  - Key files: `profiling/memory.py`, `profiling/nvtx.py`.
-
-- utils
-  - Purpose: Small shared helpers.
-  - Key files: `transformerlm/utils/dtypes.py`.
+- `transformerlm.models`: core Transformer layers + attention (`transformerlm/models/transformer.py`).
+- `transformerlm.inference`: sampling + generation helpers (`transformerlm/inference/predictor.py`).
+- `transformerlm.tokenizer`: BPE trainer + tokenizer IO (`transformerlm/tokenizer/tokenizer.py`).
+- `cli`: training/inference entry points (`cli/train.py`).
+- `benchmarking`: quick perf checks (`benchmarking/bench_infer_latency.py`).
+- `config`: schemas + example TOMLs (`config/resources/*.toml`).
+- `profiling`: memory/runtime helpers (`profiling/nvtx.py`).
+- `utils`: shared small helpers (`transformerlm/utils/dtypes.py`).
 
 ## Benchmarking
 
