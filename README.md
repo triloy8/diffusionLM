@@ -1,10 +1,12 @@
-# Diffusion Language Model
+<div align="center">
+<h1>Transformer Language Model</h1>
+</div>
 
 ## What Is This?
 
-This repo started as a from‑scratch diffusion language model inspired by the LLaDA guidelines and has since evolved into two pieces:
-- `transformerlm`: the model, tokenizer, and inference utilities.
-- `trainkit`: a generic training stack (loop, DDP, checkpointing, logging, streaming).
+A from‑scratch Transformer LM stack with flexible objectives: diffusion or autoregressive, chosen via config. The repo is split into:
+- `transformerlm`: model, tokenizer, and inference utilities.
+- `trainkit`: generic training stack (loop, DDP, checkpointing, logging, streaming).
 
 See `trainkit/README.md` for training‑specific details.
 
@@ -12,7 +14,7 @@ See `trainkit/README.md` for training‑specific details.
 
 - From‑scratch model: decoder‑only Transformer LM (RMSNorm, SwiGLU, RoPE, SDPA/MHA), implemented directly with PyTorch modules.
 - From‑scratch tokenizer: byte‑level BPE training and IO, producing `vocab.json` and `merges.txt`.
-- Diffusion inference: bidirectional decoding with configurable mask scheduling (steps, block length, temperature).
+- Objectives: diffusion (bidirectional decoding) or autoregressive (causal), selected via config.
 - Training stack lives in `trainkit` (see `trainkit/README.md`).
 - CLI + TOML configs: consistent entry points built around config schemas.
 - Benchmarking + profiling: tokenizer/inference throughput checks and memory/runtime inspection.
@@ -64,14 +66,15 @@ uv run transformerlm-train --config config/resources/train.toml --print-config
 
 ## Datasets & Tokenizer Assets
 
-Training now streams data directly from Hugging Face Datasets. To prepare your environment:
+To prepare your environment:
 
-1. **Grab tokenizer files** (if you don’t already have them). Run `scripts/fetch_data.sh <output_dir>` to download `gpt2_vocab.json` and `gpt2_merges.txt` into `data/` (or another path you supply). Point `[data.tokenizer]` in your configs to those files.
-2. **Choose a dataset** available via `datasets.load_dataset`. Configure `[data]` with `dataset_name`, optional `dataset_config`, `train_split`, `val_split`, and the text field to tokenize. Streaming supports both public Hub datasets and local files (e.g., `load_dataset("json", data_files=...)`).
-3. **Cache for offline runs**: set `HF_DATASETS_CACHE=/path/to/cache` and run training/benchmarking once with network access (or use `huggingface-cli download ...`). After the cache is populated, set `HF_DATASETS_OFFLINE=1` to force offline mode. Private datasets require `huggingface-cli login` or an `HF_TOKEN` in the environment.
-4. **Shuffling**: `[data].shuffle_buffer_size` controls the streaming shuffle window; bump it up (e.g., 10_000) for better randomization, or leave at 0 to read the dataset order as-is. `shuffle_seed` seeds the buffer RNG; DDP adds the rank to keep shards deterministic and independent.
-5. **Row boundaries**: each streamed row is tokenized, appended with `eot_token_id`, and packed into fixed-length `context_length` blocks with rollover (no padding).
-6. **Pipeline mode**: set `[data].pipeline_mode = "packed"` (default) to concatenate rows, or `"rows"` to keep each row as its own sequence with padding. Row mode requires `[data].pad_token_id` and applies an attention mask so padded tokens are ignored.
+1. **Download tokenizer + (optional) Megatron bins** with `scripts/fetch_data.sh <output_dir>`. It pulls:
+   - `vocab_simplestories_8k.json`, `merges_simplestories_8k.txt`, `special_tokens_simplestories_8k.json`
+   - `simplestories_*_text_document.{bin,idx}` (for Megatron pipeline)
+2. **Select a pipeline** via `[data].pipeline_mode`:
+   - `"megatron"`: uses `megatron_train_prefix` / `megatron_val_prefix` (bin/idx).
+   - `"packed"` or `"rows"`: streams from `datasets.load_dataset` using `dataset_name`, `train_split`, `val_split`, `text_field`.
+3. **Offline caching (streaming)**: set `HF_DATASETS_CACHE=/path/to/cache`, run once with network access, then set `HF_DATASETS_OFFLINE=1`. Private datasets need `huggingface-cli login` or `HF_TOKEN`.
 
 ## Remote Orchestration
 
@@ -100,13 +103,9 @@ The `Justfile` plus helper scripts under `scripts/` provide a thin remote contro
 
 ## Benchmarking
 
-- Benchmarks live under `benchmarking/` and are TOML‑driven, similar to the CLI tools.
-- Use the sample configs in `config/resources/` and run the scripts directly.
-- Results are logged with the `ConsoleLogger` to stdout; no files are written.
-
-- Inference latency:
-- Run: `uv run transformerlm-bench-infer --config config/resources/bench_infer.toml`
-  - Measures warmup and repeated diffusion reverse passes, logging latency, tokens/sec, and diffusion-specific metrics (steps, block length, average mask ratio). When the config includes a `[data]` section with streaming fields (`dataset_name`, `split`, `text_field`, optional shuffle settings), the benchmark can optionally stream validation tokens from Hugging Face Datasets for backward/perplexity summaries (`perplexity_*` knobs under `[benchmark]`).
+- Benchmarks live under `benchmarking/` and use TOML configs in `config/resources/`.
+- Run (latency): `uv run transformerlm-bench-infer --config config/resources/bench_infer.toml`
+- Output: stdout only (latency, tokens/sec, diffusion stats).
 
 
 ## Tests
@@ -119,12 +118,6 @@ The `Justfile` plus helper scripts under `scripts/` provide a thin remote contro
   - Quick CPU suite: `uv run pytest -m "not slow and not gpu"`
   - Select a file/test: `uv run pytest tests/tokenizer/test_tokenizer.py -q`
   - Filter by name: `uv run pytest -k tokenizer`
-
-## Logging
-
-Training logging details live in `trainkit/README.md`. Inference logs include sampling params
-and truncated text (keys: `params.temperature`, `params.p`, `params.eos_token_id`,
-`text.prompt`, `text.output`, `metrics.latency_ms`).
 
 ## Profiling
 
