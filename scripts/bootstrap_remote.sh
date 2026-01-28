@@ -51,14 +51,14 @@ if ! command -v nvitop >/dev/null 2>&1; then
     fi
 fi
 
-repo_root="${HOME}/diffusionLM"
+repo_root="${HOME}/transformerlm"
 
 if [ ! -d "${repo_root}/.git" ]; then
     if [ -d "${repo_root}" ] && [ "$(ls -A "${repo_root}")" ]; then
         err "${repo_root} exists but is not a git repo; aborting clone"
         exit 1
     fi
-    git clone -b refactor/transformerlm https://github.com/triloy8/diffusionLM.git "${repo_root}"
+    git clone https://github.com/triloy8/transformerlm.git "${repo_root}"
 else
     (
         cd "${repo_root}"

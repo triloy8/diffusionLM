@@ -1,7 +1,7 @@
 set shell := ["bash", "-euo", "pipefail", "-c"]
 
 prime_host := env_var_or_default("PRIME_HOST", "prime-node")
-remote_root := env_var_or_default("REMOTE_ROOT", "~/diffusionLM")
+remote_root := env_var_or_default("REMOTE_ROOT", "~/transformerlm")
 infer_command_default := env_var_or_default("CMD_INFER", "uv run transformerlm-bench-infer --config config/resources/bench_infer.toml")
 
 bootstrap-remote:
