@@ -6,7 +6,7 @@
 
 A from‑scratch Transformer LM stack with flexible objectives: diffusion or autoregressive, chosen via config. The repo is split into:
 - `transformerlm`: model, tokenizer, and inference utilities.
-- `trainkit`: generic training stack (loop, DDP, checkpointing, logging, streaming).
+- `trainkit`: training stack (loop, DDP, checkpointing, logging, streaming).
 
 See `trainkit/README.md` for training‑specific details.
 
