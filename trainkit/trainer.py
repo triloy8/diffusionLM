@@ -442,6 +442,7 @@ def train_ddp(
         ckpting_save_folder=ckpting_save_folder,
         lr_cosine_schedule=lr_schedule,
         gradient_clipping=gradient_clipping,
+        checkpoint_callback=checkpoint_callback,
         objective=objective,
         batch_generator=torch_generator,
         repeat_masking_seed=repeat_masking_seed,
