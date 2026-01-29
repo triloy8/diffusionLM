@@ -2,6 +2,9 @@
 <h1>🤖 Transformer Language Model</h1>
 </div>
 
+## 🚀 Runs: 
+- [trixyL/transformerlm-ar-8k-simplestories](https://hf.co/trixyL/transformerlm-ar-8k-simplestories) — AR SimpleStories run (512 ctx, 8K vocab) 🤖📚
+
 ## ✨ What Is This?
 
 A from‑scratch Transformer LM stack with flexible objectives: diffusion or autoregressive, chosen via config. The repo is split into:
