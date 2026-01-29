@@ -3,7 +3,7 @@
 </div>
 
 ## 🚀 Runs: 
-- [trixyL/transformerlm-ar-8k-simplestories](https://hf.co/trixyL/transformerlm-ar-8k-simplestories) — AR SimpleStories run (512 ctx, 8K vocab) 🤖📚
+- [trixyL/transformerlm-ar-8k-simplestories](https://hf.co/trixyL/transformerlm-ar-8k-simplestories) — AR SimpleStories run (512 ctx, 8K vocab) 🤖📚 ([demo](https://huggingface.co/spaces/trixyL/simplestories-ar-demo))
 
 ## ✨ What Is This?
 
