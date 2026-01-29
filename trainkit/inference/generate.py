@@ -171,17 +171,14 @@ def autoregressive_generate(
         if logits_eos_inf and eos_token_id is not None:
             next_logits[:, eos_token_id] = float("-inf")
 
-        if top_p is not None:
-            probs = softmax(next_logits, dim=-1)
-            probs = top_p_filter(probs, float(top_p))
-            next_logits = torch.where(
-                probs > 0,
-                next_logits,
-                torch.full_like(next_logits, float("-inf")),
-            )
-
-        logits_with_noise = add_gumbel_noise(next_logits, temperature, generator=generator)
-        next_token = torch.argmax(logits_with_noise, dim=-1, keepdim=True)
+        if temperature <= 0:
+            next_token = torch.argmax(next_logits, dim=-1, keepdim=True)
+        else:
+            scaled_logits = next_logits / float(temperature)
+            probs = softmax(scaled_logits, dim=-1)
+            if top_p is not None:
+                probs = top_p_filter(probs, float(top_p))
+            next_token = torch.multinomial(probs, 1)
         x = torch.cat([x, next_token], dim=1)
 
     return x
