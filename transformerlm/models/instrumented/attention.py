@@ -201,3 +201,95 @@ class MultiheadSelfAttentionRoPE(nn.Module):
         with nvtx.range("attn/out_proj"):
             attn_rearr_proj = self.output_proj(attn_rearr)
         return attn_rearr_proj
+
+
+class MultiheadCrossAttentionRoPE(nn.Module):
+    def __init__(
+        self,
+        d_model: int,
+        num_heads: int,
+        max_seq_len: int,
+        theta: float,
+        attention_backend: str = "custom",
+        device=None,
+        dtype=None,
+    ):
+        super().__init__()
+        self.d_model = d_model
+        self.num_heads = num_heads
+        self.d_k = self.d_model // self.num_heads
+        self.d_v = self.d_k
+        self.max_seq_len = max_seq_len
+        self.theta = theta
+        if attention_backend not in ALLOWED_ATTENTION_BACKENDS:
+            raise ValueError(f"attention_backend must be one of {sorted(ALLOWED_ATTENTION_BACKENDS)}")
+        self.attention_backend = attention_backend
+
+        self.q_proj = Linear(self.d_model, self.d_model, device=device, dtype=dtype)
+        self.k_proj = Linear(self.d_model, self.d_model, device=device, dtype=dtype)
+        self.v_proj = Linear(self.d_model, self.d_model, device=device, dtype=dtype)
+        self.output_proj = Linear(self.d_model, self.d_model, device=device, dtype=dtype)
+
+        self.rope = RotaryPositionalEmbedding(self.theta, self.d_k, self.max_seq_len, device)
+
+    def forward(
+        self,
+        x: torch.Tensor,
+        context: torch.Tensor,
+        token_positions: torch.Tensor,
+        context_token_positions: torch.Tensor,
+        attention_mask: torch.Tensor | None = None,
+    ) -> torch.Tensor:
+        with nvtx.range("attn/q_proj"):
+            wqx = self.q_proj(x)
+        if nvtx.enabled("fine"):
+            with nvtx.range("attn/q_reshape"):
+                wqx_rearr = rearrange(wqx, "... seq_len (num_heads d_k) -> ... num_heads seq_len d_k", num_heads=self.num_heads, d_k=self.d_k)
+            with nvtx.range("attn/q_rope"):
+                wqx_rearr_rope = self.rope(wqx_rearr, token_positions)
+        else:
+            wqx_rearr = rearrange(wqx, "... seq_len (num_heads d_k) -> ... num_heads seq_len d_k", num_heads=self.num_heads, d_k=self.d_k)
+            wqx_rearr_rope = self.rope(wqx_rearr, token_positions)
+
+        with nvtx.range("attn/k_proj"):
+            wkx = self.k_proj(context)
+        if nvtx.enabled("fine"):
+            with nvtx.range("attn/k_reshape"):
+                wkx_rearr = rearrange(wkx, "... seq_len (num_heads d_k) -> ... num_heads seq_len d_k", num_heads=self.num_heads, d_k=self.d_k)
+            with nvtx.range("attn/k_rope"):
+                wkx_rearr_rope = self.rope(wkx_rearr, context_token_positions)
+        else:
+            wkx_rearr = rearrange(wkx, "... seq_len (num_heads d_k) -> ... num_heads seq_len d_k", num_heads=self.num_heads, d_k=self.d_k)
+            wkx_rearr_rope = self.rope(wkx_rearr, context_token_positions)
+
+        with nvtx.range("attn/v_proj"):
+            wvx = self.v_proj(context)
+        if nvtx.enabled("fine"):
+            with nvtx.range("attn/v_reshape"):
+                wvx_rearr = rearrange(wvx, "... seq_len (num_heads d_v) -> ... num_heads seq_len d_v", num_heads=self.num_heads, d_v=self.d_v)
+        else:
+            wvx_rearr = rearrange(wvx, "... seq_len (num_heads d_v) -> ... num_heads seq_len d_v", num_heads=self.num_heads, d_v=self.d_v)
+
+        with nvtx.range("attn/sdpa"):
+            if self.attention_backend == "torch_sdpa":
+                attn = torch_scaled_dot_product_attention(
+                    wqx_rearr_rope,
+                    wkx_rearr_rope,
+                    wvx_rearr,
+                    attention_mask=attention_mask,
+                )
+            else:
+                attn = scaled_dot_product_attention(
+                    wqx_rearr_rope,
+                    wkx_rearr_rope,
+                    wvx_rearr,
+                    attention_mask=attention_mask,
+                )
+        if nvtx.enabled("fine"):
+            with nvtx.range("attn/merge_heads"):
+                attn_rearr = rearrange(attn, "... num_heads seq_len d_v -> ... seq_len (num_heads d_v)", num_heads=self.num_heads, d_v=self.d_v)
+        else:
+            attn_rearr = rearrange(attn, "... num_heads seq_len d_v -> ... seq_len (num_heads d_v)", num_heads=self.num_heads, d_v=self.d_v)
+        with nvtx.range("attn/out_proj"):
+            attn_rearr_proj = self.output_proj(attn_rearr)
+        return attn_rearr_proj
