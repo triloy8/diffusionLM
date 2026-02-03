@@ -228,11 +228,26 @@ def infer_image(args, *, logger: Optional[Logger] = None):
     out_dir = Path(args.output_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
     outputs = []
-    for i in range(num_samples):
-        arr = out_indices[i].detach().cpu().to(torch.uint8).numpy().reshape(int(h), int(w))
+    if num_samples <= 1:
+        arr = out_indices[0].detach().cpu().to(torch.uint8).numpy().reshape(int(h), int(w))
         img = Image.fromarray(arr, mode="L")
-        path = out_dir / f"label_{label}_sample_{i}.png"
+        path = out_dir / f"label_{label}_sample_0.png"
         img.save(path)
+        outputs.append(str(path))
+    else:
+        import math
+
+        cols = int(math.ceil(math.sqrt(num_samples)))
+        rows = int(math.ceil(num_samples / cols))
+        grid = Image.new("L", (cols * int(w), rows * int(h)))
+        for i in range(num_samples):
+            arr = out_indices[i].detach().cpu().to(torch.uint8).numpy().reshape(int(h), int(w))
+            img = Image.fromarray(arr, mode="L")
+            r = i // cols
+            c = i % cols
+            grid.paste(img, (c * int(w), r * int(h)))
+        path = out_dir / f"label_{label}_samples.png"
+        grid.save(path)
         outputs.append(str(path))
 
     if logger is not None:
