@@ -154,6 +154,7 @@ class OptimizerConfig(_BaseConfig):
 
 
 class ModelConfig(_BaseConfig):
+    model_type: str = "lm"
     vocab_size: int
     context_length: int
     d_model: int
@@ -161,6 +162,7 @@ class ModelConfig(_BaseConfig):
     num_heads: int
     d_ff: int
     rope_theta: float
+    label_vocab_size: Optional[int] = None
     attention_backend: str = "custom"
     attention_sdp_backend: str = "auto"
     device: str
@@ -189,6 +191,12 @@ class ModelConfig(_BaseConfig):
         for field in ("vocab_size", "context_length", "d_model", "num_layers", "num_heads", "d_ff"):
             if getattr(self, field) <= 0:
                 raise ValueError(f"{field} must be > 0")
+        self.model_type = self.model_type.lower()
+        if self.model_type not in {"lm", "image"}:
+            raise ValueError("model_type must be one of: lm, image")
+        if self.model_type == "image":
+            if self.label_vocab_size is None or self.label_vocab_size <= 0:
+                raise ValueError("label_vocab_size must be > 0 when model_type='image'")
         if self.d_model % self.num_heads != 0:
             raise ValueError("d_model must be divisible by num_heads")
         if self.rope_theta <= 0:
@@ -293,7 +301,7 @@ class DataConfig(_BaseConfig):
     train_split: str
     val_split: str
     text_field: str
-    tokenizer: TokenizerConfig
+    tokenizer: Optional[TokenizerConfig] = None
     pipeline_mode: str = "packed"
     pad_token_id: Optional[int] = None
     pad_random_shift: bool = False
@@ -311,11 +319,14 @@ class DataConfig(_BaseConfig):
             raise ValueError("train_split must not be empty")
         if not self.val_split:
             raise ValueError("val_split must not be empty")
-        if not self.text_field:
-            raise ValueError("text_field must not be empty")
         self.pipeline_mode = self.pipeline_mode.lower()
-        if self.pipeline_mode not in {"packed", "rows", "megatron"}:
-            raise ValueError("pipeline_mode must be one of: packed, rows, megatron")
+        if self.pipeline_mode not in {"packed", "rows", "megatron", "mnist"}:
+            raise ValueError("pipeline_mode must be one of: packed, rows, megatron, mnist")
+        if self.pipeline_mode != "mnist":
+            if not self.text_field:
+                raise ValueError("text_field must not be empty")
+        if self.pipeline_mode in {"packed", "rows"} and self.tokenizer is None:
+            raise ValueError("tokenizer config must be set for packed/rows pipeline")
         if self.pipeline_mode == "rows":
             if self.pad_token_id is None:
                 raise ValueError("pad_token_id must be set when pipeline_mode='rows'")
@@ -449,6 +460,12 @@ class TrainConfig(_BaseConfig):
     ddp: Optional[DdpConfig] = None
     checkpointing: CheckpointingConfig
 
+    @model_validator(mode="after")
+    def _validate_train_config(self):
+        if self.data.pipeline_mode == "mnist" and self.model.random_trunc_prob > 0:
+            raise ValueError("random_trunc_prob must be 0 when pipeline_mode='mnist'")
+        return self
+
 
 class CheckpointConfig(_BaseConfig):
     ckpt_path: Path
@@ -566,6 +583,70 @@ class InferConfig(_BaseConfig):
         updates = {}
         if inf.total_length is None:
             updates["total_length"] = self.model.context_length
+        if inf.mask_id is None and self.model.mask_token_id is not None:
+            updates["mask_id"] = self.model.mask_token_id
+        if updates:
+            inf = inf.model_copy(update=updates)
+        self.inference = inf
+        return self
+
+
+class ImageInferenceConfig(_BaseConfig):
+    label: int
+    num_samples: int = 4
+    steps: int
+    block_length: int
+    temperature: float = 1.0
+    top_p: Optional[float] = None
+    mask_id: Optional[int] = None
+    seed: Optional[int] = None
+    cfg_scale: float = 0.0
+    remasking: str = "random"
+    output_dir: Path = Path("runs/infer_images")
+    image_height: Optional[int] = None
+    image_width: Optional[int] = None
+
+    @model_validator(mode="after")
+    def _validate_image_infer(self):
+        if self.label < 0:
+            raise ValueError("label must be >= 0")
+        if self.num_samples <= 0:
+            raise ValueError("num_samples must be > 0")
+        if self.steps <= 0:
+            raise ValueError("steps must be > 0")
+        if self.block_length <= 0:
+            raise ValueError("block_length must be > 0")
+        if self.temperature < 0:
+            raise ValueError("temperature must be >= 0")
+        if self.top_p is not None and (self.top_p < 0 or self.top_p > 1):
+            raise ValueError("top_p must be between 0 and 1 when provided")
+        if self.mask_id is not None and self.mask_id < 0:
+            raise ValueError("mask_id must be >= 0")
+        if self.cfg_scale < 0:
+            raise ValueError("cfg_scale must be >= 0")
+        if self.remasking not in {"low_confidence", "random"}:
+            raise ValueError("remasking must be one of: low_confidence, random")
+        if (self.image_height is None) ^ (self.image_width is None):
+            raise ValueError("image_height and image_width must be set together")
+        if self.image_height is not None and self.image_height <= 0:
+            raise ValueError("image_height must be > 0 when provided")
+        if self.image_width is not None and self.image_width <= 0:
+            raise ValueError("image_width must be > 0 when provided")
+        return self
+
+
+class ImageInferConfig(_BaseConfig):
+    model: ModelConfig
+    checkpoint: CheckpointConfig
+    inference: ImageInferenceConfig
+    logging: Optional[LoggingConfig] = None
+
+    @model_validator(mode="after")
+    def _finalize_image_inference(self):
+        if self.model.model_type != "image":
+            raise ValueError("model.model_type must be 'image' for image inference")
+        inf = self.inference
+        updates = {}
         if inf.mask_id is None and self.model.mask_token_id is not None:
             updates["mask_id"] = self.model.mask_token_id
         if updates:

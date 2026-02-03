@@ -26,15 +26,18 @@ def top_p_filter(probs: torch.Tensor, p: float) -> torch.Tensor:
     sorted_probs, sorted_indices = torch.sort(probs, descending=True)
     cumulative = torch.cumsum(sorted_probs, dim=-1)
 
-    cutoff = (cumulative >= p).float().argmax(dim=-1) + 1
+    keep = cumulative <= p
+    keep[..., 0] = True
+    first_ge = (cumulative >= p).float().argmax(dim=-1)
+    rows = torch.arange(keep.shape[0], device=keep.device)
+    keep[rows, first_ge] = True
+
+    filtered_sorted = torch.where(keep, sorted_probs, torch.zeros_like(sorted_probs))
+    norm = filtered_sorted.sum(dim=-1, keepdim=True).clamp_min(1e-12)
+    filtered_sorted = filtered_sorted / norm
+
     filtered = torch.zeros_like(probs)
-    batch = probs.shape[0]
-    for i in range(batch):
-        k = cutoff[i].item()
-        sel = sorted_indices[i, :k]
-        sel_probs = sorted_probs[i, :k]
-        filtered[i, sel] = sel_probs
-        filtered[i] /= filtered[i].sum()
+    filtered.scatter_(dim=-1, index=sorted_indices, src=filtered_sorted)
     return filtered.reshape(orig_shape)
 
 

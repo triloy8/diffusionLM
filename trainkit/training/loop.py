@@ -108,6 +108,11 @@ def train_loop(
         train_batch = raw_train_batch
         train_inputs = objective.model_inputs(train_batch)
         train_attn_mask = _attention_mask(train_batch)
+        train_context = None
+        if isinstance(train_inputs, tuple):
+            if len(train_inputs) != 2:
+                raise ValueError("objective.model_inputs must return a tensor or (tensor, context)")
+            train_inputs, train_context = train_inputs
 
         # schedule (set LR for this iteration before forward/step)
         logged_lr = None
@@ -139,9 +144,15 @@ def train_loop(
         autocast_ctx = torch.autocast("cuda", dtype=amp_torch_dtype) if use_amp else nullcontext()
         with autocast_ctx:
             if train_attn_mask is not None:
-                train_logits = model(train_inputs, attention_mask=train_attn_mask)
+                if train_context is not None:
+                    train_logits = model(train_inputs, attention_mask=train_attn_mask, context=train_context)
+                else:
+                    train_logits = model(train_inputs, attention_mask=train_attn_mask)
             else:
-                train_logits = model(train_inputs)
+                if train_context is not None:
+                    train_logits = model(train_inputs, context=train_context)
+                else:
+                    train_logits = model(train_inputs)
             train_loss = objective.compute_loss(train_logits, train_batch)
         scaled_loss = train_loss / accum_steps
         if logger is not None and device.startswith("cuda") and torch.cuda.is_available():
@@ -367,11 +378,22 @@ def train_loop(
                     val_batch = raw_val_batch
                     val_inputs = objective.model_inputs(val_batch)
                     val_attn_mask = _attention_mask(val_batch)
+                    val_context = None
+                    if isinstance(val_inputs, tuple):
+                        if len(val_inputs) != 2:
+                            raise ValueError("objective.model_inputs must return a tensor or (tensor, context)")
+                        val_inputs, val_context = val_inputs
                     with autocast_ctx:
                         if val_attn_mask is not None:
-                            val_logits = model(val_inputs, attention_mask=val_attn_mask)
+                            if val_context is not None:
+                                val_logits = model(val_inputs, attention_mask=val_attn_mask, context=val_context)
+                            else:
+                                val_logits = model(val_inputs, attention_mask=val_attn_mask)
                         else:
-                            val_logits = model(val_inputs)
+                            if val_context is not None:
+                                val_logits = model(val_inputs, context=val_context)
+                            else:
+                                val_logits = model(val_inputs)
                         val_loss = objective.compute_loss(val_logits, val_batch)
                     running_val_loss += float(val_loss.item())
                     val_tokens += int(val_inputs.numel())

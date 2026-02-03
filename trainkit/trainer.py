@@ -12,7 +12,14 @@ from contextlib import nullcontext
 
 from config import asdict_pretty
 from trainkit.checkpointing import CheckpointManager
-from trainkit.data import HFTokenIteratorFactory, StreamingBatcher, RowBatcher, TokenizerLike, MegatronPackedBatcher
+from trainkit.data import (
+    HFTokenIteratorFactory,
+    StreamingBatcher,
+    RowBatcher,
+    TokenizerLike,
+    MegatronPackedBatcher,
+    build_mnist_batcher,
+)
 from trainkit.ddp import DDP, OptimizerStateSharding
 from trainkit.ddp.utils import broadcast_string, setup_process_group, cleanup_process_group, allreduce_mean
 from trainkit.logger import Logger, ConsoleLogger, WandbLogger, RankZeroLogger
@@ -165,17 +172,17 @@ def train_ddp(
     shuffle_seed = getattr(args, "shuffle_seed", None)
     if shuffle_seed is None:
         shuffle_seed = getattr(args, "rng_seed", getattr(cfg, "seed", None))
-    eot_token_id = getattr(cfg, "eot_token_id", None)
-    if eot_token_id is None:
-        raise ValueError("eot_token_id must be set for streaming datasets")
     val_log_every = int(getattr(cfg, "val_log_every", 0))
     val_log_samples = int(getattr(cfg, "val_log_samples", 0))
     per_rank_seed = (int(shuffle_seed) if shuffle_seed is not None else 0) + global_rank
     pipeline_mode = str(getattr(args, "pipeline_mode", "packed")).lower()
+    eot_token_id = getattr(cfg, "eot_token_id", None)
+    if pipeline_mode in {"packed", "rows"} and eot_token_id is None:
+        raise ValueError("eot_token_id must be set for packed/rows datasets")
     pad_token_id = getattr(args, "pad_token_id", None)
     pad_random_shift = bool(getattr(args, "pad_random_shift", False))
-    if pipeline_mode not in {"packed", "rows", "megatron"}:
-        raise ValueError("pipeline_mode must be one of: packed, rows, megatron")
+    if pipeline_mode not in {"packed", "rows", "megatron", "mnist"}:
+        raise ValueError("pipeline_mode must be one of: packed, rows, megatron, mnist")
     if pipeline_mode == "megatron":
         train_prefix = getattr(args, "megatron_train_prefix", None)
         val_prefix = getattr(args, "megatron_val_prefix", None)
@@ -231,6 +238,27 @@ def train_ddp(
             pad_token_id=int(pad_token_id),
             pad_random_shift=pad_random_shift,
             logger=logger,
+        )
+    elif pipeline_mode == "mnist":
+        train_batcher = build_mnist_batcher(
+            dataset_name=str(args.dataset_name),
+            dataset_config=(str(args.dataset_config) if args.dataset_config is not None else None),
+            split=str(args.train_split),
+            device=str(cfg.device),
+            shuffle=True,
+            shuffle_seed=per_rank_seed,
+            world_size=cfg.world_size,
+            rank=global_rank,
+        )
+        val_batcher = build_mnist_batcher(
+            dataset_name=str(args.dataset_name),
+            dataset_config=(str(args.dataset_config) if args.dataset_config is not None else None),
+            split=str(args.val_split),
+            device=str(cfg.device),
+            shuffle=False,
+            shuffle_seed=per_rank_seed,
+            world_size=cfg.world_size,
+            rank=global_rank,
         )
     else:
         train_iterator_factory = HFTokenIteratorFactory(
@@ -481,6 +509,8 @@ def build_run_config(cfg, cfg_dc):
         "num_heads": cfg.num_heads,
         "d_ff": cfg.d_ff,
         "rope_theta": cfg.rope_theta,
+        "model_type": getattr(cfg, "model_type", "lm"),
+        "label_vocab_size": getattr(cfg, "label_vocab_size", None),
         "attention_backend": cfg.attention_backend,
         "attention_sdp_backend": cfg.attention_sdp_backend,
         "mask_token_id": cfg.mask_token_id,

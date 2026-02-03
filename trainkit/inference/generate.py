@@ -22,6 +22,7 @@ def diffusion_generate(
     remasking: str = "random",
     logits_eos_inf: bool = False,
     confidence_eos_eot_inf: bool = False,
+    context: torch.Tensor | None = None,
     generator: torch.Generator | None = None,
 ) -> torch.Tensor:
     """Generate sequences via the diffusion reverse process."""
@@ -73,11 +74,18 @@ def diffusion_generate(
             if cfg_scale > 0.0:
                 un_x = x.clone()
                 un_x[prompt_index] = mask_id
-                logits = model(torch.cat([x, un_x], dim=0))
+                if context is not None:
+                    ctx = torch.cat([context, context], dim=0)
+                    logits = model(torch.cat([x, un_x], dim=0), context=ctx)
+                else:
+                    logits = model(torch.cat([x, un_x], dim=0))
                 logits, un_logits = torch.chunk(logits, 2, dim=0)
                 logits = un_logits + (cfg_scale + 1.0) * (logits - un_logits)
             else:
-                logits = model(x)
+                if context is not None:
+                    logits = model(x, context=context)
+                else:
+                    logits = model(x)
 
             if logits_eos_inf and eos_token_id is not None:
                 logits[:, :, eos_token_id] = float("-inf")
@@ -150,6 +158,7 @@ def autoregressive_generate(
     top_p: float | None = None,
     eos_token_id: int | None = None,
     logits_eos_inf: bool = False,
+    context: torch.Tensor | None = None,
     generator: torch.Generator | None = None,
 ) -> torch.Tensor:
     """Generate sequences token-by-token with a causal attention mask."""
@@ -165,7 +174,10 @@ def autoregressive_generate(
         causal = torch.tril(torch.ones((seq_len, seq_len), device=x.device, dtype=torch.bool))
         attention_mask = causal.unsqueeze(0).expand(x.shape[0], -1, -1)
 
-        logits = model(x, attention_mask=attention_mask)
+        if context is not None:
+            logits = model(x, attention_mask=attention_mask, context=context)
+        else:
+            logits = model(x, attention_mask=attention_mask)
         next_logits = logits[:, -1, :]
 
         if logits_eos_inf and eos_token_id is not None:

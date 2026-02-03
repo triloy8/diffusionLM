@@ -15,6 +15,7 @@ class DiffusionBatch:
     attention_mask: torch.Tensor | None
     loss_mask: torch.Tensor | None
     metadata: Dict[str, Any]
+    labels: torch.Tensor | None = None
 
 
 @dataclass
@@ -47,19 +48,25 @@ def _draw_clean_targets(
     random_trunc_prob: float = 0.01,
     min_length: int | None = None,
     generator: torch.Generator | None = None,
-) -> tuple[torch.Tensor, torch.Tensor | None, bool]:
+) -> tuple[torch.Tensor, torch.Tensor | None, bool, torch.Tensor | None]:
     device_obj = torch.device(device)
     rng_device = generator.device if generator is not None and hasattr(generator, "device") else torch.device("cpu")
 
     attention_mask = None
+    labels = None
     drawn = dataset.draw(batch_size=batch_size, context_length=context_length)
-    if isinstance(drawn, tuple):
+    if hasattr(drawn, "tokens") and hasattr(drawn, "labels"):
+        clean_targets = drawn.tokens
+        labels = drawn.labels
+    elif isinstance(drawn, tuple):
         clean_targets, attention_mask = drawn
     else:
         clean_targets = drawn
     clean_targets = clean_targets.to(device_obj, dtype=torch.long)
     if attention_mask is not None:
         attention_mask = attention_mask.to(device_obj, dtype=torch.bool)
+    if labels is not None:
+        labels = labels.to(device_obj, dtype=torch.long)
 
     random_trunc_applied = False
     if random_trunc_prob > 0:
@@ -75,7 +82,7 @@ def _draw_clean_targets(
     if attention_mask is not None and random_trunc_applied:
         attention_mask = attention_mask[:, : clean_targets.shape[1]]
 
-    return clean_targets, attention_mask, random_trunc_applied
+    return clean_targets, attention_mask, random_trunc_applied, labels
 
 
 def get_batch(
@@ -91,7 +98,7 @@ def get_batch(
     deterministic_mask: bool = False,
     generator: torch.Generator | None = None,
 ) -> DiffusionBatch:
-    clean_targets, attention_mask, random_trunc_applied = _draw_clean_targets(
+    clean_targets, attention_mask, random_trunc_applied, labels = _draw_clean_targets(
         dataset,
         batch_size,
         context_length,
@@ -147,6 +154,7 @@ def get_batch(
         p_mask=p_mask,
         attention_mask=attention_mask,
         loss_mask=loss_mask,
+        labels=labels,
         metadata=metadata,
     )
 
@@ -163,7 +171,7 @@ def get_megadlm_diffusion_batch(
     random_trunc_prob: float = 0.01,
     generator: torch.Generator | None = None,
 ) -> DiffusionBatch:
-    clean_targets, attention_mask, random_trunc_applied = _draw_clean_targets(
+    clean_targets, attention_mask, random_trunc_applied, labels = _draw_clean_targets(
         dataset,
         batch_size,
         context_length,
@@ -244,6 +252,7 @@ def get_megadlm_diffusion_batch(
         p_mask=p_mask,
         attention_mask=attention_mask,
         loss_mask=loss_mask,
+        labels=labels,
         metadata=metadata,
     )
 
@@ -257,7 +266,7 @@ def get_autoregressive_batch(
     random_trunc_prob: float = 0.01,
     generator: torch.Generator | None = None,
 ) -> AutoregressiveBatch:
-    clean_targets, attention_mask, random_trunc_applied = _draw_clean_targets(
+    clean_targets, attention_mask, random_trunc_applied, _labels = _draw_clean_targets(
         dataset,
         batch_size,
         context_length,

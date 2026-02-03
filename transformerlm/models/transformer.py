@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 
 from transformerlm.models.layers import Embedding, RMSNorm, SwiGLU, Linear
-from transformerlm.models.attention import MultiheadSelfAttentionRoPE
+from transformerlm.models.attention import MultiheadSelfAttentionRoPE, MultiheadCrossAttentionRoPE
 
 
 class TransformerBlock(nn.Module):
@@ -79,6 +79,127 @@ class TransformerLM(nn.Module):
         output_seq = self.token_embeddings(in_indices)
         for layer in self.layers:
             output_seq = layer(output_seq, attention_mask=attention_mask)
+        normed_output_seq = self.ln_final(output_seq)
+        logits = self.lm_head(normed_output_seq)
+        return logits
+
+
+class TransformerImageBlock(nn.Module):
+    def __init__(
+        self,
+        d_model: int,
+        num_heads: int,
+        max_seq_len: int,
+        theta: float,
+        d_ff: int,
+        attention_backend: str = "custom",
+        device=None,
+        dtype=None,
+    ):
+        super().__init__()
+        self.ffn = SwiGLU(d_model, d_ff, device, dtype)
+        self.self_attn = MultiheadSelfAttentionRoPE(
+            d_model,
+            num_heads,
+            max_seq_len,
+            theta,
+            attention_backend=attention_backend,
+            device=device,
+            dtype=dtype,
+        )
+        self.cross_attn = MultiheadCrossAttentionRoPE(
+            d_model,
+            num_heads,
+            max_seq_len,
+            theta,
+            attention_backend=attention_backend,
+            device=device,
+            dtype=dtype,
+        )
+        self.ln1 = RMSNorm(d_model, device=device, dtype=dtype)
+        self.ln2 = RMSNorm(d_model, device=device, dtype=dtype)
+        self.ln3 = RMSNorm(d_model, device=device, dtype=dtype)
+
+    def forward(
+        self,
+        x: torch.Tensor,
+        token_positions: torch.Tensor,
+        context: torch.Tensor,
+        context_token_positions: torch.Tensor,
+        attention_mask: torch.Tensor | None = None,
+    ) -> torch.Tensor:
+        ln1x = self.ln1(x)
+        x = x + self.self_attn(ln1x, token_positions, attention_mask=attention_mask)
+        ln2x = self.ln2(x)
+        x = x + self.cross_attn(
+            ln2x,
+            context,
+            token_positions,
+            context_token_positions,
+            attention_mask=None,
+        )
+        ln3x = self.ln3(x)
+        x = x + self.ffn(ln3x)
+        return x
+
+
+class TransformerImage(nn.Module):
+    def __init__(
+        self,
+        vocab_size: int,
+        context_length: int,
+        d_model: int,
+        num_layers: int,
+        num_heads: int,
+        d_ff: int,
+        rope_theta: float,
+        label_vocab_size: int,
+        attention_backend: str = "custom",
+        device=None,
+        dtype=None,
+    ):
+        super().__init__()
+        self.context_length = context_length
+        self.token_embeddings = Embedding(vocab_size, d_model, device, dtype)
+        self.label_embeddings = Embedding(label_vocab_size, d_model, device, dtype)
+        self.layers = torch.nn.ModuleList(
+            [
+                TransformerImageBlock(
+                    d_model,
+                    num_heads,
+                    context_length,
+                    rope_theta,
+                    d_ff,
+                    attention_backend=attention_backend,
+                    device=device,
+                    dtype=dtype,
+                )
+                for _ in range(num_layers)
+            ]
+        )
+        self.ln_final = RMSNorm(d_model, device=device, dtype=dtype)
+        self.lm_head = Linear(d_model, vocab_size, device, dtype)
+
+    def forward(
+        self,
+        in_indices: torch.Tensor,
+        attention_mask: torch.Tensor | None = None,
+        context: torch.Tensor | None = None,
+    ) -> torch.Tensor:
+        if context is None:
+            raise ValueError("context must be provided for TransformerImage")
+        output_seq = self.token_embeddings(in_indices)
+        context_emb = self.label_embeddings(context).unsqueeze(-2)
+        token_positions = torch.arange(output_seq.shape[-2], device=output_seq.device, dtype=torch.long)
+        context_token_positions = torch.arange(context_emb.shape[-2], device=output_seq.device, dtype=torch.long)
+        for layer in self.layers:
+            output_seq = layer(
+                output_seq,
+                token_positions,
+                context_emb,
+                context_token_positions,
+                attention_mask=attention_mask,
+            )
         normed_output_seq = self.ln_final(output_seq)
         logits = self.lm_head(normed_output_seq)
         return logits

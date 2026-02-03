@@ -5,7 +5,7 @@ import time
 from safetensors.torch import load_file
 
 from transformerlm.tokenizer.tokenizer import Tokenizer
-from transformerlm.models import TransformerLM
+from transformerlm.models import TransformerLM, TransformerImage
 from transformerlm.models.attention import set_sdp_backend
 from trainkit.inference.generate import autoregressive_generate, diffusion_generate
 from transformerlm.utils.dtypes import DTYPES
@@ -159,3 +159,89 @@ def infer_transformer(args, *, logger: Optional[Logger] = None, artifact_path: O
             pass
 
     return [output_string]
+
+
+def infer_image(args, *, logger: Optional[Logger] = None):
+    set_sdp_backend(getattr(args, "attention_sdp_backend", "auto"))
+    model = TransformerImage(
+        vocab_size=args.vocab_size,
+        context_length=args.context_length,
+        d_model=args.d_model,
+        num_layers=args.num_layers,
+        num_heads=args.num_heads,
+        d_ff=args.d_ff,
+        rope_theta=args.rope_theta,
+        label_vocab_size=args.label_vocab_size,
+        attention_backend=getattr(args, "attention_backend", "custom"),
+        device=args.device,
+        dtype=DTYPES[args.dtype],
+    )
+    model.eval()
+
+    model_state = load_file(str(args.ckpt_path))
+    model.load_state_dict(model_state)
+
+    num_samples = int(args.num_samples)
+    label = int(args.label)
+    device = args.device
+    context = torch.full((num_samples,), label, device=device, dtype=torch.long)
+    prompt = torch.empty((num_samples, 0), device=device, dtype=torch.long)
+    gen_length = int(args.context_length)
+
+    seed = getattr(args, "seed", None)
+    generator = None
+    if seed is not None:
+        generator = torch.Generator(device=device)
+        generator.manual_seed(int(seed))
+
+    out_indices = diffusion_generate(
+        model,
+        prompt,
+        mask_id=int(args.mask_id),
+        eos_token_id=None,
+        steps=int(args.steps),
+        gen_length=int(gen_length),
+        block_length=int(args.block_length),
+        temperature=float(args.temperature),
+        top_p=(None if args.top_p is None else float(args.top_p)),
+        cfg_scale=float(args.cfg_scale),
+        remasking=str(args.remasking),
+        logits_eos_inf=False,
+        confidence_eos_eot_inf=False,
+        context=context,
+        generator=generator,
+    )
+
+    h = getattr(args, "image_height", None)
+    w = getattr(args, "image_width", None)
+    if h is None or w is None:
+        side = int(gen_length ** 0.5)
+        if side * side != gen_length:
+            raise ValueError("image_height/image_width must be set when context_length is not a square")
+        h = side
+        w = side
+
+    from pathlib import Path
+    import numpy as np
+    from PIL import Image
+
+    out_dir = Path(args.output_dir)
+    out_dir.mkdir(parents=True, exist_ok=True)
+    outputs = []
+    for i in range(num_samples):
+        arr = out_indices[i].detach().cpu().to(torch.uint8).numpy().reshape(int(h), int(w))
+        img = Image.fromarray(arr, mode="L")
+        path = out_dir / f"label_{label}_sample_{i}.png"
+        img.save(path)
+        outputs.append(str(path))
+
+    if logger is not None:
+        logger.log(
+            {
+                "phase": "infer",
+                "metrics.num_samples": int(num_samples),
+                "params.label": int(label),
+                "params.output_dir": str(out_dir),
+            }
+        )
+    return outputs

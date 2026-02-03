@@ -27,7 +27,7 @@ class Objective(ABC):
         ...
 
     @abstractmethod
-    def model_inputs(self, batch: Any) -> torch.Tensor:
+    def model_inputs(self, batch: Any):
         ...
 
     @abstractmethod

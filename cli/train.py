@@ -33,6 +33,8 @@ def build_train_namespace(cfg_dc, config_path: str) -> argparse.Namespace:
         num_heads=cfg_dc.model.num_heads,
         d_ff=cfg_dc.model.d_ff,
         rope_theta=cfg_dc.model.rope_theta,
+        model_type=getattr(cfg_dc.model, "model_type", "lm"),
+        label_vocab_size=getattr(cfg_dc.model, "label_vocab_size", None),
         attention_backend=cfg_dc.model.attention_backend,
         attention_sdp_backend=cfg_dc.model.attention_sdp_backend,
         mask_token_id=cfg_dc.model.mask_token_id,
@@ -81,9 +83,17 @@ def build_train_namespace(cfg_dc, config_path: str) -> argparse.Namespace:
         train_split=cfg_dc.data.train_split,
         val_split=cfg_dc.data.val_split,
         text_field=cfg_dc.data.text_field,
-        tokenizer_vocab_path=cfg_dc.data.tokenizer.vocab_path,
-        tokenizer_merges_path=cfg_dc.data.tokenizer.merges_path,
-        tokenizer_special_tokens_path=str(cfg_dc.data.tokenizer.special_tokens_path),
+        tokenizer_vocab_path=(
+            cfg_dc.data.tokenizer.vocab_path if cfg_dc.data.tokenizer is not None else None
+        ),
+        tokenizer_merges_path=(
+            cfg_dc.data.tokenizer.merges_path if cfg_dc.data.tokenizer is not None else None
+        ),
+        tokenizer_special_tokens_path=(
+            str(cfg_dc.data.tokenizer.special_tokens_path)
+            if cfg_dc.data.tokenizer is not None
+            else None
+        ),
         pipeline_mode=cfg_dc.data.pipeline_mode,
         pad_token_id=cfg_dc.data.pad_token_id,
         pad_random_shift=bool(getattr(cfg_dc.data, "pad_random_shift", False)),
