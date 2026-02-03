@@ -178,7 +178,10 @@ class MegaDlmDiffusionObjective(Objective):
         )
 
     def model_inputs(self, batch: DiffusionBatch) -> torch.Tensor:
-        return batch.noisy_inputs
+        labels = getattr(batch, "labels", None)
+        if labels is None:
+            return batch.noisy_inputs
+        return batch.noisy_inputs, labels
 
     def attention_mask(self, batch: DiffusionBatch):
         return batch.attention_mask
