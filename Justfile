@@ -44,6 +44,18 @@ fetch any_file:
 	echo "Fetching {{any_file}} from {{prime_host}}"
 	scp -r {{prime_host}}:{{remote_root}}/{{any_file}} {{any_file}}
 
+rsync any_path:
+	rsync -av --partial --progress {{prime_host}}:{{remote_root}}/{{any_path}} {{any_path}}
+
+rsync-run run_name:
+	rsync -av --partial --progress {{prime_host}}:{{remote_root}}/runs/{{run_name}} runs/
+
+rsync-latest-run:
+	latest="$(ssh {{prime_host}} "ls -1t {{remote_root}}/runs | head -n 1")"; \
+	if [ -z "$latest" ]; then echo "No runs found on {{prime_host}}:{{remote_root}}/runs" >&2; exit 1; fi; \
+	echo "Fetching latest run: $latest"; \
+	rsync -av --partial --progress {{prime_host}}:{{remote_root}}/runs/"$latest" runs/
+
 list-runs:
 	ssh {{prime_host}} "ls -1 {{remote_root}}/runs"
 

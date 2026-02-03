@@ -43,6 +43,10 @@ if ! command -v tmux >/dev/null 2>&1; then
     apt_install tmux
 fi
 
+if ! command -v rsync >/dev/null 2>&1; then
+    apt_install rsync
+fi
+
 if ! command -v nvitop >/dev/null 2>&1; then
     if command -v uv >/dev/null 2>&1; then
         uvx nvitop
