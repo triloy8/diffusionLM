@@ -36,6 +36,7 @@ def build_train_namespace(cfg_dc, config_path: str) -> argparse.Namespace:
         rope_theta=cfg_dc.model.rope_theta,
         model_type=getattr(cfg_dc.model, "model_type", "lm"),
         label_vocab_size=getattr(cfg_dc.model, "label_vocab_size", None),
+        null_label_id=getattr(cfg_dc.model, "null_label_id", None),
         attention_backend=cfg_dc.model.attention_backend,
         attention_sdp_backend=cfg_dc.model.attention_sdp_backend,
         mask_token_id=cfg_dc.model.mask_token_id,

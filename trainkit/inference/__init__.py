@@ -1,8 +1,9 @@
-from trainkit.inference.generate import diffusion_generate, autoregressive_generate, generate
+from trainkit.inference.generate import diffusion_generate, image_diffusion_generate, autoregressive_generate, generate
 from trainkit.inference.sampling import softmax, top_p_filter, add_gumbel_noise, compute_transfer_schedule
 
 __all__ = [
     "diffusion_generate",
+    "image_diffusion_generate",
     "autoregressive_generate",
     "generate",
     "softmax",

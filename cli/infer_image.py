@@ -29,6 +29,7 @@ def main():
         d_ff=cfg_dc.model.d_ff,
         rope_theta=cfg_dc.model.rope_theta,
         label_vocab_size=cfg_dc.model.label_vocab_size,
+        null_label_id=cfg_dc.model.null_label_id,
         attention_backend=cfg_dc.model.attention_backend,
         attention_sdp_backend=cfg_dc.model.attention_sdp_backend,
         device=cfg_dc.model.device,

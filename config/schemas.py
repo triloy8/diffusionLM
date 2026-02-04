@@ -164,6 +164,7 @@ class ModelConfig(_BaseConfig):
     d_ff: int
     rope_theta: float
     label_vocab_size: Optional[int] = None
+    null_label_id: Optional[int] = None
     attention_backend: str = "custom"
     attention_sdp_backend: str = "auto"
     device: str
@@ -203,6 +204,8 @@ class ModelConfig(_BaseConfig):
             # Image pipeline reserves one token for diffusion masking.
             if self.vocab_size != self.pixel_bins + 1:
                 raise ValueError("for model_type='image', vocab_size must equal pixel_bins + 1")
+            if self.null_label_id is not None and not (0 <= self.null_label_id < self.label_vocab_size):
+                raise ValueError("null_label_id must be in [0, label_vocab_size)")
         if self.d_model % self.num_heads != 0:
             raise ValueError("d_model must be divisible by num_heads")
         if self.rope_theta <= 0:

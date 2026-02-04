@@ -7,7 +7,7 @@ from safetensors.torch import load_file
 from transformerlm.tokenizer.tokenizer import Tokenizer
 from transformerlm.models import TransformerLM, TransformerImage
 from transformerlm.models.attention import set_sdp_backend
-from trainkit.inference.generate import autoregressive_generate, diffusion_generate
+from trainkit.inference.generate import autoregressive_generate, diffusion_generate, image_diffusion_generate
 from transformerlm.utils.dtypes import DTYPES
 from trainkit.logger import Logger
 from trainkit.data.image import dequantize_tokens_to_uint8
@@ -186,6 +186,7 @@ def infer_image(args, *, logger: Optional[Logger] = None):
     label = int(args.label)
     device = args.device
     context = torch.full((num_samples,), label, device=device, dtype=torch.long)
+    null_label_id = getattr(args, "null_label_id", None)
     prompt = torch.empty((num_samples, 0), device=device, dtype=torch.long)
     gen_length = int(args.context_length)
 
@@ -195,9 +196,20 @@ def infer_image(args, *, logger: Optional[Logger] = None):
         generator = torch.Generator(device=device)
         generator.manual_seed(int(seed))
 
-    out_indices = diffusion_generate(
+    cfg_scale = float(args.cfg_scale)
+    uncond_context = None
+    if cfg_scale > 0.0:
+        if null_label_id is None:
+            raise ValueError(
+                "cfg_scale > 0 for infer_image requires model.null_label_id to be configured "
+                "to a dedicated unconditional label embedding"
+            )
+        uncond_context = torch.full((num_samples,), int(null_label_id), device=device, dtype=torch.long)
+
+    out_indices = image_diffusion_generate(
         model,
         prompt,
+        context=context,
         mask_id=int(args.mask_id),
         eos_token_id=None,
         steps=int(args.steps),
@@ -205,11 +217,11 @@ def infer_image(args, *, logger: Optional[Logger] = None):
         block_length=int(args.block_length),
         temperature=float(args.temperature),
         top_p=(None if args.top_p is None else float(args.top_p)),
-        cfg_scale=float(args.cfg_scale),
+        cfg_scale=cfg_scale,
+        uncond_context=uncond_context,
         remasking=str(args.remasking),
         logits_eos_inf=False,
         confidence_eos_eot_inf=False,
-        context=context,
         generator=generator,
     )
 

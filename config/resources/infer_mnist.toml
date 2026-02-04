@@ -14,20 +14,21 @@ attention_sdp_backend = "auto"
 device = "cuda"
 dtype = "float16"
 mask_token_id = 32
+null_label_id = 1
 
 [checkpoint]
-ckpt_path = "/home/tadhiel/transformerlm/runs/2026-02-04_13-39-31/versions/v004000/model.safetensors"
+ckpt_path = "/home/tadhiel/transformerlm/runs/2026-02-04_15-46-57/versions/v008000/model.safetensors"
 
 [inference]
-label = 9
-num_samples = 4
+label = 0
+num_samples = 16
 steps = 784
 block_length = 784
-temperature = 1.0
-top_p = 0.95
-cfg_scale = 0.0
+temperature = 0.6
+# top_p = 0.95
+cfg_scale = 2.0
 remasking = "random"
 seed = 123
-output_dir = "./runs/2026-02-04_13-39-31/infer_images"
+output_dir = "./runs/2026-02-04_15-46-57/infer_images"
 # image_height = 28
 # image_width = 28

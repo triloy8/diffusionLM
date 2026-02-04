@@ -515,6 +515,7 @@ def build_run_config(cfg, cfg_dc):
         "rope_theta": cfg.rope_theta,
         "model_type": getattr(cfg, "model_type", "lm"),
         "label_vocab_size": getattr(cfg, "label_vocab_size", None),
+        "null_label_id": getattr(cfg, "null_label_id", None),
         "attention_backend": cfg.attention_backend,
         "attention_sdp_backend": cfg.attention_sdp_backend,
         "mask_token_id": cfg.mask_token_id,

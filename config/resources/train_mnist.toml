@@ -1,6 +1,6 @@
 [model]
 model_type = "image"
-label_vocab_size = 10
+label_vocab_size = 11
 vocab_size = 33
 pixel_bins = 32
 context_length = 784
@@ -14,6 +14,7 @@ attention_sdp_backend = "auto"
 device = "cuda"
 dtype = "float32"
 mask_token_id = 32
+null_label_id = 10
 random_trunc_prob = 0.0
 
 [optimizer]
