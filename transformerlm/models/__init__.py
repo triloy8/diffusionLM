@@ -3,6 +3,7 @@ from .layers import Linear, Embedding, RMSNorm, SwiGLU
 from .attention import (
     RotaryPositionalEmbedding,
     MultiheadSelfAttentionRoPE,
+    MultiheadSelfAttentionRoPE2D,
     MultiheadCrossAttentionRoPE,
     scaled_dot_product_attention,
 )
@@ -16,6 +17,7 @@ __all__ = [
     "SwiGLU",
     "RotaryPositionalEmbedding",
     "MultiheadSelfAttentionRoPE",
+    "MultiheadSelfAttentionRoPE2D",
     "MultiheadCrossAttentionRoPE",
     "scaled_dot_product_attention",
 ]

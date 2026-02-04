@@ -229,3 +229,107 @@ class MultiheadCrossAttentionRoPE(nn.Module):
         attn_rearr = rearrange(attn, "... num_heads seq_len d_v -> ... seq_len (num_heads d_v)", num_heads=self.num_heads, d_v=self.d_v)
         attn_rearr_proj = self.output_proj(attn_rearr)
         return attn_rearr_proj
+
+
+class MultiheadSelfAttentionRoPE2D(nn.Module):
+    """Self-attention with 2D RoPE using separate row/column rotations."""
+
+    def __init__(
+        self,
+        d_model: int,
+        num_heads: int,
+        max_height: int,
+        max_width: int,
+        theta: float,
+        attention_backend: str = "custom",
+        device=None,
+        dtype=None,
+    ):
+        super().__init__()
+        self.d_model = d_model
+        self.num_heads = num_heads
+        self.d_k = self.d_model // self.num_heads
+        if self.d_k % 4 != 0:
+            raise ValueError("per-head dimension must be divisible by 4 for 2D RoPE")
+        self.d_v = self.d_k
+        self.theta = theta
+        if attention_backend not in ALLOWED_ATTENTION_BACKENDS:
+            raise ValueError(f"attention_backend must be one of {sorted(ALLOWED_ATTENTION_BACKENDS)}")
+        self.attention_backend = attention_backend
+
+        self.q_proj = Linear(self.d_model, self.d_model, device=device, dtype=dtype)
+        self.k_proj = Linear(self.d_model, self.d_model, device=device, dtype=dtype)
+        self.v_proj = Linear(self.d_model, self.d_model, device=device, dtype=dtype)
+        self.output_proj = Linear(self.d_model, self.d_model, device=device, dtype=dtype)
+
+        self.d_k_half = self.d_k // 2
+        self.row_rope = RotaryPositionalEmbedding(self.theta, self.d_k_half, int(max_height), device)
+        self.col_rope = RotaryPositionalEmbedding(self.theta, self.d_k_half, int(max_width), device)
+
+    def _apply_2d_rope(
+        self,
+        x: torch.Tensor,
+        row_positions: torch.Tensor,
+        col_positions: torch.Tensor,
+    ) -> torch.Tensor:
+        row_part = x[..., : self.d_k_half]
+        col_part = x[..., self.d_k_half :]
+        row_rot = self.row_rope(row_part, row_positions)
+        col_rot = self.col_rope(col_part, col_positions)
+        return torch.cat((row_rot, col_rot), dim=-1)
+
+    def forward(
+        self,
+        x: torch.Tensor,
+        row_positions: torch.Tensor,
+        col_positions: torch.Tensor,
+        attention_mask: torch.Tensor | None = None,
+    ) -> torch.Tensor:
+        wqx = self.q_proj(x)
+        wqx_rearr = rearrange(
+            wqx,
+            "... seq_len (num_heads d_k) -> ... num_heads seq_len d_k",
+            num_heads=self.num_heads,
+            d_k=self.d_k,
+        )
+        wqx_rearr_rope = self._apply_2d_rope(wqx_rearr, row_positions, col_positions)
+
+        wkx = self.k_proj(x)
+        wkx_rearr = rearrange(
+            wkx,
+            "... seq_len (num_heads d_k) -> ... num_heads seq_len d_k",
+            num_heads=self.num_heads,
+            d_k=self.d_k,
+        )
+        wkx_rearr_rope = self._apply_2d_rope(wkx_rearr, row_positions, col_positions)
+
+        wvx = self.v_proj(x)
+        wvx_rearr = rearrange(
+            wvx,
+            "... seq_len (num_heads d_v) -> ... num_heads seq_len d_v",
+            num_heads=self.num_heads,
+            d_v=self.d_v,
+        )
+
+        if self.attention_backend == "torch_sdpa":
+            attn = torch_scaled_dot_product_attention(
+                wqx_rearr_rope,
+                wkx_rearr_rope,
+                wvx_rearr,
+                attention_mask=attention_mask,
+            )
+        else:
+            attn = scaled_dot_product_attention(
+                wqx_rearr_rope,
+                wkx_rearr_rope,
+                wvx_rearr,
+                attention_mask=attention_mask,
+            )
+        attn_rearr = rearrange(
+            attn,
+            "... num_heads seq_len d_v -> ... seq_len (num_heads d_v)",
+            num_heads=self.num_heads,
+            d_v=self.d_v,
+        )
+        attn_rearr_proj = self.output_proj(attn_rearr)
+        return attn_rearr_proj

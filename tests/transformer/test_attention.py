@@ -1,5 +1,6 @@
 import torch
-from transformerlm.models import MultiheadSelfAttentionRoPE, scaled_dot_product_attention
+import pytest
+from transformerlm.models import MultiheadSelfAttentionRoPE, MultiheadSelfAttentionRoPE2D, scaled_dot_product_attention
 from transformerlm.models import RotaryPositionalEmbedding
 from transformerlm.inference import softmax
 
@@ -94,3 +95,31 @@ def test_head_split_merge_preserves_feature_dimension(device):
     pos = torch.arange(4, dtype=torch.long, device=device)
     y = attn(x, pos)
     assert y.shape == x.shape
+
+
+def test_mhsa_rope2d_shapes(device):
+    attn = MultiheadSelfAttentionRoPE2D(
+        d_model=16,
+        num_heads=2,
+        max_height=28,
+        max_width=28,
+        theta=10_000.0,
+        device=device,
+    )
+    x = torch.randn(2, 8, 16, device=device)
+    row_pos = torch.tensor([0, 0, 0, 0, 1, 1, 1, 1], dtype=torch.long, device=device)
+    col_pos = torch.tensor([0, 1, 2, 3, 0, 1, 2, 3], dtype=torch.long, device=device)
+    y = attn(x, row_pos, col_pos)
+    assert y.shape == x.shape
+
+
+def test_mhsa_rope2d_requires_per_head_divisible_by_4(device):
+    with pytest.raises(ValueError, match="divisible by 4"):
+        MultiheadSelfAttentionRoPE2D(
+            d_model=10,
+            num_heads=2,
+            max_height=28,
+            max_width=28,
+            theta=10_000.0,
+            device=device,
+        )
