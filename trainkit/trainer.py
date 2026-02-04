@@ -542,6 +542,7 @@ def build_run_config(cfg, cfg_dc):
         "amp_enabled": bool(getattr(cfg, "amp_enabled", False)),
         "amp_dtype": str(getattr(cfg, "amp_dtype", "float16")),
         "training_objective": str(getattr(cfg, "training_objective", "diffusion")),
+        "uncond_label_dropout_prob": float(getattr(cfg, "uncond_label_dropout_prob", 0.0)),
     }
 
     seed_value = getattr(cfg, "rng_seed", getattr(cfg, "seed", None))

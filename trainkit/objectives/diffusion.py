@@ -19,9 +19,13 @@ class DiffusionObjective(Objective):
         self.p_mask_override = getattr(cfg, "p_mask_override", None)
         self.deterministic_mask = bool(getattr(cfg, "deterministic_mask", False))
         self.p_mask_bucket_edges = getattr(cfg, "p_mask_bucket_edges", None)
+        self.null_label_id = getattr(cfg, "null_label_id", None)
+        self.uncond_label_dropout_prob = float(getattr(cfg, "uncond_label_dropout_prob", 0.0))
+        if self.uncond_label_dropout_prob > 0 and self.null_label_id is None:
+            raise ValueError("uncond_label_dropout_prob > 0 requires null_label_id")
 
     def get_batch(self, *, dataset, batch_size: int, context_length: int, device: str, generator=None):
-        return get_batch(
+        batch = get_batch(
             dataset=dataset,
             batch_size=batch_size,
             context_length=context_length,
@@ -33,6 +37,16 @@ class DiffusionObjective(Objective):
             deterministic_mask=self.deterministic_mask,
             generator=generator,
         )
+        labels = getattr(batch, "labels", None)
+        if labels is not None and self.uncond_label_dropout_prob > 0:
+            keep = torch.rand(
+                labels.shape,
+                device=labels.device,
+                generator=generator,
+            ) >= self.uncond_label_dropout_prob
+            null_labels = torch.full_like(labels, int(self.null_label_id))
+            batch.labels = torch.where(keep, labels, null_labels)
+        return batch
 
     def model_inputs(self, batch: DiffusionBatch):
         labels = getattr(batch, "labels", None)
@@ -163,9 +177,13 @@ class MegaDlmDiffusionObjective(Objective):
         self.eot_mask_loss = bool(getattr(cfg, "eot_mask_loss", False))
         self.random_trunc_prob = float(getattr(cfg, "random_trunc_prob", 0.01))
         self.p_mask_bucket_edges = getattr(cfg, "p_mask_bucket_edges", None)
+        self.null_label_id = getattr(cfg, "null_label_id", None)
+        self.uncond_label_dropout_prob = float(getattr(cfg, "uncond_label_dropout_prob", 0.0))
+        if self.uncond_label_dropout_prob > 0 and self.null_label_id is None:
+            raise ValueError("uncond_label_dropout_prob > 0 requires null_label_id")
 
     def get_batch(self, *, dataset, batch_size: int, context_length: int, device: str, generator=None):
-        return get_megadlm_diffusion_batch(
+        batch = get_megadlm_diffusion_batch(
             dataset=dataset,
             batch_size=batch_size,
             context_length=context_length,
@@ -176,6 +194,16 @@ class MegaDlmDiffusionObjective(Objective):
             random_trunc_prob=self.random_trunc_prob,
             generator=generator,
         )
+        labels = getattr(batch, "labels", None)
+        if labels is not None and self.uncond_label_dropout_prob > 0:
+            keep = torch.rand(
+                labels.shape,
+                device=labels.device,
+                generator=generator,
+            ) >= self.uncond_label_dropout_prob
+            null_labels = torch.full_like(labels, int(self.null_label_id))
+            batch.labels = torch.where(keep, labels, null_labels)
+        return batch
 
     def model_inputs(self, batch: DiffusionBatch) -> torch.Tensor:
         labels = getattr(batch, "labels", None)

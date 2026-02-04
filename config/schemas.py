@@ -245,6 +245,7 @@ class TrainingConfig(_BaseConfig):
     eot_mask_loss: bool = False
     p_mask_override: Optional[float] = None
     deterministic_mask: bool = False
+    uncond_label_dropout_prob: float = 0.0
 
     @model_validator(mode="after")
     def _validate_training(self):
@@ -267,6 +268,8 @@ class TrainingConfig(_BaseConfig):
             raise ValueError("objective must be one of: diffusion, megadlm-diffusion, ar")
         if self.p_mask_override is not None and not (0 < self.p_mask_override <= 1):
             raise ValueError("p_mask_override must be in (0, 1] when provided")
+        if not (0 <= self.uncond_label_dropout_prob <= 1):
+            raise ValueError("uncond_label_dropout_prob must be in [0, 1]")
         return self
 
 
@@ -473,6 +476,11 @@ class TrainConfig(_BaseConfig):
     def _validate_train_config(self):
         if self.data.pipeline_mode == "mnist" and self.model.random_trunc_prob > 0:
             raise ValueError("random_trunc_prob must be 0 when pipeline_mode='mnist'")
+        if self.training.uncond_label_dropout_prob > 0:
+            if self.model.model_type != "image":
+                raise ValueError("uncond_label_dropout_prob requires model_type='image'")
+            if self.model.null_label_id is None:
+                raise ValueError("uncond_label_dropout_prob > 0 requires model.null_label_id")
         return self
 
 
