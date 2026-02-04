@@ -255,6 +255,56 @@ def test_optimizer_initial_lr_defaults_to_max(tmp_path: Path):
     assert cfg.optimizer.initial_learning_rate == pytest.approx(cfg.optimizer.max_learning_rate)
 
 
+def test_image_model_requires_vocab_size_matches_pixel_bins(tmp_path: Path):
+    cfg_path = tmp_path / "train_image_bad.toml"
+    write(cfg_path, f"""
+    [model]
+    model_type = "image"
+    vocab_size = 257
+    pixel_bins = 32
+    context_length = 784
+    d_model = 16
+    num_layers = 1
+    num_heads = 2
+    d_ff = 32
+    rope_theta = 10000.0
+    label_vocab_size = 10
+    device = "cpu"
+    dtype = "float32"
+    mask_token_id = 32
+    random_trunc_prob = 0.0
+
+    [optimizer]
+    eps = 1e-8
+    weight_decay = 0.0
+    max_learning_rate = 0.01
+    min_learning_rate = 0.001
+    warmup_iters = 0
+    cosine_cycle_iters = 10
+    grad_clip_max_l2_norm = 1.0
+
+    [training]
+    batch_size = 2
+    max_train_iteration = 2
+    max_val_iteration = 1
+    val_freq_iteration = 1
+
+    [checkpointing]
+    ckpting_save_iter = 2
+
+    [data]
+    runs_path = "{tmp_path.as_posix()}"
+    dataset_name = "ylecun/mnist"
+    train_split = "train"
+    val_split = "test"
+    text_field = "image"
+    pipeline_mode = "mnist"
+    """)
+    with pytest.raises(ValidationError) as exc:
+        load_train_config(cfg_path)
+    assert "vocab_size must equal pixel_bins + 1" in str(exc.value)
+
+
 def _write_text(path: Path, content: str = "") -> str:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(content)

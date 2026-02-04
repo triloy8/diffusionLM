@@ -17,6 +17,24 @@ def _tupleify(value):
     return value
 
 
+def _quantize_pixels_uint8(pixels: np.ndarray, *, pixel_bins: int) -> np.ndarray:
+    if pixel_bins == 256:
+        return pixels
+    # Uniform bucketization over [0, 255] -> [0, pixel_bins - 1].
+    quant = (pixels.astype(np.uint16) * int(pixel_bins)) // 256
+    return np.minimum(quant, int(pixel_bins) - 1).astype(np.uint8)
+
+
+def dequantize_tokens_to_uint8(tokens: np.ndarray, *, pixel_bins: int) -> np.ndarray:
+    if pixel_bins == 256:
+        return tokens.astype(np.uint8)
+    # Use bin centers for visualization in [0, 255].
+    vals = np.clip(tokens.astype(np.int32), 0, int(pixel_bins) - 1)
+    scale = 256.0 / float(pixel_bins)
+    restored = np.round((vals + 0.5) * scale - 0.5)
+    return np.clip(restored, 0, 255).astype(np.uint8)
+
+
 @dataclass
 class ImageBatch:
     tokens: torch.Tensor
@@ -105,7 +123,12 @@ def _load_hf_dataset(dataset_name: str, dataset_config: Optional[str], split: st
     return load_dataset(dataset_name, split=split, streaming=False)
 
 
-def _extract_hf_images(dataset, *, include_label: bool) -> tuple[np.ndarray, list[int] | None]:
+def _extract_hf_images(
+    dataset,
+    *,
+    include_label: bool,
+    pixel_bins: int = 256,
+) -> tuple[np.ndarray, list[int] | None]:
     images: list[np.ndarray] = []
     labels: list[int] = []
     for example in dataset:
@@ -122,7 +145,9 @@ def _extract_hf_images(dataset, *, include_label: bool) -> tuple[np.ndarray, lis
             labels.append(int(example.get("label", 0)))
     if not images:
         raise ValueError("dataset contains no usable images")
-    return np.stack(images, axis=0), (labels if include_label else None)
+    stacked = np.stack(images, axis=0)
+    quantized = _quantize_pixels_uint8(stacked, pixel_bins=pixel_bins)
+    return quantized, (labels if include_label else None)
 
 
 def build_mnist_batcher(
@@ -131,13 +156,16 @@ def build_mnist_batcher(
     dataset_config: Optional[str],
     split: str,
     device: str | torch.device,
+    pixel_bins: int = 256,
     shuffle: bool = True,
     shuffle_seed: Optional[int] = None,
     world_size: int = 1,
     rank: int = 0,
 ) -> DiscreteImageBatcher:
+    if pixel_bins <= 1 or pixel_bins > 256:
+        raise ValueError("pixel_bins must be in [2, 256]")
     dataset = _load_hf_dataset(dataset_name, dataset_config, split)
-    images, labels = _extract_hf_images(dataset, include_label=True)
+    images, labels = _extract_hf_images(dataset, include_label=True, pixel_bins=int(pixel_bins))
     return DiscreteImageBatcher(
         images=images,
         labels=labels,

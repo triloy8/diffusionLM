@@ -156,6 +156,7 @@ class OptimizerConfig(_BaseConfig):
 class ModelConfig(_BaseConfig):
     model_type: str = "lm"
     vocab_size: int
+    pixel_bins: int = 256
     context_length: int
     d_model: int
     num_layers: int
@@ -191,12 +192,17 @@ class ModelConfig(_BaseConfig):
         for field in ("vocab_size", "context_length", "d_model", "num_layers", "num_heads", "d_ff"):
             if getattr(self, field) <= 0:
                 raise ValueError(f"{field} must be > 0")
+        if not (1 < self.pixel_bins <= 256):
+            raise ValueError("pixel_bins must be in [2, 256]")
         self.model_type = self.model_type.lower()
         if self.model_type not in {"lm", "image"}:
             raise ValueError("model_type must be one of: lm, image")
         if self.model_type == "image":
             if self.label_vocab_size is None or self.label_vocab_size <= 0:
                 raise ValueError("label_vocab_size must be > 0 when model_type='image'")
+            # Image pipeline reserves one token for diffusion masking.
+            if self.vocab_size != self.pixel_bins + 1:
+                raise ValueError("for model_type='image', vocab_size must equal pixel_bins + 1")
         if self.d_model % self.num_heads != 0:
             raise ValueError("d_model must be divisible by num_heads")
         if self.rope_theta <= 0:

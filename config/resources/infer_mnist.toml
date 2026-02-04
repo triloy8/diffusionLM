@@ -1,32 +1,33 @@
 [model]
 model_type = "image"
 label_vocab_size = 10
-vocab_size = 257
+vocab_size = 33
+pixel_bins = 32
 context_length = 784
-d_model = 512
-num_layers = 6
-num_heads = 8
-d_ff = 2048
+d_model = 256
+num_layers = 8
+num_heads = 16
+d_ff = 1024
 rope_theta = 10000.0
 attention_backend = "torch_sdpa"
 attention_sdp_backend = "auto"
 device = "cuda"
 dtype = "float16"
-mask_token_id = 256
+mask_token_id = 32
 
 [checkpoint]
-ckpt_path = "/home/tadhiel/transformerlm/runs/2026-02-03_01-21-09/versions/v002000/model.safetensors"
+ckpt_path = "/home/tadhiel/transformerlm/runs/2026-02-04_13-39-31/versions/v004000/model.safetensors"
 
 [inference]
-label = 7
+label = 9
 num_samples = 4
-steps = 128
+steps = 784
 block_length = 784
 temperature = 1.0
 top_p = 0.95
 cfg_scale = 0.0
 remasking = "random"
-seed = 1234
-output_dir = "./runs/infer_images"
+seed = 123
+output_dir = "./runs/2026-02-04_13-39-31/infer_images"
 # image_height = 28
 # image_width = 28

@@ -240,11 +240,13 @@ def train_ddp(
             logger=logger,
         )
     elif pipeline_mode == "mnist":
+        pixel_bins = int(getattr(cfg, "pixel_bins", 256))
         train_batcher = build_mnist_batcher(
             dataset_name=str(args.dataset_name),
             dataset_config=(str(args.dataset_config) if args.dataset_config is not None else None),
             split=str(args.train_split),
             device=str(cfg.device),
+            pixel_bins=pixel_bins,
             shuffle=True,
             shuffle_seed=per_rank_seed,
             world_size=cfg.world_size,
@@ -255,6 +257,7 @@ def train_ddp(
             dataset_config=(str(args.dataset_config) if args.dataset_config is not None else None),
             split=str(args.val_split),
             device=str(cfg.device),
+            pixel_bins=pixel_bins,
             shuffle=False,
             shuffle_seed=per_rank_seed,
             world_size=cfg.world_size,
@@ -503,6 +506,7 @@ def build_run_config(cfg, cfg_dc):
     """
     run_config = {
         "vocab_size": cfg.vocab_size,
+        "pixel_bins": getattr(cfg, "pixel_bins", None),
         "context_length": cfg.context_length,
         "d_model": cfg.d_model,
         "num_layers": cfg.num_layers,

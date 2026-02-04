@@ -10,6 +10,7 @@ from transformerlm.models.attention import set_sdp_backend
 from trainkit.inference.generate import autoregressive_generate, diffusion_generate
 from transformerlm.utils.dtypes import DTYPES
 from trainkit.logger import Logger
+from trainkit.data.image import dequantize_tokens_to_uint8
 
 
 def infer_transformer(args, *, logger: Optional[Logger] = None, artifact_path: Optional[str] = None):
@@ -214,6 +215,7 @@ def infer_image(args, *, logger: Optional[Logger] = None):
 
     h = getattr(args, "image_height", None)
     w = getattr(args, "image_width", None)
+    pixel_bins = int(getattr(args, "pixel_bins", 256))
     if h is None or w is None:
         side = int(gen_length ** 0.5)
         if side * side != gen_length:
@@ -222,14 +224,14 @@ def infer_image(args, *, logger: Optional[Logger] = None):
         w = side
 
     from pathlib import Path
-    import numpy as np
     from PIL import Image
 
     out_dir = Path(args.output_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
     outputs = []
     if num_samples <= 1:
-        arr = out_indices[0].detach().cpu().to(torch.uint8).numpy().reshape(int(h), int(w))
+        tokens = out_indices[0].detach().cpu().to(torch.int32).numpy().reshape(int(h), int(w))
+        arr = dequantize_tokens_to_uint8(tokens, pixel_bins=pixel_bins)
         img = Image.fromarray(arr, mode="L")
         path = out_dir / f"label_{label}_sample_0.png"
         img.save(path)
@@ -241,7 +243,8 @@ def infer_image(args, *, logger: Optional[Logger] = None):
         rows = int(math.ceil(num_samples / cols))
         grid = Image.new("L", (cols * int(w), rows * int(h)))
         for i in range(num_samples):
-            arr = out_indices[i].detach().cpu().to(torch.uint8).numpy().reshape(int(h), int(w))
+            tokens = out_indices[i].detach().cpu().to(torch.int32).numpy().reshape(int(h), int(w))
+            arr = dequantize_tokens_to_uint8(tokens, pixel_bins=pixel_bins)
             img = Image.fromarray(arr, mode="L")
             r = i // cols
             c = i % cols
@@ -256,6 +259,7 @@ def infer_image(args, *, logger: Optional[Logger] = None):
                 "phase": "infer",
                 "metrics.num_samples": int(num_samples),
                 "params.label": int(label),
+                "params.pixel_bins": int(pixel_bins),
                 "params.output_dir": str(out_dir),
             }
         )

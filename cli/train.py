@@ -27,6 +27,7 @@ def build_train_namespace(cfg_dc, config_path: str) -> argparse.Namespace:
         grad_clip_max_l2_norm=cfg_dc.optimizer.grad_clip_max_l2_norm,
         # model
         vocab_size=cfg_dc.model.vocab_size,
+        pixel_bins=cfg_dc.model.pixel_bins,
         context_length=cfg_dc.model.context_length,
         d_model=cfg_dc.model.d_model,
         num_layers=cfg_dc.model.num_layers,
