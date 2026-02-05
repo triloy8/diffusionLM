@@ -60,6 +60,12 @@ def diffusion_generate(
     x[:, :prompt_len] = prompt_indices
     prompt_index = (x != mask_id)
 
+    try:
+        from tqdm import tqdm
+    except Exception as exc:  # pragma: no cover - import-only path
+        raise RuntimeError("tqdm is required for diffusion_generate") from exc
+    pbar = tqdm(total=steps, desc="diffusion_generate", leave=False)
+
     for block_idx in range(blocks):
         block_start = prompt_len + block_idx * block_length
         block_end = min(block_start + block_length, total_len)
@@ -144,7 +150,9 @@ def diffusion_generate(
                 transfer_mask[b, topk_indices] = True
 
             x = torch.where(transfer_mask, predictions, x)
+            pbar.update(1)
 
+    pbar.close()
     return x
 
 
@@ -212,6 +220,12 @@ def image_diffusion_generate(
         if uncond_context.shape[0] != batch_size:
             raise ValueError("uncond_context batch size must match prompt batch size")
         uncond_context = uncond_context.to(device=context.device, dtype=context.dtype)
+
+    try:
+        from tqdm import tqdm
+    except Exception as exc:  # pragma: no cover - import-only path
+        raise RuntimeError("tqdm is required for image_diffusion_generate") from exc
+    pbar = tqdm(total=steps, desc="image_diffusion_generate", leave=False)
 
     for block_idx in range(blocks):
         block_start = prompt_len + block_idx * block_length
@@ -290,7 +304,9 @@ def image_diffusion_generate(
                 transfer_mask[b, topk_indices] = True
 
             x = torch.where(transfer_mask, predictions, x)
+            pbar.update(1)
 
+    pbar.close()
     return x
 
 
