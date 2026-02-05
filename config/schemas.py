@@ -165,6 +165,9 @@ class ModelConfig(_BaseConfig):
     rope_theta: float
     label_vocab_size: Optional[int] = None
     null_label_id: Optional[int] = None
+    use_rope_2d: bool = False
+    image_height: Optional[int] = None
+    image_width: Optional[int] = None
     attention_backend: str = "custom"
     attention_sdp_backend: str = "auto"
     device: str
@@ -206,6 +209,19 @@ class ModelConfig(_BaseConfig):
                 raise ValueError("for model_type='image', vocab_size must equal pixel_bins + 1")
             if self.null_label_id is not None and not (0 <= self.null_label_id < self.label_vocab_size):
                 raise ValueError("null_label_id must be in [0, label_vocab_size)")
+            if (self.image_height is None) ^ (self.image_width is None):
+                raise ValueError("image_height and image_width must be set together when provided")
+            if self.image_height is not None and self.image_height <= 0:
+                raise ValueError("image_height must be > 0 when provided")
+            if self.image_width is not None and self.image_width <= 0:
+                raise ValueError("image_width must be > 0 when provided")
+            if self.use_rope_2d:
+                if self.image_height is None or self.image_width is None:
+                    side = int(self.context_length ** 0.5)
+                    if side * side != self.context_length:
+                        raise ValueError(
+                            "use_rope_2d requires image_height/image_width or a square context_length"
+                        )
         if self.d_model % self.num_heads != 0:
             raise ValueError("d_model must be divisible by num_heads")
         if self.rope_theta <= 0:

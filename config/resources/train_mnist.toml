@@ -16,6 +16,9 @@ dtype = "float32"
 mask_token_id = 32
 null_label_id = 10
 random_trunc_prob = 0.0
+use_rope_2d = true
+image_height = 28
+image_width = 28
 
 [optimizer]
 optimizer_name = "adamw"

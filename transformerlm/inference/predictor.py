@@ -174,6 +174,9 @@ def infer_image(args, *, logger: Optional[Logger] = None):
         rope_theta=args.rope_theta,
         label_vocab_size=args.label_vocab_size,
         attention_backend=getattr(args, "attention_backend", "custom"),
+        image_height=getattr(args, "image_height", None),
+        image_width=getattr(args, "image_width", None),
+        use_rope_2d=bool(getattr(args, "use_rope_2d", False)),
         device=args.device,
         dtype=DTYPES[args.dtype],
     )

@@ -30,6 +30,9 @@ def build_model(cfg) -> torch.nn.Module:
             rope_theta=cfg.rope_theta,
             label_vocab_size=int(getattr(cfg, "label_vocab_size")),
             attention_backend=cfg.attention_backend,
+            image_height=getattr(cfg, "image_height", None),
+            image_width=getattr(cfg, "image_width", None),
+            use_rope_2d=bool(getattr(cfg, "use_rope_2d", False)),
             device=cfg.device,
             dtype=DTYPES[cfg.dtype],
         )
