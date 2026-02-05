@@ -18,6 +18,13 @@ def main():
     if cfg_dc is None:
         return
 
+    image_height = cfg_dc.model.image_height
+    image_width = cfg_dc.model.image_width
+    if image_height is None:
+        image_height = cfg_dc.inference.image_height
+    if image_width is None:
+        image_width = cfg_dc.inference.image_width
+
     ns = argparse.Namespace(
         # model
         vocab_size=cfg_dc.model.vocab_size,
@@ -31,8 +38,8 @@ def main():
         label_vocab_size=cfg_dc.model.label_vocab_size,
         null_label_id=cfg_dc.model.null_label_id,
         use_rope_2d=cfg_dc.model.use_rope_2d,
-        image_height=cfg_dc.model.image_height,
-        image_width=cfg_dc.model.image_width,
+        image_height=image_height,
+        image_width=image_width,
         attention_backend=cfg_dc.model.attention_backend,
         attention_sdp_backend=cfg_dc.model.attention_sdp_backend,
         device=cfg_dc.model.device,
@@ -51,8 +58,6 @@ def main():
         remasking=cfg_dc.inference.remasking,
         seed=cfg_dc.inference.seed,
         output_dir=str(cfg_dc.inference.output_dir),
-        image_height=cfg_dc.inference.image_height,
-        image_width=cfg_dc.inference.image_width,
     )
     logger = ConsoleLogger()
     _ = infer_image(ns, logger=logger)

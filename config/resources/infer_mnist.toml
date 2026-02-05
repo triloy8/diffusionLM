@@ -15,23 +15,21 @@ device = "cuda"
 dtype = "float16"
 mask_token_id = 32
 null_label_id = 10
-use_rope_2d = true
+use_rope_2d = false
 image_height = 28
 image_width = 28
 
 [checkpoint]
-ckpt_path = "/home/tadhiel/transformerlm/runs/2026-02-04_21-50-53/versions/v006000/model.safetensors"
+ckpt_path = "/home/tadhiel/transformerlm/runs/2026-02-05_17-34-14/versions/v006000/model.safetensors"
 
 [inference]
-label = 6
+label = 2
 num_samples = 16
 steps = 784
 block_length = 784
 temperature = 0.6
-top_p = 0.99
+top_p = 1.0
 cfg_scale = 2.0
 remasking = "random"
 seed = 123
-output_dir = "./runs/2026-02-04_21-50-53/infer_images/6000/test"
-image_height = 28
-image_width = 28
+output_dir = "./runs/2026-02-05_17-34-14/infer_images/6000"
