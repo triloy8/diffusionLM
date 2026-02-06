@@ -4,11 +4,12 @@
 
 ## 🚀 Runs: 
 - [trixyL/transformerlm-ar-8k-simplestories](https://hf.co/trixyL/transformerlm-ar-8k-simplestories) — AR SimpleStories run (512 ctx, 8K vocab) 🤖📚 ([demo](https://huggingface.co/spaces/trixyL/simplestories-ar-demo))
+- [trixyL/transformerlm-diff-32-mnist](https://hf.co/trixyL/transformerlm-diff-32-mnist) — MNIST image diffusion run (32 bins, 28x28) 🤖🌫️ ([demo](https://huggingface.co/spaces/trixyL/mnist-diff-demo)) 
 
 ## ✨ What Is This?
 
 A from‑scratch Transformer LM stack with flexible objectives: diffusion or autoregressive, chosen via config. The repo is split into:
-- `transformerlm`: model, tokenizer, and inference utilities.
+- `transformerlm`: model, tokenizer and inference utilities.
 - `trainkit`: training stack (loop, DDP, checkpointing, logging, streaming).
 
 See `trainkit/README.md` for training‑specific details.
@@ -72,7 +73,7 @@ To prepare your environment:
 ## 🛰️ Remote Orchestration
 
 The `Justfile` plus helper scripts under `scripts/` provide a thin remote control plane focused on Prime Intellect hosts; set `PRIME_HOST`/`REMOTE_ROOT` to point at the target machine and path. All available recipes:
-- `just bootstrap-remote` runs `scripts/bootstrap_remote.sh` over SSH to install uv/just/tmux, clone the repo, and prepare `data/`, `runs/`, and `env/` directories on the remote.
+- `just bootstrap-remote` runs `scripts/bootstrap_remote.sh` over SSH to install uv/just/tmux, clone the repo and prepare `data/`, `runs/` and `env/` directories on the remote.
 - `just data-remote` executes `scripts/fetch_data.sh` remotely to download the GPT‑2 tokenizer vocab/merges into the remote `data/` directory (streaming datasets are fetched via Hugging Face at runtime).
 - `just build-remote` syncs dependencies by running `uv sync` (with a frozen lockfile fallback) inside the remote checkout.
 - `just train config=<toml> extra="<args>"` launches `scripts/run_train_remote.sh` inside a tmux session (`transformerlm-train`) after validating Weights & Biases credentials.
