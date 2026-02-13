@@ -24,10 +24,10 @@ download() {
     mv "${tmp}" "${dest}"
 }
 
-download "https://huggingface.co/trixyL/transformerlm-diff/resolve/main/merges_simplestories_8k.txt"
-download "https://huggingface.co/trixyL/transformerlm-diff/resolve/main/vocab_simplestories_8k.json"
-download "https://huggingface.co/trixyL/transformerlm-diff/resolve/main/special_tokens_simplestories_8k.json"
-download "https://huggingface.co/datasets/trixyL/simplestories-8k-megatron/resolve/main/simplestories_train_text_document.bin"
-download "https://huggingface.co/datasets/trixyL/simplestories-8k-megatron/resolve/main/simplestories_train_text_document.idx"
-download "https://huggingface.co/datasets/trixyL/simplestories-8k-megatron/resolve/main/simplestories_test_text_document.bin"
-download "https://huggingface.co/datasets/trixyL/simplestories-8k-megatron/resolve/main/simplestories_test_text_document.idx"
+download "https://huggingface.co/trixyL/transformerlm-diff/resolve/main/merges_simplestories_4k.txt"
+download "https://huggingface.co/trixyL/transformerlm-diff/resolve/main/vocab_simplestories_4k.json"
+download "https://huggingface.co/trixyL/transformerlm-diff/resolve/main/special_tokens_simplestories_4k.json"
+download "https://huggingface.co/datasets/trixyL/simplestories-4k-megatron/resolve/main/simplestories_train_text_document.bin"
+download "https://huggingface.co/datasets/trixyL/simplestories-4k-megatron/resolve/main/simplestories_train_text_document.idx"
+download "https://huggingface.co/datasets/trixyL/simplestories-4k-megatron/resolve/main/simplestories_test_text_document.bin"
+download "https://huggingface.co/datasets/trixyL/simplestories-4k-megatron/resolve/main/simplestories_test_text_document.idx"

@@ -1,17 +1,17 @@
 [model]
-vocab_size = 8001
-context_length = 512
+vocab_size = 4097
+context_length = 2048
 d_model = 512
 num_layers = 12
 num_heads = 8
-d_ff = 2048
+d_ff = 1344
 rope_theta = 10000.0
 attention_backend = "torch_sdpa"
-attention_sdp_backend = "flash"
+attention_sdp_backend = "auto"
 device = "cuda"
 dtype = "float32"
-mask_token_id = 8000
-eot_token_id = 7999
+mask_token_id = 4096
+eot_token_id = 4095
 noise_epsilon = 0.001
 random_trunc_prob = 0.0 # 0.01
 
@@ -62,7 +62,7 @@ val_split = "test"
 text_field = "story"
 pipeline_mode = "megatron" # rows/packed/megatron
 pad_token_id = 50256
-pad_random_shift = true
+pad_random_shift = false
 shuffle_buffer_size = 0
 cache_all = true
 shuffle_seed = 3407
@@ -70,9 +70,9 @@ megatron_train_prefix = "./data/simplestories_train_text_document"
 megatron_val_prefix = "./data/simplestories_test_text_document"
 
 [data.tokenizer]
-vocab_path = "./data/vocab_simplestories_8k.json"
-merges_path = "./data/merges_simplestories_8k.txt"
-special_tokens_path = "./data/special_tokens_simplestories_8k.json"
+vocab_path = "./data/vocab_simplestories_4k.json"
+merges_path = "./data/merges_simplestories_4k.txt"
+special_tokens_path = "./data/special_tokens_simplestories_4k.json"
 
 [logging]
 backend = "wandb"
