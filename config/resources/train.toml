@@ -29,7 +29,7 @@ grad_clip_max_l2_norm = 3.0
 lr_schedule = "cosine" # constant/cosine/constant_with_warmup
 
 [training]
-batch_size = 42
+batch_size = 64
 max_train_iteration = 120000
 max_val_iteration = 10
 val_freq_iteration = 100
@@ -78,7 +78,7 @@ special_tokens_path = "./data/special_tokens_simplestories_4k.json"
 backend = "wandb"
 architecture = "DiffusionLM"
 dataset = "SimpleStories"
-log_activation_norms = true
+log_activation_norms = false
 log_weight_norms = true
 log_grad_norms = true
 log_p_mask_bucket_loss = false
