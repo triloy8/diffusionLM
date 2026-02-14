@@ -46,7 +46,7 @@ eot_mask_loss = false
 # deterministic_mask = false
 
 [compile]
-enabled = false
+enabled = true
 backend = "inductor"
 mode = "default"
 fullgraph = false
