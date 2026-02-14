@@ -1,5 +1,5 @@
 program: cli/sweep_train.py
-project: diffusion_adamw_lr_simplestories_5
+project: diffusion_adamw_lr_simplestories_6
 command:
   - ${env}
   - uv
@@ -12,90 +12,12 @@ metric:
   goal: minimize
   name: metrics.val_loss
 parameters:
-  logging.architecture:
-    value: TransformerLM
-  logging.dataset:
-    value: SimpleStories
-  training.batch_size:
-    value: 128
-  training.objective:
-    value: diffusion
   training.max_train_iteration:
-    value: 3000
-  training.max_val_iteration:
-    value: 10
+    value: 2000
   training.val_freq_iteration:
     value: 100
-  training.grad_accum_steps:
-    value: 2
   checkpointing.ckpting_save_iter:
-    value: 1000
-  model.context_length:
-    value: 512
-  model.d_ff:
-    value: 2048
-  model.d_model:
-    value: 512
-  model.num_layers:
-    value: 12
-  model.num_heads:
-    value: 8
-  model.rope_theta:
-    value: 10000.0
-  model.attention_backend:
-    value: torch_sdpa
-  model.attention_sdp_backend:
-    value: flash
-  data.dataset_name:
-    value: SimpleStories/SimpleStories
-  data.dataset_config:
-    value: ""
-  data.train_split:
-    value: train
-  data.val_split:
-    value: test
-  data.text_field:
-    value: story
-  data.pipeline_mode:
-    value: packed
-  data.pad_token_id:
-    value: 50256
-  data.pad_random_shift:
-    value: true
-  data.shuffle_buffer_size:
-    value: 0
-  data.shuffle_seed:
-    value: 3407
-  model.device:
-    value: cuda
-  model.dtype:
-    value: float32
-  model.vocab_size:
-    value: 8001
-  model.eot_token_id:
-    value: 7999
-  model.mask_token_id:
-    value: 8000
-  model.noise_epsilon:
-    value: 0.001
-  model.random_trunc_prob:
-    value: 0.0
-  optimizer.optimizer_name:
-    value: adamw
-  optimizer.betas:
-    value: [0.9, 0.95]
-  optimizer.eps:
-    value: 1e-8
-  optimizer.weight_decay:
-    value: 0.1
-  optimizer.grad_clip_max_l2_norm:
-    value: 3.0
-  optimizer.lr_schedule:
-    value: cosine
-  optimizer.cosine_cycle_iters:
-    value: 60000
-  optimizer.warmup_iters:
-    value: 600
+    value: 2000
   optimizer.max_learning_rate:
     distribution: log_uniform_values
     min: 0.0001
