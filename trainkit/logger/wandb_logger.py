@@ -13,6 +13,15 @@ class WandbLogger(Logger):
         self._run = None
         self._tables: Dict[str, Any] = {}
         self._table_rows: Dict[str, list[list[Any]]] = {}
+        self._last_step: Optional[int] = None
+
+    def _resolve_step(self, step: Optional[int]) -> int:
+        if step is None:
+            # Keep W&B step monotonic even for background logs that don't carry
+            # train iteration information (e.g. streaming diagnostics).
+            return 0 if self._last_step is None else int(self._last_step)
+        self._last_step = int(step)
+        return int(step)
 
     def start_run(self, config: Dict[str, Any]) -> Dict[str, str]:
         # Import lazily to keep core free of wandb dependency
@@ -28,13 +37,14 @@ class WandbLogger(Logger):
     def log(self, data: Dict[str, Any], step: Optional[int] = None) -> None:
         import wandb  # type: ignore
 
-        wandb.log(data, step=step)
+        wandb.log(data, step=self._resolve_step(step))
 
     def log_table(self, key: str, rows: list, step: Optional[int] = None) -> None:
         import wandb  # type: ignore
 
+        resolved_step = self._resolve_step(step)
         if isinstance(rows, wandb.Table):
-            wandb.log({key: rows}, step=step)
+            wandb.log({key: rows}, step=resolved_step)
             return
 
         table = self._tables.get(key)
@@ -56,7 +66,7 @@ class WandbLogger(Logger):
 
         table = wandb.Table(columns=table.columns, data=row_cache)
         self._tables[key] = table
-        wandb.log({key: table}, step=step)
+        wandb.log({key: table}, step=resolved_step)
 
     def log_artifact(self, path: str, name: Optional[str] = None, type_: Optional[str] = None) -> None:
         try:
