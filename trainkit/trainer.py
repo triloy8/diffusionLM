@@ -305,8 +305,9 @@ def train_ddp(
     )
 
     activation_norms = {}
+    log_activation_norms_enabled = bool(getattr(cfg, "log_activation_norms", False))
 
-    if activation_module_filter is not None:
+    if log_activation_norms_enabled and activation_module_filter is not None:
         def get_activation_norm_hook(name):
             def hook(module, input, output):
                 activation_norms[name] = output.norm().item()
