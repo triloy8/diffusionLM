@@ -39,13 +39,12 @@ grad_accum_steps = 1
 train_loss_ema_decay = 0.99
 amp_enabled = true
 amp_dtype = "bfloat16"
-objective = "megadlm-diffusion" # diffusion/megadlm-diffusion/ar
-# objective = "joint-diffusion-ar" # mixed AR+diffusion single-head training
-# joint_diffusion_alpha = 0.3       # diffusion weight alpha (AR weight = 1-alpha)
-# joint_diffusion_alpha_end = 0.45  # optional end alpha for annealing
-# joint_alpha_schedule = "constant" # constant/linear/cosine
-# joint_alpha_schedule_start = 0.0  # normalized progress
-# joint_alpha_schedule_end = 1.0    # normalized progress
+objective = "joint-diffusion-ar" # diffusion/megadlm-diffusion/ar/joint-diffusion-ar
+joint_diffusion_alpha = 0.30      # diffusion weight alpha (AR weight = 1-alpha)
+joint_diffusion_alpha_end = 0.45  # increase diffusion weight later in training
+joint_alpha_schedule = "linear"   # constant/linear/cosine
+joint_alpha_schedule_start = 0.10 # normalized progress
+joint_alpha_schedule_end = 0.70   # normalized progress
 eot_mask_loss = false
 # repeat_masking_seed = 3407
 # p_mask_override = 0.3
@@ -109,7 +108,7 @@ seed = 3410
 
 [wandb]
 entity = "yiltro8-org"
-project = "diff_lm_simplestories"
+project = "joint_lm_simplestories"
 
 [ddp]
 backend = "nccl"               # gloo/nccl
