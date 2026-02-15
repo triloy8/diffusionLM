@@ -49,7 +49,30 @@ def _load_model_and_tokenizer(cfg):
     model_state = _normalize_state_dict_keys(load_file(str(cfg.checkpoint.ckpt_path)))
     model.load_state_dict(model_state)
     model.eval()
-    return model, tokenizer
+    guide_model = None
+    guidance_mode = "none"
+    guide_fallback_strategy = "single_token"
+    if getattr(cfg, "guide", None) is not None:
+        guidance_mode = str(cfg.guide.guidance_mode)
+        guide_fallback_strategy = str(cfg.guide.fallback_strategy)
+        if guidance_mode != "none":
+            gcfg = cfg.guide.model
+            guide_model = TransformerLM(
+                vocab_size=gcfg.vocab_size,
+                context_length=gcfg.context_length,
+                d_model=gcfg.d_model,
+                num_layers=gcfg.num_layers,
+                num_heads=gcfg.num_heads,
+                d_ff=gcfg.d_ff,
+                rope_theta=gcfg.rope_theta,
+                attention_backend=gcfg.attention_backend,
+                device=gcfg.device,
+                dtype=DTYPES[gcfg.dtype],
+            )
+            guide_state = _normalize_state_dict_keys(load_file(str(cfg.guide.checkpoint.ckpt_path)))
+            guide_model.load_state_dict(guide_state)
+            guide_model.eval()
+    return model, tokenizer, guide_model, guidance_mode, guide_fallback_strategy
 
 
 def main():
@@ -76,7 +99,7 @@ def main():
         top_ps = cfg.sweep.top_ps
     seeds = cfg.sweep.seeds if cfg.sweep.seeds is not None else [cfg.inference.seed]
 
-    model, tokenizer = _load_model_and_tokenizer(cfg)
+    model, tokenizer, guide_model, guidance_mode, guide_fallback_strategy = _load_model_and_tokenizer(cfg)
 
     output_path = Path(cfg.sweep.output_path)
     output_path.parent.mkdir(parents=True, exist_ok=True)
@@ -147,6 +170,9 @@ def main():
                         remasking=str(remask),
                         logits_eos_inf=bool(cfg.inference.logits_eos_inf),
                         confidence_eos_eot_inf=bool(cfg.inference.confidence_eos_eot_inf),
+                        guide_model=guide_model,
+                        guidance_mode=guidance_mode,
+                        guide_fallback_strategy=guide_fallback_strategy,
                         generator=generator,
                     )
                 else:

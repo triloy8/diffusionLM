@@ -56,6 +56,11 @@ def main():
         logits_eos_inf=cfg_dc.inference.logits_eos_inf,
         confidence_eos_eot_inf=cfg_dc.inference.confidence_eos_eot_inf,
         generation_mode=cfg_dc.inference.generation_mode,
+        # optional AR guide
+        guide_model=(cfg_dc.guide.model if cfg_dc.guide is not None else None),
+        guide_ckpt_path=(str(cfg_dc.guide.checkpoint.ckpt_path) if cfg_dc.guide is not None else None),
+        guidance_mode=(cfg_dc.guide.guidance_mode if cfg_dc.guide is not None else "none"),
+        guide_fallback_strategy=(cfg_dc.guide.fallback_strategy if cfg_dc.guide is not None else "single_token"),
     )
     logger = ConsoleLogger()
     _ = infer_transformer(ns, logger=logger)

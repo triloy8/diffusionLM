@@ -23,6 +23,9 @@ def diffusion_generate(
     logits_eos_inf: bool = False,
     confidence_eos_eot_inf: bool = False,
     context: torch.Tensor | None = None,
+    guide_model=None,
+    guidance_mode: str = "none",
+    guide_fallback_strategy: str = "single_token",
     generator: torch.Generator | None = None,
 ) -> torch.Tensor:
     """Generate sequences via the diffusion reverse process."""
@@ -33,6 +36,14 @@ def diffusion_generate(
         raise ValueError("block_length must be > 0")
     if steps <= 0:
         raise ValueError("steps must be > 0")
+    guidance_mode = str(guidance_mode).lower()
+    if guidance_mode not in {"none", "ar_agreement"}:
+        raise ValueError("guidance_mode must be one of: none, ar_agreement")
+    if guidance_mode == "ar_agreement" and guide_model is None:
+        raise ValueError("guide_model must be set when guidance_mode='ar_agreement'")
+    guide_fallback_strategy = str(guide_fallback_strategy).lower()
+    if guide_fallback_strategy not in {"single_token"}:
+        raise ValueError("guide_fallback_strategy must be one of: single_token")
 
     if gen_length <= 0:
         return prompt_indices
@@ -108,6 +119,14 @@ def diffusion_generate(
             logits_with_noise = add_gumbel_noise(logits, temperature, generator=generator)
             predictions = torch.argmax(logits_with_noise, dim=-1)
             predictions = torch.where(mask_index, predictions, x)
+            agreement_mask = None
+            if guidance_mode == "ar_agreement":
+                if context is not None:
+                    guide_logits = guide_model(x, context=context)
+                else:
+                    guide_logits = guide_model(x)
+                guide_predictions = torch.argmax(guide_logits, dim=-1)
+                agreement_mask = torch.logical_and(mask_index, predictions == guide_predictions)
 
             if remasking == "low_confidence":
                 probs = softmax(logits, dim=-1)
@@ -134,20 +153,38 @@ def diffusion_generate(
 
             confidence[:, block_end:] = float("-inf")
             confidence = torch.where(mask_index, confidence, torch.full_like(confidence, float("-inf")))
+            guided_confidence = confidence
+            if agreement_mask is not None:
+                guided_confidence = torch.where(
+                    agreement_mask,
+                    confidence,
+                    torch.full_like(confidence, float("-inf")),
+                )
 
             transfer_mask = torch.zeros_like(mask_index)
             for b in range(batch_size):
                 k = int(transfer_counts[b, step_idx].item())
                 if k <= 0:
                     continue
-                available = confidence[b] > float("-inf")
+                selected = False
+                active_confidence = guided_confidence[b] if agreement_mask is not None else confidence[b]
+                available = active_confidence > float("-inf")
                 available_count = int(available.sum().item())
-                if available_count == 0:
-                    continue
-                if available_count < k:
-                    k = available_count
-                topk_indices = torch.topk(confidence[b], k=k, dim=-1).indices
-                transfer_mask[b, topk_indices] = True
+                if available_count > 0:
+                    if available_count < k:
+                        k = available_count
+                    topk_indices = torch.topk(active_confidence, k=k, dim=-1).indices
+                    transfer_mask[b, topk_indices] = True
+                    selected = True
+                if (
+                    not selected
+                    and agreement_mask is not None
+                    and guide_fallback_strategy == "single_token"
+                ):
+                    fallback_available = confidence[b] > float("-inf")
+                    if int(fallback_available.sum().item()) > 0:
+                        fallback_idx = torch.topk(confidence[b], k=1, dim=-1).indices
+                        transfer_mask[b, fallback_idx] = True
 
             x = torch.where(transfer_mask, predictions, x)
             pbar.update(1)

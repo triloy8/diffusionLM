@@ -510,6 +510,27 @@ class CheckpointConfig(_BaseConfig):
         return self
 
 
+class GuideConfig(_BaseConfig):
+    model: ModelConfig
+    checkpoint: CheckpointConfig
+    guidance_mode: str = "ar_agreement"
+    fallback_strategy: str = "single_token"
+
+    @model_validator(mode="after")
+    def _validate_guide(self):
+        self.guidance_mode = self.guidance_mode.lower()
+        if self.guidance_mode not in {"none", "ar_agreement"}:
+            raise ValueError("guide.guidance_mode must be one of: none, ar_agreement")
+        self.fallback_strategy = self.fallback_strategy.lower()
+        if self.fallback_strategy not in {"single_token"}:
+            raise ValueError("guide.fallback_strategy must be one of: single_token")
+        if self.model.model_type != "lm":
+            raise ValueError("guide.model.model_type must be 'lm'")
+        if self.model.vocab_size <= 0:
+            raise ValueError("guide.model.vocab_size must be > 0")
+        return self
+
+
 class InferenceConfig(_BaseConfig):
     prompt: str
     steps: int
@@ -608,6 +629,7 @@ class InferConfig(_BaseConfig):
     model: ModelConfig
     checkpoint: CheckpointConfig
     inference: InferenceConfig
+    guide: Optional[GuideConfig] = None
     logging: Optional[LoggingConfig] = None
 
     @model_validator(mode="after")
@@ -621,6 +643,13 @@ class InferConfig(_BaseConfig):
         if updates:
             inf = inf.model_copy(update=updates)
         self.inference = inf
+        if self.guide is not None:
+            if self.guide.model.vocab_size != self.model.vocab_size:
+                raise ValueError("guide.model.vocab_size must match model.vocab_size")
+            if self.guide.model.context_length < self.model.context_length:
+                raise ValueError("guide.model.context_length must be >= model.context_length")
+            if self.guide.model.device != self.model.device:
+                raise ValueError("guide.model.device must match model.device")
         return self
 
 
@@ -693,6 +722,7 @@ class SweepInferConfig(_BaseConfig):
     model: ModelConfig
     checkpoint: CheckpointConfig
     inference: InferenceConfig
+    guide: Optional[GuideConfig] = None
     sweep: SweepConfig
     logging: Optional[LoggingConfig] = None
 
@@ -707,6 +737,13 @@ class SweepInferConfig(_BaseConfig):
         if updates:
             inf = inf.model_copy(update=updates)
         self.inference = inf
+        if self.guide is not None:
+            if self.guide.model.vocab_size != self.model.vocab_size:
+                raise ValueError("guide.model.vocab_size must match model.vocab_size")
+            if self.guide.model.context_length < self.model.context_length:
+                raise ValueError("guide.model.context_length must be >= model.context_length")
+            if self.guide.model.device != self.model.device:
+                raise ValueError("guide.model.device must match model.device")
         return self
 
 

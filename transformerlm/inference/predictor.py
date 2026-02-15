@@ -53,6 +53,29 @@ def infer_transformer(args, *, logger: Optional[Logger] = None, artifact_path: O
 
     model_state = _normalize_state_dict_keys(load_file(str(args.ckpt_path)))
     model.load_state_dict(model_state)
+    model.eval()
+
+    guide_model = None
+    guidance_mode = str(getattr(args, "guidance_mode", "none"))
+    guide_fallback_strategy = str(getattr(args, "guide_fallback_strategy", "single_token"))
+    guide_cfg = getattr(args, "guide_model", None)
+    guide_ckpt_path = getattr(args, "guide_ckpt_path", None)
+    if guide_cfg is not None and guide_ckpt_path is not None and guidance_mode != "none":
+        guide_model = TransformerLM(
+            vocab_size=guide_cfg.vocab_size,
+            context_length=guide_cfg.context_length,
+            d_model=guide_cfg.d_model,
+            num_layers=guide_cfg.num_layers,
+            num_heads=guide_cfg.num_heads,
+            d_ff=guide_cfg.d_ff,
+            rope_theta=guide_cfg.rope_theta,
+            attention_backend=getattr(guide_cfg, "attention_backend", "custom"),
+            device=guide_cfg.device,
+            dtype=DTYPES[guide_cfg.dtype],
+        )
+        guide_state = _normalize_state_dict_keys(load_file(str(guide_ckpt_path)))
+        guide_model.load_state_dict(guide_state)
+        guide_model.eval()
 
     in_indices = torch.tensor(ids, device=args.device)
     eos_token_id = getattr(args, "eos_token_id", None)
@@ -86,6 +109,8 @@ def infer_transformer(args, *, logger: Optional[Logger] = None, artifact_path: O
                 "params.remasking": str(remasking),
                 "params.logits_eos_inf": bool(logits_eos_inf),
                 "params.confidence_eos_eot_inf": bool(confidence_eos_eot_inf),
+                "params.guidance_mode": str(guidance_mode),
+                "params.guide_fallback_strategy": str(guide_fallback_strategy),
             }
         )
 
@@ -117,6 +142,9 @@ def infer_transformer(args, *, logger: Optional[Logger] = None, artifact_path: O
                 remasking=str(remasking),
                 logits_eos_inf=bool(logits_eos_inf),
                 confidence_eos_eot_inf=bool(confidence_eos_eot_inf),
+                guide_model=guide_model,
+                guidance_mode=guidance_mode,
+                guide_fallback_strategy=guide_fallback_strategy,
                 generator=generator,
             )
         else:
