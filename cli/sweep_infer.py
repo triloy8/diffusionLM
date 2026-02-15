@@ -19,6 +19,14 @@ from transformerlm.utils.dtypes import DTYPES
 from cli.utils import add_config_args, load_config_or_print
 
 
+def _normalize_state_dict_keys(state_dict):
+    if not state_dict:
+        return state_dict
+    if any(k.startswith("_orig_mod.") for k in state_dict.keys()):
+        return {k.removeprefix("_orig_mod."): v for k, v in state_dict.items()}
+    return state_dict
+
+
 def _load_model_and_tokenizer(cfg):
     tokenizer = Tokenizer.from_files(
         vocab_filepath=cfg.tokenizer.vocab_path,
@@ -38,7 +46,7 @@ def _load_model_and_tokenizer(cfg):
         device=cfg.model.device,
         dtype=DTYPES[cfg.model.dtype],
     )
-    model_state = load_file(str(cfg.checkpoint.ckpt_path))
+    model_state = _normalize_state_dict_keys(load_file(str(cfg.checkpoint.ckpt_path)))
     model.load_state_dict(model_state)
     model.eval()
     return model, tokenizer

@@ -13,6 +13,14 @@ from trainkit.logger import Logger
 from trainkit.data.image import dequantize_tokens_to_uint8
 
 
+def _normalize_state_dict_keys(state_dict):
+    if not state_dict:
+        return state_dict
+    if any(k.startswith("_orig_mod.") for k in state_dict.keys()):
+        return {k.removeprefix("_orig_mod."): v for k, v in state_dict.items()}
+    return state_dict
+
+
 def infer_transformer(args, *, logger: Optional[Logger] = None, artifact_path: Optional[str] = None):
     tokenizer = Tokenizer.from_files(
         vocab_filepath=args.vocab_path,
@@ -43,7 +51,7 @@ def infer_transformer(args, *, logger: Optional[Logger] = None, artifact_path: O
         dtype=DTYPES[args.dtype],
     )
 
-    model_state = load_file(str(args.ckpt_path))
+    model_state = _normalize_state_dict_keys(load_file(str(args.ckpt_path)))
     model.load_state_dict(model_state)
 
     in_indices = torch.tensor(ids, device=args.device)
@@ -182,7 +190,7 @@ def infer_image(args, *, logger: Optional[Logger] = None):
     )
     model.eval()
 
-    model_state = load_file(str(args.ckpt_path))
+    model_state = _normalize_state_dict_keys(load_file(str(args.ckpt_path)))
     model.load_state_dict(model_state)
 
     num_samples = int(args.num_samples)
