@@ -7,6 +7,7 @@ from trainkit.inference.generate import autoregressive_generate, diffusion_gener
 from trainkit.objectives.base import Objective
 from trainkit.objectives.data import DiffusionBatch, get_batch, get_megadlm_diffusion_batch
 from trainkit.objectives.loss import cross_entropy, diffusion_cross_entropy
+from trainkit.objectives.schedule import resolve_scheduled_p_mask
 
 
 class DiffusionObjective(Objective):
@@ -23,6 +24,29 @@ class DiffusionObjective(Objective):
         self.uncond_label_dropout_prob = float(getattr(cfg, "uncond_label_dropout_prob", 0.0))
         if self.uncond_label_dropout_prob > 0 and self.null_label_id is None:
             raise ValueError("uncond_label_dropout_prob > 0 requires null_label_id")
+        self.p_mask_schedule = str(getattr(cfg, "p_mask_schedule", "none")).lower()
+        self.p_mask_start = getattr(cfg, "p_mask_start", None)
+        self.p_mask_end = getattr(cfg, "p_mask_end", None)
+        self.p_mask_schedule_start = float(getattr(cfg, "p_mask_schedule_start", 0.0))
+        self.p_mask_schedule_end = float(getattr(cfg, "p_mask_schedule_end", 1.0))
+        self.total_steps = int(getattr(cfg, "max_train_iteration", 0))
+        self._step = 0
+
+    def on_step(self, step: int, max_steps: int | None, is_train: bool) -> None:
+        if is_train:
+            self._step = int(step)
+
+    def _scheduled_p_mask(self):
+        return resolve_scheduled_p_mask(
+            step=self._step,
+            total_steps=self.total_steps,
+            override=self.p_mask_override,
+            schedule=self.p_mask_schedule,
+            start_value=self.p_mask_start,
+            end_value=self.p_mask_end,
+            schedule_start=self.p_mask_schedule_start,
+            schedule_end=self.p_mask_schedule_end,
+        )
 
     def get_batch(self, *, dataset, batch_size: int, context_length: int, device: str, generator=None):
         batch = get_batch(
@@ -33,7 +57,7 @@ class DiffusionObjective(Objective):
             mask_token_id=self.mask_token_id,
             noise_epsilon=self.noise_epsilon,
             random_trunc_prob=self.random_trunc_prob,
-            p_mask_override=self.p_mask_override,
+            p_mask_override=self._scheduled_p_mask(),
             deterministic_mask=self.deterministic_mask,
             generator=generator,
         )
@@ -181,6 +205,30 @@ class MegaDlmDiffusionObjective(Objective):
         self.uncond_label_dropout_prob = float(getattr(cfg, "uncond_label_dropout_prob", 0.0))
         if self.uncond_label_dropout_prob > 0 and self.null_label_id is None:
             raise ValueError("uncond_label_dropout_prob > 0 requires null_label_id")
+        self.p_mask_override = getattr(cfg, "p_mask_override", None)
+        self.p_mask_schedule = str(getattr(cfg, "p_mask_schedule", "none")).lower()
+        self.p_mask_start = getattr(cfg, "p_mask_start", None)
+        self.p_mask_end = getattr(cfg, "p_mask_end", None)
+        self.p_mask_schedule_start = float(getattr(cfg, "p_mask_schedule_start", 0.0))
+        self.p_mask_schedule_end = float(getattr(cfg, "p_mask_schedule_end", 1.0))
+        self.total_steps = int(getattr(cfg, "max_train_iteration", 0))
+        self._step = 0
+
+    def on_step(self, step: int, max_steps: int | None, is_train: bool) -> None:
+        if is_train:
+            self._step = int(step)
+
+    def _scheduled_p_mask(self):
+        return resolve_scheduled_p_mask(
+            step=self._step,
+            total_steps=self.total_steps,
+            override=self.p_mask_override,
+            schedule=self.p_mask_schedule,
+            start_value=self.p_mask_start,
+            end_value=self.p_mask_end,
+            schedule_start=self.p_mask_schedule_start,
+            schedule_end=self.p_mask_schedule_end,
+        )
 
     def get_batch(self, *, dataset, batch_size: int, context_length: int, device: str, generator=None):
         batch = get_megadlm_diffusion_batch(
@@ -192,6 +240,7 @@ class MegaDlmDiffusionObjective(Objective):
             eot_token_id=self.eot_token_id,
             eot_mask_loss=self.eot_mask_loss,
             random_trunc_prob=self.random_trunc_prob,
+            p_mask_override=self._scheduled_p_mask(),
             generator=generator,
         )
         labels = getattr(batch, "labels", None)

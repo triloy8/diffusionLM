@@ -9,6 +9,7 @@ from trainkit.inference.generate import autoregressive_generate, diffusion_gener
 from trainkit.objectives.base import Objective
 from trainkit.objectives.data import JointBatch, get_joint_batch
 from trainkit.objectives.loss import autoregressive_cross_entropy, diffusion_cross_entropy
+from trainkit.objectives.schedule import resolve_scheduled_p_mask
 
 
 class JointDiffusionAutoregressiveObjective(Objective):
@@ -28,7 +29,16 @@ class JointDiffusionAutoregressiveObjective(Objective):
         self.alpha_schedule_start = float(getattr(cfg, "joint_alpha_schedule_start", 0.0))
         self.alpha_schedule_end = float(getattr(cfg, "joint_alpha_schedule_end", 1.0))
         self.total_steps = int(getattr(cfg, "max_train_iteration", 0))
+        self.p_mask_schedule = str(getattr(cfg, "p_mask_schedule", "none")).lower()
+        self.p_mask_start = getattr(cfg, "p_mask_start", None)
+        self.p_mask_end = getattr(cfg, "p_mask_end", None)
+        self.p_mask_schedule_start = float(getattr(cfg, "p_mask_schedule_start", 0.0))
+        self.p_mask_schedule_end = float(getattr(cfg, "p_mask_schedule_end", 1.0))
         self._step = 0
+
+    def on_step(self, step: int, max_steps: int | None, is_train: bool) -> None:
+        if is_train:
+            self._step = int(step)
 
     def _current_alpha(self) -> float:
         if self.alpha_schedule == "constant" or self.total_steps <= 1:
@@ -48,6 +58,16 @@ class JointDiffusionAutoregressiveObjective(Objective):
         return float(self.alpha_start + (self.alpha_end - self.alpha_start) * interp)
 
     def get_batch(self, *, dataset, batch_size: int, context_length: int, device: str, generator=None):
+        scheduled_p_mask = resolve_scheduled_p_mask(
+            step=self._step,
+            total_steps=self.total_steps,
+            override=self.p_mask_override,
+            schedule=self.p_mask_schedule,
+            start_value=self.p_mask_start,
+            end_value=self.p_mask_end,
+            schedule_start=self.p_mask_schedule_start,
+            schedule_end=self.p_mask_schedule_end,
+        )
         return get_joint_batch(
             dataset=dataset,
             batch_size=batch_size,
@@ -56,7 +76,7 @@ class JointDiffusionAutoregressiveObjective(Objective):
             mask_token_id=self.mask_token_id,
             noise_epsilon=self.noise_epsilon,
             random_trunc_prob=self.random_trunc_prob,
-            p_mask_override=self.p_mask_override,
+            p_mask_override=scheduled_p_mask,
             deterministic_mask=self.deterministic_mask,
             generator=generator,
         )
@@ -120,8 +140,6 @@ class JointDiffusionAutoregressiveObjective(Objective):
 
         total_loss = alpha * diff_loss + (1.0 - alpha) * ar_loss
 
-        if model.training:
-            self._step += 1
         return {
             "loss": total_loss,
             "logits": diff_logits,

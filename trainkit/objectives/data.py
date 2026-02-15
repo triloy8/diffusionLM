@@ -176,6 +176,7 @@ def get_megadlm_diffusion_batch(
     eot_token_id: int | None = None,
     eot_mask_loss: bool = False,
     random_trunc_prob: float = 0.01,
+    p_mask_override: Optional[float] = None,
     generator: torch.Generator | None = None,
 ) -> DiffusionBatch:
     clean_targets, attention_mask, random_trunc_applied, labels = _draw_clean_targets(
@@ -190,8 +191,11 @@ def get_megadlm_diffusion_batch(
     device_obj = clean_targets.device
     batch_size, seq_len = clean_targets.shape
 
-    t = _rand_uniform((batch_size,), device=device_obj, generator=generator)
-    p_mask = t[:, None]
+    if p_mask_override is not None:
+        p_mask = torch.full((batch_size, 1), float(p_mask_override), device=device_obj)
+    else:
+        t = _rand_uniform((batch_size,), device=device_obj, generator=generator)
+        p_mask = t[:, None]
     mask = _rand_uniform((batch_size, seq_len), device=device_obj, generator=generator) < p_mask
     if attention_mask is not None:
         mask = mask & attention_mask

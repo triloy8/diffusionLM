@@ -41,6 +41,9 @@ class Objective(ABC):
     def forward_with_model(self, model: torch.nn.Module, batch: Any) -> Optional[dict]:
         return None
 
+    def on_step(self, step: int, max_steps: int | None, is_train: bool) -> None:
+        return None
+
     def extra_metrics(
         self,
         logits: torch.Tensor,

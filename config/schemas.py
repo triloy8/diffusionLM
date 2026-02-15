@@ -263,6 +263,11 @@ class TrainingConfig(_BaseConfig):
     joint_alpha_schedule: str = "constant"
     joint_alpha_schedule_start: float = 0.0
     joint_alpha_schedule_end: float = 1.0
+    p_mask_schedule: str = "none"
+    p_mask_start: Optional[float] = None
+    p_mask_end: Optional[float] = None
+    p_mask_schedule_start: float = 0.0
+    p_mask_schedule_end: float = 1.0
     eot_mask_loss: bool = False
     p_mask_override: Optional[float] = None
     deterministic_mask: bool = False
@@ -300,6 +305,23 @@ class TrainingConfig(_BaseConfig):
             raise ValueError("joint_alpha_schedule_end must be in [0, 1]")
         if self.joint_alpha_schedule_end < self.joint_alpha_schedule_start:
             raise ValueError("joint_alpha_schedule_end must be >= joint_alpha_schedule_start")
+        self.p_mask_schedule = self.p_mask_schedule.lower()
+        if self.p_mask_schedule not in {"none", "linear", "cosine"}:
+            raise ValueError("p_mask_schedule must be one of: none, linear, cosine")
+        if self.p_mask_start is not None and not (0 < self.p_mask_start <= 1):
+            raise ValueError("p_mask_start must be in (0, 1] when provided")
+        if self.p_mask_end is not None and not (0 < self.p_mask_end <= 1):
+            raise ValueError("p_mask_end must be in (0, 1] when provided")
+        if not (0 <= self.p_mask_schedule_start <= 1):
+            raise ValueError("p_mask_schedule_start must be in [0, 1]")
+        if not (0 <= self.p_mask_schedule_end <= 1):
+            raise ValueError("p_mask_schedule_end must be in [0, 1]")
+        if self.p_mask_schedule_end < self.p_mask_schedule_start:
+            raise ValueError("p_mask_schedule_end must be >= p_mask_schedule_start")
+        if self.p_mask_schedule in {"linear", "cosine"} and (
+            self.p_mask_start is None or self.p_mask_end is None
+        ):
+            raise ValueError("p_mask_start and p_mask_end must be set when p_mask_schedule is linear/cosine")
         if self.p_mask_override is not None and not (0 < self.p_mask_override <= 1):
             raise ValueError("p_mask_override must be in (0, 1] when provided")
         if not (0 <= self.uncond_label_dropout_prob <= 1):

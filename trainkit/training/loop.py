@@ -92,6 +92,7 @@ def train_loop(
 
     while True:
         model.train()
+        objective.on_step(train_iteration, max_train_iteration, True)
         step_generator = batch_generator
         if repeat_masking_seed is not None:
             generator_device = "cuda" if device.startswith("cuda") and torch.cuda.is_available() else "cpu"
