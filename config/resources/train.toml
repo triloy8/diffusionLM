@@ -40,6 +40,12 @@ train_loss_ema_decay = 0.99
 amp_enabled = true
 amp_dtype = "bfloat16"
 objective = "megadlm-diffusion" # diffusion/megadlm-diffusion/ar
+# objective = "joint-diffusion-ar" # mixed AR+diffusion single-head training
+# joint_diffusion_alpha = 0.3       # diffusion weight alpha (AR weight = 1-alpha)
+# joint_diffusion_alpha_end = 0.45  # optional end alpha for annealing
+# joint_alpha_schedule = "constant" # constant/linear/cosine
+# joint_alpha_schedule_start = 0.0  # normalized progress
+# joint_alpha_schedule_end = 1.0    # normalized progress
 eot_mask_loss = false
 # repeat_masking_seed = 3407
 # p_mask_override = 0.3

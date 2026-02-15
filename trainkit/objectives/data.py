@@ -27,6 +27,13 @@ class AutoregressiveBatch:
     metadata: Dict[str, Any]
 
 
+@dataclass
+class JointBatch:
+    diffusion: DiffusionBatch
+    autoregressive: AutoregressiveBatch
+    metadata: Dict[str, Any]
+
+
 def _rand_uniform(shape, *, device: torch.device, generator: torch.Generator | None = None):
     if generator is not None:
         return torch.rand(shape, generator=generator, device=device)
@@ -305,4 +312,118 @@ def get_autoregressive_batch(
         metadata=metadata,
     )
 
-__all__ = ["DiffusionBatch", "AutoregressiveBatch", "get_batch", "get_autoregressive_batch"]
+
+def get_joint_batch(
+    dataset,
+    batch_size: int,
+    context_length: int,
+    device: str,
+    *,
+    mask_token_id: int,
+    noise_epsilon: float = 1e-3,
+    random_trunc_prob: float = 0.01,
+    p_mask_override: Optional[float] = None,
+    deterministic_mask: bool = False,
+    generator: torch.Generator | None = None,
+) -> JointBatch:
+    clean_targets, attention_mask, random_trunc_applied, labels = _draw_clean_targets(
+        dataset,
+        batch_size,
+        context_length,
+        device,
+        random_trunc_prob=random_trunc_prob,
+        min_length=2,
+        generator=generator,
+    )
+    device_obj = clean_targets.device
+    batch_size, seq_len = clean_targets.shape
+
+    if p_mask_override is not None:
+        p_mask = torch.full((batch_size, 1), float(p_mask_override), device=device_obj)
+    else:
+        t = _rand_uniform((batch_size,), device=device_obj, generator=generator)
+        p_mask = (1.0 - noise_epsilon) * t[:, None] + noise_epsilon
+
+    if deterministic_mask:
+        mask_len = (p_mask.view(-1) * seq_len).floor().to(torch.long)
+        positions = torch.arange(seq_len, device=device_obj)
+        mask = positions[None, :] < mask_len[:, None]
+    else:
+        mask_rand = _rand_uniform((batch_size, seq_len), device=device_obj, generator=generator)
+        mask = mask_rand < p_mask
+    if attention_mask is not None:
+        mask = mask & attention_mask
+
+    mask_token_tensor = torch.full_like(clean_targets, fill_value=mask_token_id)
+    noisy_inputs = torch.where(mask, mask_token_tensor, clean_targets)
+    diff_loss_mask = attention_mask
+    diff_token_count = int(diff_loss_mask.sum().item()) if diff_loss_mask is not None else int(clean_targets.numel())
+    diffusion_batch = DiffusionBatch(
+        noisy_inputs=noisy_inputs,
+        clean_targets=clean_targets,
+        mask=mask,
+        p_mask=p_mask,
+        attention_mask=attention_mask,
+        loss_mask=diff_loss_mask,
+        labels=labels,
+        metadata={
+            "random_truncation_applied": random_trunc_applied,
+            "sequence_length": seq_len,
+            "mask_ratio": float(mask.float().mean().detach().cpu().item()),
+            "token_count": diff_token_count,
+            "p_mask_stats": {
+                "mean": float(p_mask.mean().detach().cpu().item()),
+                "min": float(p_mask.min().detach().cpu().item()),
+                "max": float(p_mask.max().detach().cpu().item()),
+                "std": float(p_mask.std(unbiased=False).detach().cpu().item()),
+                "inv_mean": float((1.0 / p_mask).mean().detach().cpu().item()),
+                "inv_max": float((1.0 / p_mask).max().detach().cpu().item()),
+            },
+        },
+    )
+
+    ar_inputs = clean_targets[:, :-1]
+    ar_targets = clean_targets[:, 1:]
+    ar_loss_mask = attention_mask[:, 1:] if attention_mask is not None else None
+    ar_seq_len = ar_inputs.shape[1]
+    ar_causal_mask = torch.ones((ar_seq_len, ar_seq_len), device=device_obj, dtype=torch.bool).tril()
+    if attention_mask is not None:
+        key_mask = attention_mask[:, :-1]
+        query_mask = attention_mask[:, :-1]
+        ar_causal_mask = ar_causal_mask[None, :, :] & key_mask[:, None, :] & query_mask[:, :, None]
+    else:
+        ar_causal_mask = ar_causal_mask[None, :, :].expand(ar_inputs.shape[0], -1, -1)
+    ar_token_count = int(ar_loss_mask.sum().item()) if ar_loss_mask is not None else int(ar_targets.numel())
+    autoregressive_batch = AutoregressiveBatch(
+        inputs=ar_inputs,
+        targets=ar_targets,
+        attention_mask=ar_causal_mask,
+        loss_mask=ar_loss_mask,
+        metadata={
+            "random_truncation_applied": random_trunc_applied,
+            "sequence_length": ar_seq_len,
+            "token_count": ar_token_count,
+        },
+    )
+
+    metadata: Dict[str, Any] = {
+        "random_truncation_applied": random_trunc_applied,
+        "sequence_length": seq_len,
+        "token_count": diff_token_count + ar_token_count,
+        "token_count_diffusion": diff_token_count,
+        "token_count_ar": ar_token_count,
+        "mask_ratio": diffusion_batch.metadata["mask_ratio"],
+        "p_mask_stats": diffusion_batch.metadata["p_mask_stats"],
+    }
+
+    return JointBatch(diffusion=diffusion_batch, autoregressive=autoregressive_batch, metadata=metadata)
+
+
+__all__ = [
+    "DiffusionBatch",
+    "AutoregressiveBatch",
+    "JointBatch",
+    "get_batch",
+    "get_autoregressive_batch",
+    "get_joint_batch",
+]

@@ -258,6 +258,11 @@ class TrainingConfig(_BaseConfig):
     amp_enabled: bool = False
     amp_dtype: str = "float16"
     objective: str = "diffusion"
+    joint_diffusion_alpha: float = 0.3
+    joint_diffusion_alpha_end: Optional[float] = None
+    joint_alpha_schedule: str = "constant"
+    joint_alpha_schedule_start: float = 0.0
+    joint_alpha_schedule_end: float = 1.0
     eot_mask_loss: bool = False
     p_mask_override: Optional[float] = None
     deterministic_mask: bool = False
@@ -280,8 +285,21 @@ class TrainingConfig(_BaseConfig):
         if self.amp_dtype not in ALLOWED_AMP_DTYPES:
             raise ValueError(f"amp_dtype must be one of {sorted(ALLOWED_AMP_DTYPES)}")
         self.objective = self.objective.lower()
-        if self.objective not in {"diffusion", "megadlm-diffusion", "ar"}:
-            raise ValueError("objective must be one of: diffusion, megadlm-diffusion, ar")
+        if self.objective not in {"diffusion", "megadlm-diffusion", "ar", "joint-diffusion-ar"}:
+            raise ValueError("objective must be one of: diffusion, megadlm-diffusion, ar, joint-diffusion-ar")
+        if not (0 <= self.joint_diffusion_alpha <= 1):
+            raise ValueError("joint_diffusion_alpha must be in [0, 1]")
+        if self.joint_diffusion_alpha_end is not None and not (0 <= self.joint_diffusion_alpha_end <= 1):
+            raise ValueError("joint_diffusion_alpha_end must be in [0, 1] when provided")
+        self.joint_alpha_schedule = self.joint_alpha_schedule.lower()
+        if self.joint_alpha_schedule not in {"constant", "linear", "cosine"}:
+            raise ValueError("joint_alpha_schedule must be one of: constant, linear, cosine")
+        if not (0 <= self.joint_alpha_schedule_start <= 1):
+            raise ValueError("joint_alpha_schedule_start must be in [0, 1]")
+        if not (0 <= self.joint_alpha_schedule_end <= 1):
+            raise ValueError("joint_alpha_schedule_end must be in [0, 1]")
+        if self.joint_alpha_schedule_end < self.joint_alpha_schedule_start:
+            raise ValueError("joint_alpha_schedule_end must be >= joint_alpha_schedule_start")
         if self.p_mask_override is not None and not (0 < self.p_mask_override <= 1):
             raise ValueError("p_mask_override must be in (0, 1] when provided")
         if not (0 <= self.uncond_label_dropout_prob <= 1):
@@ -492,6 +510,8 @@ class TrainConfig(_BaseConfig):
     def _validate_train_config(self):
         if self.data.pipeline_mode == "mnist" and self.model.random_trunc_prob > 0:
             raise ValueError("random_trunc_prob must be 0 when pipeline_mode='mnist'")
+        if self.training.objective == "joint-diffusion-ar" and self.model.model_type != "lm":
+            raise ValueError("training.objective='joint-diffusion-ar' requires model.model_type='lm'")
         if self.training.uncond_label_dropout_prob > 0:
             if self.model.model_type != "image":
                 raise ValueError("uncond_label_dropout_prob requires model_type='image'")

@@ -140,20 +140,35 @@ def train_loop(
                     step=train_iteration,
                 )
 
+        train_forward_metrics = None
         # forward
         autocast_ctx = torch.autocast("cuda", dtype=amp_torch_dtype) if use_amp else nullcontext()
         with autocast_ctx:
-            if train_attn_mask is not None:
+            custom_forward = objective.forward_with_model(model, train_batch)
+            if custom_forward is not None:
+                train_logits = custom_forward["logits"]
+                train_loss = custom_forward["loss"]
+                train_forward_metrics = custom_forward.get("metrics")
+                if "inputs" in custom_forward and custom_forward["inputs"] is not None:
+                    train_inputs = custom_forward["inputs"]
+                if "batch" in custom_forward and custom_forward["batch"] is not None:
+                    train_batch = custom_forward["batch"]
+                if "attention_mask" in custom_forward:
+                    train_attn_mask = custom_forward.get("attention_mask")
+                if "context" in custom_forward:
+                    train_context = custom_forward.get("context")
+            elif train_attn_mask is not None:
                 if train_context is not None:
                     train_logits = model(train_inputs, attention_mask=train_attn_mask, context=train_context)
                 else:
                     train_logits = model(train_inputs, attention_mask=train_attn_mask)
+                train_loss = objective.compute_loss(train_logits, train_batch)
             else:
                 if train_context is not None:
                     train_logits = model(train_inputs, context=train_context)
                 else:
                     train_logits = model(train_inputs)
-            train_loss = objective.compute_loss(train_logits, train_batch)
+                train_loss = objective.compute_loss(train_logits, train_batch)
         scaled_loss = train_loss / accum_steps
         if logger is not None and device.startswith("cuda") and torch.cuda.is_available():
             logger.log(
@@ -180,6 +195,10 @@ def train_loop(
             if train_loss_ema is not None:
                 payload["metrics.train_loss_ema"] = float(train_loss_ema)
             logger.log(payload, step=train_iteration)
+            if train_forward_metrics:
+                metrics_payload = {"phase": "train"}
+                metrics_payload.update(train_forward_metrics)
+                logger.log(metrics_payload, step=train_iteration)
             batch_metadata = getattr(train_batch, "metadata", None)
             if isinstance(batch_metadata, dict):
                 token_count = batch_metadata.get("token_count")
@@ -384,17 +403,26 @@ def train_loop(
                             raise ValueError("objective.model_inputs must return a tensor or (tensor, context)")
                         val_inputs, val_context = val_inputs
                     with autocast_ctx:
-                        if val_attn_mask is not None:
+                        custom_val_forward = objective.forward_with_model(model, val_batch)
+                        if custom_val_forward is not None:
+                            val_logits = custom_val_forward["logits"]
+                            val_loss = custom_val_forward["loss"]
+                            if "inputs" in custom_val_forward and custom_val_forward["inputs"] is not None:
+                                val_inputs = custom_val_forward["inputs"]
+                            if "batch" in custom_val_forward and custom_val_forward["batch"] is not None:
+                                val_batch = custom_val_forward["batch"]
+                        elif val_attn_mask is not None:
                             if val_context is not None:
                                 val_logits = model(val_inputs, attention_mask=val_attn_mask, context=val_context)
                             else:
                                 val_logits = model(val_inputs, attention_mask=val_attn_mask)
+                            val_loss = objective.compute_loss(val_logits, val_batch)
                         else:
                             if val_context is not None:
                                 val_logits = model(val_inputs, context=val_context)
                             else:
                                 val_logits = model(val_inputs)
-                        val_loss = objective.compute_loss(val_logits, val_batch)
+                            val_loss = objective.compute_loss(val_logits, val_batch)
                     running_val_loss += float(val_loss.item())
                     val_tokens += int(val_inputs.numel())
                     if log_samples_now and sample_payload is None:
