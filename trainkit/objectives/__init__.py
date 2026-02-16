@@ -1,9 +1,9 @@
 from trainkit.objectives.base import Objective
 from trainkit.objectives.data import DiffusionBatch, AutoregressiveBatch, get_batch, get_autoregressive_batch
-from trainkit.objectives.loss import cross_entropy, diffusion_cross_entropy, autoregressive_cross_entropy
+from trainkit.objectives.loss import cross_entropy, diffusion_cross_entropy, mntp_cross_entropy, autoregressive_cross_entropy
 from trainkit.objectives.diffusion import DiffusionObjective, MegaDlmDiffusionObjective
 from trainkit.objectives.autoregressive import AutoregressiveObjective
-from trainkit.objectives.joint import JointDiffusionAutoregressiveObjective
+from trainkit.objectives.joint import JointDiffusionAutoregressiveObjective, JointMntpAutoregressiveObjective
 
 
 def build_objective(cfg, tokenizer) -> Objective:
@@ -14,6 +14,8 @@ def build_objective(cfg, tokenizer) -> Objective:
         return MegaDlmDiffusionObjective(cfg, tokenizer)
     if name == "joint-diffusion-ar":
         return JointDiffusionAutoregressiveObjective(cfg, tokenizer)
+    if name == "joint-mntp-ar":
+        return JointMntpAutoregressiveObjective(cfg, tokenizer)
     return DiffusionObjective(cfg, tokenizer)
 
 
@@ -23,6 +25,7 @@ __all__ = [
     "MegaDlmDiffusionObjective",
     "AutoregressiveObjective",
     "JointDiffusionAutoregressiveObjective",
+    "JointMntpAutoregressiveObjective",
     "build_objective",
     "DiffusionBatch",
     "AutoregressiveBatch",
@@ -30,5 +33,6 @@ __all__ = [
     "get_autoregressive_batch",
     "cross_entropy",
     "diffusion_cross_entropy",
+    "mntp_cross_entropy",
     "autoregressive_cross_entropy",
 ]

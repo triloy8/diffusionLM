@@ -8,7 +8,7 @@ import torch
 from trainkit.inference.generate import autoregressive_generate, diffusion_generate
 from trainkit.objectives.base import Objective
 from trainkit.objectives.data import JointBatch, get_joint_batch
-from trainkit.objectives.loss import autoregressive_cross_entropy, diffusion_cross_entropy
+from trainkit.objectives.loss import autoregressive_cross_entropy, diffusion_cross_entropy, mntp_cross_entropy
 from trainkit.objectives.schedule import resolve_scheduled_p_mask
 
 
@@ -204,4 +204,72 @@ class JointDiffusionAutoregressiveObjective(Objective):
         )
 
 
-__all__ = ["JointDiffusionAutoregressiveObjective"]
+class JointMntpAutoregressiveObjective(JointDiffusionAutoregressiveObjective):
+    def __init__(self, cfg, tokenizer) -> None:
+        super().__init__(cfg, tokenizer)
+        self.name = "joint-mntp-ar"
+
+    def compute_loss(self, logits: torch.Tensor, batch: JointBatch) -> torch.Tensor:
+        # Fallback path only; train_loop should call forward_with_model for this objective.
+        alpha = self._current_alpha()
+        mntp_loss = mntp_cross_entropy(
+            logits,
+            batch.diffusion.clean_targets,
+            batch.diffusion.mask,
+            batch.diffusion.p_mask,
+            loss_mask=batch.diffusion.loss_mask,
+        )
+        return alpha * mntp_loss
+
+    def forward_with_model(self, model: torch.nn.Module, batch: JointBatch) -> dict:
+        alpha = self._current_alpha()
+
+        diff_inputs = batch.diffusion.noisy_inputs
+        diff_attn = batch.diffusion.attention_mask
+        diff_labels = getattr(batch.diffusion, "labels", None)
+        if diff_attn is not None:
+            if diff_labels is not None:
+                diff_logits = model(diff_inputs, attention_mask=diff_attn, context=diff_labels)
+            else:
+                diff_logits = model(diff_inputs, attention_mask=diff_attn)
+        else:
+            if diff_labels is not None:
+                diff_logits = model(diff_inputs, context=diff_labels)
+            else:
+                diff_logits = model(diff_inputs)
+        mntp_loss = mntp_cross_entropy(
+            diff_logits,
+            batch.diffusion.clean_targets,
+            batch.diffusion.mask,
+            batch.diffusion.p_mask,
+            loss_mask=batch.diffusion.loss_mask,
+        )
+
+        ar_inputs = batch.autoregressive.inputs
+        ar_attn = batch.autoregressive.attention_mask
+        if ar_attn is not None:
+            ar_logits = model(ar_inputs, attention_mask=ar_attn)
+        else:
+            ar_logits = model(ar_inputs)
+        ar_loss = autoregressive_cross_entropy(
+            ar_logits,
+            batch.autoregressive.targets,
+            loss_mask=batch.autoregressive.loss_mask,
+        )
+
+        total_loss = alpha * mntp_loss + (1.0 - alpha) * ar_loss
+
+        return {
+            "loss": total_loss,
+            "logits": diff_logits,
+            "inputs": diff_inputs,
+            "batch": replace(batch, metadata=batch.diffusion.metadata),
+            "metrics": {
+                "metrics.train_loss_mntp": float(mntp_loss.detach().item()),
+                "metrics.train_loss_ar": float(ar_loss.detach().item()),
+                "metrics.train_joint_alpha": float(alpha),
+            },
+        }
+
+
+__all__ = ["JointDiffusionAutoregressiveObjective", "JointMntpAutoregressiveObjective"]

@@ -43,6 +43,30 @@ def diffusion_cross_entropy(
     return weighted.sum() / max(denom, 1)
 
 
+def mntp_cross_entropy(
+    logits: Tensor,
+    targets: Tensor,
+    mask: Tensor,
+    p_mask: Tensor,
+    *,
+    loss_mask: Tensor | None = None,
+) -> Tensor:
+    # MNTP uses next-token targets while keeping masked-token weighting.
+    if logits.shape[1] < 2:
+        return logits.new_tensor(0.0)
+    shifted_logits = logits[:, :-1, :]
+    shifted_targets = targets[:, 1:]
+    shifted_mask = mask[:, :-1]
+    shifted_loss_mask = loss_mask[:, 1:] if loss_mask is not None else None
+    return diffusion_cross_entropy(
+        shifted_logits,
+        shifted_targets,
+        shifted_mask,
+        p_mask,
+        loss_mask=shifted_loss_mask,
+    )
+
+
 def autoregressive_cross_entropy(
     logits: Tensor,
     targets: Tensor,
@@ -59,4 +83,9 @@ def autoregressive_cross_entropy(
     return per_token.sum() / max(denom, 1)
 
 
-__all__ = ["cross_entropy", "diffusion_cross_entropy", "autoregressive_cross_entropy"]
+__all__ = [
+    "cross_entropy",
+    "diffusion_cross_entropy",
+    "mntp_cross_entropy",
+    "autoregressive_cross_entropy",
+]

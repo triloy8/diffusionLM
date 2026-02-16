@@ -290,8 +290,10 @@ class TrainingConfig(_BaseConfig):
         if self.amp_dtype not in ALLOWED_AMP_DTYPES:
             raise ValueError(f"amp_dtype must be one of {sorted(ALLOWED_AMP_DTYPES)}")
         self.objective = self.objective.lower()
-        if self.objective not in {"diffusion", "megadlm-diffusion", "ar", "joint-diffusion-ar"}:
-            raise ValueError("objective must be one of: diffusion, megadlm-diffusion, ar, joint-diffusion-ar")
+        if self.objective not in {"diffusion", "megadlm-diffusion", "ar", "joint-diffusion-ar", "joint-mntp-ar"}:
+            raise ValueError(
+                "objective must be one of: diffusion, megadlm-diffusion, ar, joint-diffusion-ar, joint-mntp-ar"
+            )
         if not (0 <= self.joint_diffusion_alpha <= 1):
             raise ValueError("joint_diffusion_alpha must be in [0, 1]")
         if self.joint_diffusion_alpha_end is not None and not (0 <= self.joint_diffusion_alpha_end <= 1):
@@ -532,8 +534,10 @@ class TrainConfig(_BaseConfig):
     def _validate_train_config(self):
         if self.data.pipeline_mode == "mnist" and self.model.random_trunc_prob > 0:
             raise ValueError("random_trunc_prob must be 0 when pipeline_mode='mnist'")
-        if self.training.objective == "joint-diffusion-ar" and self.model.model_type != "lm":
-            raise ValueError("training.objective='joint-diffusion-ar' requires model.model_type='lm'")
+        if self.training.objective in {"joint-diffusion-ar", "joint-mntp-ar"} and self.model.model_type != "lm":
+            raise ValueError(
+                "training.objective in {'joint-diffusion-ar', 'joint-mntp-ar'} requires model.model_type='lm'"
+            )
         if self.training.uncond_label_dropout_prob > 0:
             if self.model.model_type != "image":
                 raise ValueError("uncond_label_dropout_prob requires model_type='image'")

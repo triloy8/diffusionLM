@@ -465,3 +465,11 @@ def test_resource_configs_validate(filename: str, schema, patcher, tmp_path: Pat
     patched = patcher(deepcopy(raw), tmp_path)
     cfg = schema.model_validate(patched)
     assert cfg is not None
+
+
+def test_train_config_accepts_joint_mntp_ar_objective(tmp_path: Path):
+    raw = tomllib.load((RESOURCE_ROOT / "train.toml").open("rb"))
+    patched = _patch_train_like(deepcopy(raw), tmp_path)
+    patched["training"]["objective"] = "joint-mntp-ar"
+    cfg = TrainConfig.model_validate(patched)
+    assert cfg.training.objective == "joint-mntp-ar"
