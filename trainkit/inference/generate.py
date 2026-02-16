@@ -367,7 +367,13 @@ def autoregressive_generate(
     if gen_length <= 0:
         return prompt_indices
 
+    try:
+        from tqdm import tqdm
+    except Exception as exc:  # pragma: no cover - import-only path
+        raise RuntimeError("tqdm is required for autoregressive_generate") from exc
+
     x = prompt_indices
+    pbar = tqdm(total=gen_length, desc="autoregressive_generate", leave=False)
     for _ in range(gen_length):
         seq_len = x.shape[1]
         causal = torch.tril(torch.ones((seq_len, seq_len), device=x.device, dtype=torch.bool))
@@ -391,7 +397,9 @@ def autoregressive_generate(
                 probs = top_p_filter(probs, float(top_p))
             next_token = torch.multinomial(probs, 1)
         x = torch.cat([x, next_token], dim=1)
+        pbar.update(1)
 
+    pbar.close()
     return x
 
 
