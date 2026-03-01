@@ -1,6 +1,6 @@
 from types import SimpleNamespace
 
-from trainkit.objectives import build_objective, JointMntpAutoregressiveObjective
+from trainkit.objectives import build_objective, JointMntpAutoregressiveObjective, SemicatObjective
 
 
 class _DummyTokenizer:
@@ -34,3 +34,19 @@ def test_build_objective_joint_mntp_ar():
     )
     objective = build_objective(cfg, _DummyTokenizer())
     assert isinstance(objective, JointMntpAutoregressiveObjective)
+
+
+def test_build_objective_semicat():
+    cfg = SimpleNamespace(
+        training_objective="semicat",
+        vocab_size=33,
+        mask_token_id=32,
+        random_trunc_prob=0.0,
+        noise_epsilon=1e-3,
+        semicat_sd_prop=0.25,
+        semicat_sd_lambda=1.0,
+        semicat_sd_type="lag",
+        semicat_label_smoothing=0.0,
+    )
+    objective = build_objective(cfg, _DummyTokenizer())
+    assert isinstance(objective, SemicatObjective)

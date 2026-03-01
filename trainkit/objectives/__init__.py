@@ -4,6 +4,7 @@ from trainkit.objectives.loss import cross_entropy, diffusion_cross_entropy, mnt
 from trainkit.objectives.diffusion import DiffusionObjective, MegaDlmDiffusionObjective
 from trainkit.objectives.autoregressive import AutoregressiveObjective
 from trainkit.objectives.joint import JointDiffusionAutoregressiveObjective, JointMntpAutoregressiveObjective
+from trainkit.objectives.semicat import SemicatObjective
 
 
 def build_objective(cfg, tokenizer) -> Objective:
@@ -16,6 +17,8 @@ def build_objective(cfg, tokenizer) -> Objective:
         return JointDiffusionAutoregressiveObjective(cfg, tokenizer)
     if name == "joint-mntp-ar":
         return JointMntpAutoregressiveObjective(cfg, tokenizer)
+    if name == "semicat":
+        return SemicatObjective(cfg, tokenizer)
     return DiffusionObjective(cfg, tokenizer)
 
 
@@ -26,6 +29,7 @@ __all__ = [
     "AutoregressiveObjective",
     "JointDiffusionAutoregressiveObjective",
     "JointMntpAutoregressiveObjective",
+    "SemicatObjective",
     "build_objective",
     "DiffusionBatch",
     "AutoregressiveBatch",

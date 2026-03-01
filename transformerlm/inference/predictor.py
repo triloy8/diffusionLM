@@ -7,7 +7,12 @@ from safetensors.torch import load_file
 from transformerlm.tokenizer.tokenizer import Tokenizer
 from transformerlm.models import TransformerLM, TransformerImage
 from transformerlm.models.attention import set_sdp_backend
-from trainkit.inference.generate import autoregressive_generate, diffusion_generate, image_diffusion_generate
+from trainkit.inference.generate import (
+    autoregressive_generate,
+    diffusion_generate,
+    image_diffusion_generate,
+    semicat_flow_generate,
+)
 from transformerlm.utils.dtypes import DTYPES
 from trainkit.logger import Logger
 from trainkit.data.image import dequantize_tokens_to_uint8
@@ -147,6 +152,17 @@ def infer_transformer(args, *, logger: Optional[Logger] = None, artifact_path: O
                 guide_fallback_strategy=guide_fallback_strategy,
                 generator=generator,
             )
+        elif generation_mode == "semicat_flow":
+            out_indices = semicat_flow_generate(
+                model,
+                in_indices,
+                mask_id=int(args.mask_id),
+                steps=int(args.steps),
+                gen_length=int(gen_length),
+                temperature=float(args.temperature),
+                top_p=(None if top_p is None else float(top_p)),
+                generator=generator,
+            )
         else:
             raise ValueError(f"Unsupported generation_mode: {generation_mode}")
     else:
@@ -236,6 +252,7 @@ def infer_image(args, *, logger: Optional[Logger] = None):
         generator.manual_seed(int(seed))
 
     cfg_scale = float(args.cfg_scale)
+    generation_mode = str(getattr(args, "generation_mode", "diffusion")).lower()
     uncond_context = None
     if cfg_scale > 0.0:
         if null_label_id is None:
@@ -245,24 +262,41 @@ def infer_image(args, *, logger: Optional[Logger] = None):
             )
         uncond_context = torch.full((num_samples,), int(null_label_id), device=device, dtype=torch.long)
 
-    out_indices = image_diffusion_generate(
-        model,
-        prompt,
-        context=context,
-        mask_id=int(args.mask_id),
-        eos_token_id=None,
-        steps=int(args.steps),
-        gen_length=int(gen_length),
-        block_length=int(args.block_length),
-        temperature=float(args.temperature),
-        top_p=(None if args.top_p is None else float(args.top_p)),
-        cfg_scale=cfg_scale,
-        uncond_context=uncond_context,
-        remasking=str(args.remasking),
-        logits_eos_inf=False,
-        confidence_eos_eot_inf=False,
-        generator=generator,
-    )
+    if generation_mode == "diffusion":
+        out_indices = image_diffusion_generate(
+            model,
+            prompt,
+            context=context,
+            mask_id=int(args.mask_id),
+            eos_token_id=None,
+            steps=int(args.steps),
+            gen_length=int(gen_length),
+            block_length=int(args.block_length),
+            temperature=float(args.temperature),
+            top_p=(None if args.top_p is None else float(args.top_p)),
+            cfg_scale=cfg_scale,
+            uncond_context=uncond_context,
+            remasking=str(args.remasking),
+            logits_eos_inf=False,
+            confidence_eos_eot_inf=False,
+            generator=generator,
+        )
+    elif generation_mode == "semicat_flow":
+        out_indices = semicat_flow_generate(
+            model,
+            prompt,
+            context=context,
+            mask_id=int(args.mask_id),
+            steps=int(args.steps),
+            gen_length=int(gen_length),
+            temperature=float(args.temperature),
+            top_p=(None if args.top_p is None else float(args.top_p)),
+            cfg_scale=cfg_scale,
+            uncond_context=uncond_context,
+            generator=generator,
+        )
+    else:
+        raise ValueError(f"Unsupported generation_mode for image inference: {generation_mode}")
 
     h = getattr(args, "image_height", None)
     w = getattr(args, "image_width", None)

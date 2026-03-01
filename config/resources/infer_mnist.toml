@@ -25,6 +25,7 @@ ckpt_path = "/home/tadhiel/transformerlm/runs/2026-02-05_20-20-58/versions/v0060
 [inference]
 label = 2
 num_samples = 4
+generation_mode = "diffusion" # diffusion/semicat_flow
 steps = 784
 block_length = 784
 temperature = 0.6

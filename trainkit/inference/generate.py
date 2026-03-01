@@ -7,6 +7,103 @@ from trainkit.inference.sampling import add_gumbel_noise, compute_transfer_sched
 
 
 @torch.no_grad()
+def semicat_flow_generate(
+    model,
+    prompt_indices: torch.Tensor,
+    *,
+    mask_id: int,
+    steps: int,
+    gen_length: int,
+    temperature: float = 0.0,
+    top_p: float | None = None,
+    context: torch.Tensor | None = None,
+    cfg_scale: float = 0.0,
+    uncond_context: torch.Tensor | None = None,
+    generator: torch.Generator | None = None,
+) -> torch.Tensor:
+    """Generate via monotonic confidence-based unmasking inspired by semicat flow maps."""
+
+    if prompt_indices.dim() != 2:
+        raise ValueError("prompt_indices must be 2D (batch, seq)")
+    if steps <= 0:
+        raise ValueError("steps must be > 0")
+    if gen_length <= 0:
+        return prompt_indices
+
+    device = prompt_indices.device
+    batch_size, prompt_len = prompt_indices.shape
+    total_len = prompt_len + gen_length
+    context_limit = getattr(model, "context_length", None)
+    if context_limit is not None and total_len > int(context_limit):
+        raise ValueError("prompt length + gen_length exceeds model context_length")
+
+    if cfg_scale > 0.0:
+        if context is None:
+            raise ValueError("context must be set when cfg_scale > 0")
+        if uncond_context is None:
+            raise ValueError("uncond_context must be set when cfg_scale > 0")
+
+    x = torch.full(
+        (batch_size, total_len),
+        fill_value=mask_id,
+        device=device,
+        dtype=prompt_indices.dtype,
+    )
+    x[:, :prompt_len] = prompt_indices
+
+    for step_idx in range(steps):
+        mask_index = (x == mask_id)
+        masked_counts = mask_index.sum(dim=1)
+        if int(masked_counts.sum().item()) == 0:
+            break
+
+        if cfg_scale > 0.0:
+            cond_logits = model(x, context=context)
+            uncond_logits = model(x, context=uncond_context)
+            logits = uncond_logits + (cfg_scale + 1.0) * (cond_logits - uncond_logits)
+        else:
+            if context is not None:
+                logits = model(x, context=context)
+            else:
+                logits = model(x)
+
+        if top_p is not None:
+            probs = softmax(logits, dim=-1)
+            probs = top_p_filter(probs, float(top_p))
+            logits = torch.where(
+                probs > 0,
+                logits,
+                torch.full_like(logits, float("-inf")),
+            )
+
+        logits_with_noise = add_gumbel_noise(logits, temperature, generator=generator)
+        predictions = torch.argmax(logits_with_noise, dim=-1)
+        predictions = torch.where(mask_index, predictions, x)
+
+        probs = softmax(logits, dim=-1)
+        confidence = torch.squeeze(
+            torch.gather(probs, dim=-1, index=predictions.unsqueeze(-1)),
+            -1,
+        )
+        confidence = torch.where(mask_index, confidence, torch.full_like(confidence, float("-inf")))
+
+        transfer_mask = torch.zeros_like(mask_index)
+        steps_left = max(1, steps - step_idx)
+        for b in range(batch_size):
+            remaining = int(masked_counts[b].item())
+            if remaining <= 0:
+                continue
+            k = max(1, math.ceil(remaining / steps_left))
+            k = min(k, remaining)
+            topk_indices = torch.topk(confidence[b], k=k, dim=-1).indices
+            transfer_mask[b, topk_indices] = True
+
+        x = torch.where(transfer_mask, predictions, x)
+
+    return x
+
+
+@torch.no_grad()
 def diffusion_generate(
     model,
     prompt_indices: torch.Tensor,

@@ -258,6 +258,10 @@ class TrainingConfig(_BaseConfig):
     amp_enabled: bool = False
     amp_dtype: str = "float16"
     objective: str = "diffusion"
+    semicat_sd_prop: float = 0.25
+    semicat_sd_lambda: float = 1.0
+    semicat_sd_type: str = "lag"
+    semicat_label_smoothing: float = 0.0
     joint_diffusion_alpha: float = 0.3
     joint_diffusion_alpha_end: Optional[float] = None
     joint_alpha_schedule: str = "constant"
@@ -290,10 +294,19 @@ class TrainingConfig(_BaseConfig):
         if self.amp_dtype not in ALLOWED_AMP_DTYPES:
             raise ValueError(f"amp_dtype must be one of {sorted(ALLOWED_AMP_DTYPES)}")
         self.objective = self.objective.lower()
-        if self.objective not in {"diffusion", "megadlm-diffusion", "ar", "joint-diffusion-ar", "joint-mntp-ar"}:
+        if self.objective not in {"diffusion", "megadlm-diffusion", "ar", "joint-diffusion-ar", "joint-mntp-ar", "semicat"}:
             raise ValueError(
-                "objective must be one of: diffusion, megadlm-diffusion, ar, joint-diffusion-ar, joint-mntp-ar"
+                "objective must be one of: diffusion, megadlm-diffusion, ar, joint-diffusion-ar, joint-mntp-ar, semicat"
             )
+        if not (0 <= self.semicat_sd_prop <= 1):
+            raise ValueError("semicat_sd_prop must be in [0, 1]")
+        if self.semicat_sd_lambda < 0:
+            raise ValueError("semicat_sd_lambda must be >= 0")
+        self.semicat_sd_type = self.semicat_sd_type.lower()
+        if self.semicat_sd_type not in {"lag"}:
+            raise ValueError("semicat_sd_type must be one of: lag")
+        if not (0 <= self.semicat_label_smoothing < 1):
+            raise ValueError("semicat_label_smoothing must be in [0, 1)")
         if not (0 <= self.joint_diffusion_alpha <= 1):
             raise ValueError("joint_diffusion_alpha must be in [0, 1]")
         if self.joint_diffusion_alpha_end is not None and not (0 <= self.joint_diffusion_alpha_end <= 1):
@@ -511,8 +524,8 @@ class TrainInferConfig(_BaseConfig):
             raise ValueError("train_infer.cfg_scale must be >= 0")
         if self.remasking not in {"low_confidence", "random"}:
             raise ValueError("train_infer.remasking must be one of: low_confidence, random")
-        if self.generation_mode not in {"diffusion", "ar"}:
-            raise ValueError("train_infer.generation_mode must be one of: diffusion, ar")
+        if self.generation_mode not in {"diffusion", "ar", "semicat_flow"}:
+            raise ValueError("train_infer.generation_mode must be one of: diffusion, ar, semicat_flow")
         if self.seed is not None and self.seed < 0:
             raise ValueError("train_infer.seed must be >= 0 when provided")
         return self
@@ -607,8 +620,8 @@ class InferenceConfig(_BaseConfig):
             raise ValueError("top_p must be between 0 and 1 when provided")
         if self.mask_id is not None and self.mask_id < 0:
             raise ValueError("mask_id must be >= 0")
-        if self.generation_mode == "diffusion" and self.mask_id is None:
-            raise ValueError("mask_id must be set when generation_mode='diffusion'")
+        if self.generation_mode in {"diffusion", "semicat_flow"} and self.mask_id is None:
+            raise ValueError("mask_id must be set when generation_mode is diffusion-like")
         if self.seed is not None and self.seed < 0:
             raise ValueError("seed must be >= 0")
         if self.eos_token_id is not None and self.eos_token_id < 0:
@@ -619,8 +632,8 @@ class InferenceConfig(_BaseConfig):
             raise ValueError("cfg_scale must be >= 0")
         if self.remasking not in {"low_confidence", "random"}:
             raise ValueError("remasking must be one of: low_confidence, random")
-        if self.generation_mode not in {"diffusion", "ar"}:
-            raise ValueError("generation_mode must be one of: diffusion, ar")
+        if self.generation_mode not in {"diffusion", "ar", "semicat_flow"}:
+            raise ValueError("generation_mode must be one of: diffusion, ar, semicat_flow")
         if (self.logits_eos_inf or self.confidence_eos_eot_inf) and self.eos_token_id is None:
             raise ValueError("eos_token_id must be set when EOS suppression is enabled")
         return self
@@ -710,6 +723,7 @@ class ImageInferenceConfig(_BaseConfig):
     seed: Optional[int] = None
     cfg_scale: float = 0.0
     remasking: str = "random"
+    generation_mode: str = "diffusion"
     output_dir: Path = Path("runs/infer_images")
     image_height: Optional[int] = None
     image_width: Optional[int] = None
@@ -734,6 +748,8 @@ class ImageInferenceConfig(_BaseConfig):
             raise ValueError("cfg_scale must be >= 0")
         if self.remasking not in {"low_confidence", "random"}:
             raise ValueError("remasking must be one of: low_confidence, random")
+        if self.generation_mode not in {"diffusion", "semicat_flow"}:
+            raise ValueError("generation_mode must be one of: diffusion, semicat_flow")
         if (self.image_height is None) ^ (self.image_width is None):
             raise ValueError("image_height and image_width must be set together")
         if self.image_height is not None and self.image_height <= 0:

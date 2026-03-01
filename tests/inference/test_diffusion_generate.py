@@ -1,6 +1,6 @@
 import torch
 
-from trainkit.inference.generate import diffusion_generate, image_diffusion_generate
+from trainkit.inference.generate import diffusion_generate, image_diffusion_generate, semicat_flow_generate
 from trainkit.inference.sampling import compute_transfer_schedule, add_gumbel_noise
 
 
@@ -133,3 +133,45 @@ def test_image_diffusion_generate_requires_uncond_context_when_cfg_enabled():
         assert "uncond_context must be set" in str(exc)
     else:
         raise AssertionError("expected ValueError when cfg_scale > 0 without uncond_context")
+
+
+def test_semicat_flow_generate_fills_mask_tokens():
+    device = torch.device("cpu")
+    vocab_size = 6
+    context_length = 8
+    prompt = torch.tensor([[1, 2]], device=device)
+    model = DummyModel(vocab_size=vocab_size, context_length=context_length, target_token=4).to(device)
+
+    output = semicat_flow_generate(
+        model,
+        prompt,
+        mask_id=5,
+        steps=4,
+        gen_length=4,
+        temperature=0.0,
+    )
+
+    assert output.shape == (1, 6)
+    assert torch.equal(output[:, : prompt.shape[1]], prompt)
+    assert torch.all(output[:, prompt.shape[1]:] == 4)
+
+
+def test_semicat_flow_generate_cfg_uses_unconditional_context():
+    device = torch.device("cpu")
+    model = DummyImageModel(vocab_size=6, context_length=8).to(device)
+    prompt = torch.empty((1, 0), dtype=torch.long, device=device)
+    context = torch.tensor([2], dtype=torch.long, device=device)
+    uncond_context = torch.tensor([0], dtype=torch.long, device=device)
+
+    out = semicat_flow_generate(
+        model,
+        prompt,
+        context=context,
+        uncond_context=uncond_context,
+        mask_id=5,
+        steps=4,
+        gen_length=4,
+        cfg_scale=2.0,
+        temperature=0.0,
+    )
+    assert torch.all(out == 2)

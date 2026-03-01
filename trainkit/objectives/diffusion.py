@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Optional
 import torch
 
-from trainkit.inference.generate import autoregressive_generate, diffusion_generate
+from trainkit.inference.generate import autoregressive_generate, diffusion_generate, semicat_flow_generate
 from trainkit.objectives.base import Objective
 from trainkit.objectives.data import DiffusionBatch, get_batch, get_megadlm_diffusion_batch
 from trainkit.objectives.loss import cross_entropy, diffusion_cross_entropy
@@ -170,6 +170,17 @@ class DiffusionObjective(Objective):
                 top_p=kwargs.get("top_p"),
                 eos_token_id=kwargs.get("eos_token_id"),
                 logits_eos_inf=bool(kwargs.get("logits_eos_inf", False)),
+                generator=kwargs.get("generator"),
+            )
+        if generation_mode == "semicat_flow":
+            return semicat_flow_generate(
+                model,
+                prompt_indices,
+                mask_id=int(kwargs.get("mask_id")),
+                steps=int(kwargs.get("steps", 0)),
+                gen_length=int(kwargs.get("gen_length", 0)),
+                temperature=float(kwargs.get("temperature", 0.0)),
+                top_p=kwargs.get("top_p"),
                 generator=kwargs.get("generator"),
             )
         return diffusion_generate(
@@ -352,6 +363,17 @@ class MegaDlmDiffusionObjective(Objective):
                 top_p=kwargs.get("top_p"),
                 eos_token_id=kwargs.get("eos_token_id"),
                 logits_eos_inf=bool(kwargs.get("logits_eos_inf", False)),
+                generator=kwargs.get("generator"),
+            )
+        if generation_mode == "semicat_flow":
+            return semicat_flow_generate(
+                model,
+                prompt_indices,
+                mask_id=int(kwargs.get("mask_id")),
+                steps=int(kwargs.get("steps", 0)),
+                gen_length=int(kwargs.get("gen_length", 0)),
+                temperature=float(kwargs.get("temperature", 0.0)),
+                top_p=kwargs.get("top_p"),
                 generator=kwargs.get("generator"),
             )
         return diffusion_generate(

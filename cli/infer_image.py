@@ -56,6 +56,7 @@ def main():
         top_p=cfg_dc.inference.top_p,
         cfg_scale=cfg_dc.inference.cfg_scale,
         remasking=cfg_dc.inference.remasking,
+        generation_mode=cfg_dc.inference.generation_mode,
         seed=cfg_dc.inference.seed,
         output_dir=str(cfg_dc.inference.output_dir),
     )

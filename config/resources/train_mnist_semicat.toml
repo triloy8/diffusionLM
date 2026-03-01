@@ -1,0 +1,95 @@
+[model]
+model_type = "image"
+label_vocab_size = 11
+vocab_size = 33
+pixel_bins = 32
+context_length = 784
+d_model = 256
+num_layers = 8
+num_heads = 16
+d_ff = 1024
+rope_theta = 10000.0
+attention_backend = "torch_sdpa"
+attention_sdp_backend = "auto"
+device = "cuda"
+dtype = "float32"
+mask_token_id = 32
+null_label_id = 10
+random_trunc_prob = 0.0
+use_rope_2d = true
+image_height = 28
+image_width = 28
+
+[optimizer]
+optimizer_name = "adamw"
+betas = [0.9, 0.95]
+eps = 1e-8
+weight_decay = 0.1
+initial_learning_rate = 0.0001
+max_learning_rate = 0.003
+min_learning_rate = 0.0003
+warmup_iters = 200
+cosine_cycle_iters = 60000
+grad_clip_max_l2_norm = 3.0
+lr_schedule = "constant_with_warmup"
+
+[training]
+batch_size = 256
+max_train_iteration = 120000
+max_val_iteration = 10
+val_freq_iteration = 250
+seed = 3407
+skip_validation = false
+grad_accum_steps = 1
+train_loss_ema_decay = 0.99
+amp_enabled = true
+amp_dtype = "bfloat16"
+objective = "semicat"
+semicat_sd_prop = 0.25
+semicat_sd_lambda = 0.5
+semicat_sd_type = "lag"
+semicat_label_smoothing = 0.0
+uncond_label_dropout_prob = 0.1
+
+[data]
+runs_path = "./runs"
+dataset_name = "ylecun/mnist"
+train_split = "train"
+val_split = "test"
+text_field = "image"
+pipeline_mode = "mnist"
+shuffle_buffer_size = 0
+cache_all = true
+shuffle_seed = 3407
+
+[logging]
+backend = "wandb"
+architecture = "TransformerImage"
+dataset = "MNIST"
+log_activation_norms = false
+log_weight_norms = true
+log_grad_norms = true
+log_p_mask_bucket_loss = false
+val_log_every = 8
+val_log_samples = 1
+
+[wandb]
+entity = "yiltro8-org"
+project = "mnist_semicat"
+
+[ddp]
+backend = "nccl"
+num_nodes = 1
+num_gpus_per_node = 1
+node_rank = 0
+master_addr = "127.0.0.1"
+master_port = "29500"
+bucket_size_mb = 200
+nccl_p2p_disable = true
+
+[checkpointing]
+enabled = true
+ckpting_save_iter = 1000
+resume_optimizer = true
+best_metric_name = "val_loss"
+best_mode = "min"

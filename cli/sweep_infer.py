@@ -11,7 +11,7 @@ import torch
 from safetensors.torch import load_file
 
 from config import load_sweep_infer_config
-from trainkit.inference.generate import autoregressive_generate, diffusion_generate
+from trainkit.inference.generate import autoregressive_generate, diffusion_generate, semicat_flow_generate
 from transformerlm.models import TransformerLM
 from transformerlm.models.attention import set_sdp_backend
 from transformerlm.tokenizer.tokenizer import Tokenizer
@@ -173,6 +173,17 @@ def main():
                         guide_model=guide_model,
                         guidance_mode=guidance_mode,
                         guide_fallback_strategy=guide_fallback_strategy,
+                        generator=generator,
+                    )
+                elif generation_mode == "semicat_flow":
+                    out_indices = semicat_flow_generate(
+                        model,
+                        in_indices,
+                        mask_id=int(cfg.inference.mask_id),
+                        steps=int(steps),
+                        gen_length=int(gen_length),
+                        temperature=float(temp),
+                        top_p=(None if top_p is None else float(top_p)),
                         generator=generator,
                     )
                 else:
