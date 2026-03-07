@@ -10,10 +10,12 @@ from pydantic import ValidationError
 from config import (
     load_train_config,
     load_infer_config,
+    load_image_infer_config,
     load_train_tokenizer_config,
     asdict_pretty,
     TrainConfig,
     InferConfig,
+    ImageInferConfig,
     TrainTokenizerConfig,
     BenchInferConfig,
     BenchTokenizerConfig,
@@ -473,3 +475,65 @@ def test_train_config_accepts_joint_mntp_ar_objective(tmp_path: Path):
     patched["training"]["objective"] = "joint-mntp-ar"
     cfg = TrainConfig.model_validate(patched)
     assert cfg.training.objective == "joint-mntp-ar"
+
+
+def test_train_config_accepts_flow_with_image_dit(tmp_path: Path):
+    raw = tomllib.load((RESOURCE_ROOT / "train_mnist.toml").open("rb"))
+    patched = deepcopy(raw)
+    patched["model"]["model_type"] = "image_dit"
+    patched["training"]["objective"] = "flow"
+    cfg = TrainConfig.model_validate(patched)
+    assert cfg.model.model_type == "image_dit"
+    assert cfg.training.objective == "flow"
+
+
+def test_image_infer_config_accepts_flow_mode_for_image_dit(tmp_path: Path):
+    ckpt = tmp_path / "model.safetensors"
+    ckpt.write_bytes(b"123")
+    cfg_path = tmp_path / "infer_image_flow.toml"
+    write(cfg_path, f"""
+    [model]
+    model_type = "image_dit"
+    vocab_size = 33
+    pixel_bins = 32
+    context_length = 784
+    d_model = 16
+    num_layers = 1
+    num_heads = 2
+    d_ff = 32
+    rope_theta = 10000.0
+    label_vocab_size = 11
+    null_label_id = 10
+    use_rope_2d = true
+    image_height = 28
+    image_width = 28
+    attention_backend = "torch_sdpa"
+    attention_sdp_backend = "auto"
+    device = "cpu"
+    dtype = "float32"
+
+    [checkpoint]
+    ckpt_path = "{ckpt.as_posix()}"
+
+    [inference]
+    generation_mode = "flow"
+    label = 3
+    num_samples = 2
+    steps = 32
+    block_length = 784
+    temperature = 1.0
+    cfg_scale = 1.0
+    output_dir = "{(tmp_path / 'out').as_posix()}"
+    """)
+    cfg = load_image_infer_config(cfg_path)
+    assert isinstance(cfg, ImageInferConfig)
+    assert cfg.inference.generation_mode == "flow"
+
+
+def test_train_config_rejects_flow_without_image_dit(tmp_path: Path):
+    raw = tomllib.load((RESOURCE_ROOT / "train_mnist.toml").open("rb"))
+    patched = deepcopy(raw)
+    patched["training"]["objective"] = "flow"
+    with pytest.raises(ValidationError) as exc:
+        TrainConfig.model_validate(patched)
+    assert "requires model.model_type='image_dit'" in str(exc.value)

@@ -3,9 +3,15 @@ from __future__ import annotations
 from typing import Optional
 import torch
 
-from trainkit.inference.generate import autoregressive_generate, diffusion_generate
+from trainkit.inference.generate import autoregressive_generate, diffusion_generate, flow_image_generate
 from trainkit.objectives.base import Objective
-from trainkit.objectives.data import DiffusionBatch, get_batch, get_megadlm_diffusion_batch
+from trainkit.objectives.data import (
+    DiffusionBatch,
+    FlowMatchingBatch,
+    get_batch,
+    get_flow_matching_batch,
+    get_megadlm_diffusion_batch,
+)
 from trainkit.objectives.loss import cross_entropy, diffusion_cross_entropy
 from trainkit.objectives.schedule import resolve_scheduled_p_mask
 
@@ -186,6 +192,86 @@ class DiffusionObjective(Objective):
             remasking=str(kwargs.get("remasking", "random")),
             logits_eos_inf=bool(kwargs.get("logits_eos_inf", False)),
             confidence_eos_eot_inf=bool(kwargs.get("confidence_eos_eot_inf", False)),
+            generator=kwargs.get("generator"),
+        )
+
+
+class FlowMatchingObjective(Objective):
+    def __init__(self, cfg, tokenizer) -> None:
+        super().__init__("flow")
+        self._tokenizer = tokenizer
+        self.pixel_bins = int(getattr(cfg, "pixel_bins", 256))
+        self.random_trunc_prob = float(getattr(cfg, "random_trunc_prob", 0.0))
+        self.null_label_id = getattr(cfg, "null_label_id", None)
+        self.uncond_label_dropout_prob = float(getattr(cfg, "uncond_label_dropout_prob", 0.0))
+        if self.uncond_label_dropout_prob > 0 and self.null_label_id is None:
+            raise ValueError("uncond_label_dropout_prob > 0 requires null_label_id")
+
+    def get_batch(self, *, dataset, batch_size: int, context_length: int, device: str, generator=None):
+        batch = get_flow_matching_batch(
+            dataset=dataset,
+            batch_size=batch_size,
+            context_length=context_length,
+            device=device,
+            pixel_bins=self.pixel_bins,
+            random_trunc_prob=self.random_trunc_prob,
+            generator=generator,
+        )
+        labels = getattr(batch, "labels", None)
+        if labels is not None and self.uncond_label_dropout_prob > 0:
+            keep = torch.rand(
+                labels.shape,
+                device=labels.device,
+                generator=generator,
+            ) >= self.uncond_label_dropout_prob
+            null_labels = torch.full_like(labels, int(self.null_label_id))
+            batch.labels = torch.where(keep, labels, null_labels)
+        return batch
+
+    def model_inputs(self, batch: FlowMatchingBatch):
+        return batch.noisy_inputs
+
+    def attention_mask(self, batch: FlowMatchingBatch):
+        return None
+
+    def forward_with_model(self, model: torch.nn.Module, batch: FlowMatchingBatch) -> Optional[dict]:
+        labels = getattr(batch, "labels", None)
+        if labels is None:
+            raise ValueError("flow objective requires labels for class conditioning")
+        preds = model(batch.noisy_inputs, batch.timesteps, context=labels)
+        loss = self.compute_loss(preds, batch)
+        return {"logits": preds, "loss": loss, "inputs": batch.noisy_inputs}
+
+    def compute_loss(self, logits: torch.Tensor, batch: FlowMatchingBatch) -> torch.Tensor:
+        target = batch.target_velocity
+        sq = (logits - target).pow(2)
+        loss_mask = getattr(batch, "loss_mask", None)
+        if loss_mask is None:
+            return sq.mean()
+        mask = loss_mask.to(sq.dtype)
+        denom = mask.sum().clamp_min(1.0)
+        return (sq * mask).sum() / denom
+
+    def val_samples(self, inputs: torch.Tensor, logits: torch.Tensor, batch: FlowMatchingBatch, max_samples: int):
+        return None
+
+    def encode(self, text: str) -> list[int]:
+        return self._tokenizer.encode(text)
+
+    def decode(self, tokens: list[int]) -> str:
+        return self._tokenizer.decode(tokens)
+
+    def generate(self, model, prompt_indices: torch.Tensor, **kwargs) -> torch.Tensor:
+        context = kwargs.get("context")
+        if context is None:
+            raise ValueError("flow generation requires context labels")
+        return flow_image_generate(
+            model,
+            prompt_indices,
+            context=context,
+            steps=int(kwargs.get("steps", 0)),
+            cfg_scale=float(kwargs.get("cfg_scale", 0.0)),
+            uncond_context=kwargs.get("uncond_context"),
             generator=kwargs.get("generator"),
         )
 

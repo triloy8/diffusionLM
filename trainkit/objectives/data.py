@@ -34,6 +34,18 @@ class JointBatch:
     metadata: Dict[str, Any]
 
 
+@dataclass
+class FlowMatchingBatch:
+    noisy_inputs: torch.Tensor
+    clean_targets: torch.Tensor
+    target_velocity: torch.Tensor
+    timesteps: torch.Tensor
+    attention_mask: torch.Tensor | None
+    loss_mask: torch.Tensor | None
+    metadata: Dict[str, Any]
+    labels: torch.Tensor | None = None
+
+
 def _rand_uniform(shape, *, device: torch.device, generator: torch.Generator | None = None):
     if generator is not None:
         return torch.rand(shape, generator=generator, device=device)
@@ -423,11 +435,65 @@ def get_joint_batch(
     return JointBatch(diffusion=diffusion_batch, autoregressive=autoregressive_batch, metadata=metadata)
 
 
+def get_flow_matching_batch(
+    dataset,
+    batch_size: int,
+    context_length: int,
+    device: str,
+    *,
+    pixel_bins: int,
+    random_trunc_prob: float = 0.0,
+    generator: torch.Generator | None = None,
+) -> FlowMatchingBatch:
+    if pixel_bins <= 1:
+        raise ValueError("pixel_bins must be > 1 for flow matching")
+    clean_targets, attention_mask, random_trunc_applied, labels = _draw_clean_targets(
+        dataset,
+        batch_size,
+        context_length,
+        device,
+        random_trunc_prob=random_trunc_prob,
+        min_length=1,
+        generator=generator,
+    )
+    x1 = clean_targets.to(torch.float32)
+    x1 = 2.0 * (x1 / float(pixel_bins - 1)) - 1.0
+    x0 = torch.randn(x1.shape, device=x1.device, dtype=x1.dtype, generator=generator)
+    t = _rand_uniform((x1.shape[0], 1), device=x1.device, generator=generator)
+    xt = (1.0 - t) * x0 + t * x1
+    u = x1 - x0
+
+    loss_mask = attention_mask
+    token_count = int(loss_mask.sum().item()) if loss_mask is not None else int(x1.numel())
+    metadata: Dict[str, Any] = {
+        "random_truncation_applied": random_trunc_applied,
+        "sequence_length": int(x1.shape[1]),
+        "token_count": token_count,
+        "t_stats": {
+            "mean": float(t.mean().detach().cpu().item()),
+            "min": float(t.min().detach().cpu().item()),
+            "max": float(t.max().detach().cpu().item()),
+        },
+    }
+    return FlowMatchingBatch(
+        noisy_inputs=xt,
+        clean_targets=x1,
+        target_velocity=u,
+        timesteps=t,
+        attention_mask=attention_mask,
+        loss_mask=loss_mask,
+        labels=labels,
+        metadata=metadata,
+    )
+
+
 __all__ = [
     "DiffusionBatch",
     "AutoregressiveBatch",
     "JointBatch",
+    "FlowMatchingBatch",
     "get_batch",
     "get_autoregressive_batch",
     "get_joint_batch",
+    "get_flow_matching_batch",
 ]

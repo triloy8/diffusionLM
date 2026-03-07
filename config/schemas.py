@@ -199,14 +199,15 @@ class ModelConfig(_BaseConfig):
         if not (1 < self.pixel_bins <= 256):
             raise ValueError("pixel_bins must be in [2, 256]")
         self.model_type = self.model_type.lower()
-        if self.model_type not in {"lm", "image"}:
-            raise ValueError("model_type must be one of: lm, image")
-        if self.model_type == "image":
+        if self.model_type not in {"lm", "image", "image_dit"}:
+            raise ValueError("model_type must be one of: lm, image, image_dit")
+        if self.model_type in {"image", "image_dit"}:
             if self.label_vocab_size is None or self.label_vocab_size <= 0:
-                raise ValueError("label_vocab_size must be > 0 when model_type='image'")
-            # Image pipeline reserves one token for diffusion masking.
-            if self.vocab_size != self.pixel_bins + 1:
-                raise ValueError("for model_type='image', vocab_size must equal pixel_bins + 1")
+                raise ValueError("label_vocab_size must be > 0 when model_type is image/image_dit")
+            if self.model_type == "image":
+                # Image diffusion pipeline reserves one token for masking.
+                if self.vocab_size != self.pixel_bins + 1:
+                    raise ValueError("for model_type='image', vocab_size must equal pixel_bins + 1")
             if self.null_label_id is not None and not (0 <= self.null_label_id < self.label_vocab_size):
                 raise ValueError("null_label_id must be in [0, label_vocab_size)")
             if (self.image_height is None) ^ (self.image_width is None):
@@ -290,9 +291,9 @@ class TrainingConfig(_BaseConfig):
         if self.amp_dtype not in ALLOWED_AMP_DTYPES:
             raise ValueError(f"amp_dtype must be one of {sorted(ALLOWED_AMP_DTYPES)}")
         self.objective = self.objective.lower()
-        if self.objective not in {"diffusion", "megadlm-diffusion", "ar", "joint-diffusion-ar", "joint-mntp-ar"}:
+        if self.objective not in {"diffusion", "megadlm-diffusion", "ar", "joint-diffusion-ar", "joint-mntp-ar", "flow"}:
             raise ValueError(
-                "objective must be one of: diffusion, megadlm-diffusion, ar, joint-diffusion-ar, joint-mntp-ar"
+                "objective must be one of: diffusion, megadlm-diffusion, ar, joint-diffusion-ar, joint-mntp-ar, flow"
             )
         if not (0 <= self.joint_diffusion_alpha <= 1):
             raise ValueError("joint_diffusion_alpha must be in [0, 1]")
@@ -538,9 +539,13 @@ class TrainConfig(_BaseConfig):
             raise ValueError(
                 "training.objective in {'joint-diffusion-ar', 'joint-mntp-ar'} requires model.model_type='lm'"
             )
+        if self.training.objective == "flow" and self.model.model_type != "image_dit":
+            raise ValueError("training.objective='flow' requires model.model_type='image_dit'")
+        if self.model.model_type == "image_dit" and self.training.objective != "flow":
+            raise ValueError("model.model_type='image_dit' requires training.objective='flow'")
         if self.training.uncond_label_dropout_prob > 0:
-            if self.model.model_type != "image":
-                raise ValueError("uncond_label_dropout_prob requires model_type='image'")
+            if self.model.model_type not in {"image", "image_dit"}:
+                raise ValueError("uncond_label_dropout_prob requires model_type in {'image', 'image_dit'}")
             if self.model.null_label_id is None:
                 raise ValueError("uncond_label_dropout_prob > 0 requires model.null_label_id")
         return self
@@ -700,6 +705,7 @@ class InferConfig(_BaseConfig):
 
 
 class ImageInferenceConfig(_BaseConfig):
+    generation_mode: str = "diffusion"
     label: int
     num_samples: int = 4
     steps: int
@@ -716,6 +722,9 @@ class ImageInferenceConfig(_BaseConfig):
 
     @model_validator(mode="after")
     def _validate_image_infer(self):
+        self.generation_mode = self.generation_mode.lower()
+        if self.generation_mode not in {"diffusion", "flow"}:
+            raise ValueError("generation_mode must be one of: diffusion, flow")
         if self.label < 0:
             raise ValueError("label must be >= 0")
         if self.num_samples <= 0:
@@ -751,14 +760,18 @@ class ImageInferConfig(_BaseConfig):
 
     @model_validator(mode="after")
     def _finalize_image_inference(self):
-        if self.model.model_type != "image":
-            raise ValueError("model.model_type must be 'image' for image inference")
+        if self.model.model_type not in {"image", "image_dit"}:
+            raise ValueError("model.model_type must be one of: image, image_dit for image inference")
         inf = self.inference
         updates = {}
-        if inf.mask_id is None and self.model.mask_token_id is not None:
+        if inf.generation_mode == "diffusion" and inf.mask_id is None and self.model.mask_token_id is not None:
             updates["mask_id"] = self.model.mask_token_id
         if updates:
             inf = inf.model_copy(update=updates)
+        if self.model.model_type == "image_dit" and inf.generation_mode != "flow":
+            raise ValueError("model.model_type='image_dit' requires inference.generation_mode='flow'")
+        if self.model.model_type == "image" and inf.generation_mode != "diffusion":
+            raise ValueError("model.model_type='image' requires inference.generation_mode='diffusion'")
         self.inference = inf
         return self
 

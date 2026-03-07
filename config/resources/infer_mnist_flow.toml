@@ -1,0 +1,35 @@
+[model]
+model_type = "image_dit"
+label_vocab_size = 11
+vocab_size = 33
+pixel_bins = 32
+context_length = 784
+d_model = 256
+num_layers = 8
+num_heads = 16
+d_ff = 1024
+rope_theta = 10000.0
+attention_backend = "torch_sdpa"
+attention_sdp_backend = "auto"
+device = "cuda"
+dtype = "float16"
+null_label_id = 10
+use_rope_2d = true
+image_height = 28
+image_width = 28
+
+[checkpoint]
+ckpt_path = "/home/tadhiel/transformerlm/runs/REPLACE_WITH_FLOW_RUN/versions/v006000/model.safetensors"
+
+[inference]
+generation_mode = "flow"
+label = 2
+num_samples = 4
+steps = 64
+block_length = 784
+temperature = 1.0
+top_p = 1.0
+cfg_scale = 2.0
+remasking = "random"
+seed = 123
+output_dir = "./runs/infer_images_flow"

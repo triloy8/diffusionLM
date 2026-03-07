@@ -403,6 +403,59 @@ def autoregressive_generate(
     return x
 
 
+@torch.no_grad()
+def flow_image_generate(
+    model,
+    prompt_indices: torch.Tensor,
+    *,
+    context: torch.Tensor,
+    steps: int,
+    cfg_scale: float = 0.0,
+    uncond_context: torch.Tensor | None = None,
+    generator: torch.Generator | None = None,
+) -> torch.Tensor:
+    if prompt_indices.dim() != 2:
+        raise ValueError("prompt_indices must be 2D (batch, seq)")
+    if context.dim() != 1:
+        raise ValueError("context must be 1D (batch,)")
+    if prompt_indices.shape[0] != context.shape[0]:
+        raise ValueError("context batch size must match prompt batch size")
+    if prompt_indices.shape[1] != 0:
+        raise ValueError("flow_image_generate expects empty prompt_indices for full-image generation")
+    if steps <= 0:
+        raise ValueError("steps must be > 0")
+
+    batch_size = context.shape[0]
+    gen_length = int(getattr(model, "context_length"))
+    x = torch.randn(
+        (batch_size, gen_length),
+        device=prompt_indices.device,
+        dtype=torch.float32,
+        generator=generator,
+    )
+    dt = 1.0 / float(steps)
+
+    if uncond_context is not None:
+        if uncond_context.dim() != 1:
+            raise ValueError("uncond_context must be 1D (batch,)")
+        if uncond_context.shape[0] != batch_size:
+            raise ValueError("uncond_context batch size must match prompt batch size")
+        uncond_context = uncond_context.to(device=context.device, dtype=context.dtype)
+
+    for k in range(steps):
+        t = torch.full((batch_size,), float(k) / float(steps), device=x.device, dtype=x.dtype)
+        if cfg_scale > 0.0:
+            if uncond_context is None:
+                raise ValueError("uncond_context must be set when cfg_scale > 0 for flow_image_generate")
+            v_cond = model(x, t, context=context)
+            v_uncond = model(x, t, context=uncond_context)
+            v = v_uncond + (cfg_scale + 1.0) * (v_cond - v_uncond)
+        else:
+            v = model(x, t, context=context)
+        x = x + dt * v
+    return x
+
+
 # Backwards-compatible alias
 generate = diffusion_generate
 
@@ -411,5 +464,6 @@ __all__ = [
     "diffusion_generate",
     "image_diffusion_generate",
     "autoregressive_generate",
+    "flow_image_generate",
     "generate",
 ]

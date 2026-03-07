@@ -35,6 +35,12 @@ def dequantize_tokens_to_uint8(tokens: np.ndarray, *, pixel_bins: int) -> np.nda
     return np.clip(restored, 0, 255).astype(np.uint8)
 
 
+def flow_pixels_to_uint8(values: np.ndarray) -> np.ndarray:
+    clipped = np.clip(values.astype(np.float32), -1.0, 1.0)
+    restored = np.round((clipped + 1.0) * 127.5)
+    return np.clip(restored, 0, 255).astype(np.uint8)
+
+
 @dataclass
 class ImageBatch:
     tokens: torch.Tensor

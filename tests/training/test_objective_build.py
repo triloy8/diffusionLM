@@ -1,6 +1,6 @@
 from types import SimpleNamespace
 
-from trainkit.objectives import build_objective, JointMntpAutoregressiveObjective
+from trainkit.objectives import build_objective, JointMntpAutoregressiveObjective, FlowMatchingObjective
 
 
 class _DummyTokenizer:
@@ -34,3 +34,15 @@ def test_build_objective_joint_mntp_ar():
     )
     objective = build_objective(cfg, _DummyTokenizer())
     assert isinstance(objective, JointMntpAutoregressiveObjective)
+
+
+def test_build_objective_flow():
+    cfg = SimpleNamespace(
+        training_objective="flow",
+        pixel_bins=32,
+        random_trunc_prob=0.0,
+        null_label_id=10,
+        uncond_label_dropout_prob=0.1,
+    )
+    objective = build_objective(cfg, _DummyTokenizer())
+    assert isinstance(objective, FlowMatchingObjective)

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import torch
 
-from transformerlm.models import TransformerLM, TransformerImage, Linear
+from transformerlm.models import TransformerLM, TransformerImage, DiTImage, Linear
 from transformerlm.models.attention import set_sdp_backend
 from transformerlm.tokenizer.tokenizer import Tokenizer
 from transformerlm.utils.dtypes import DTYPES
@@ -22,6 +22,22 @@ def build_model(cfg) -> torch.nn.Module:
     if model_type == "image":
         return TransformerImage(
             vocab_size=cfg.vocab_size,
+            context_length=cfg.context_length,
+            d_model=cfg.d_model,
+            num_layers=cfg.num_layers,
+            num_heads=cfg.num_heads,
+            d_ff=cfg.d_ff,
+            rope_theta=cfg.rope_theta,
+            label_vocab_size=int(getattr(cfg, "label_vocab_size")),
+            attention_backend=cfg.attention_backend,
+            image_height=getattr(cfg, "image_height", None),
+            image_width=getattr(cfg, "image_width", None),
+            use_rope_2d=bool(getattr(cfg, "use_rope_2d", False)),
+            device=cfg.device,
+            dtype=DTYPES[cfg.dtype],
+        )
+    if model_type == "image_dit":
+        return DiTImage(
             context_length=cfg.context_length,
             d_model=cfg.d_model,
             num_layers=cfg.num_layers,

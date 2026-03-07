@@ -5,12 +5,17 @@ import time
 from safetensors.torch import load_file
 
 from transformerlm.tokenizer.tokenizer import Tokenizer
-from transformerlm.models import TransformerLM, TransformerImage
+from transformerlm.models import TransformerLM, TransformerImage, DiTImage
 from transformerlm.models.attention import set_sdp_backend
-from trainkit.inference.generate import autoregressive_generate, diffusion_generate, image_diffusion_generate
+from trainkit.inference.generate import (
+    autoregressive_generate,
+    diffusion_generate,
+    image_diffusion_generate,
+    flow_image_generate,
+)
 from transformerlm.utils.dtypes import DTYPES
 from trainkit.logger import Logger
-from trainkit.data.image import dequantize_tokens_to_uint8
+from trainkit.data.image import dequantize_tokens_to_uint8, flow_pixels_to_uint8
 
 
 def _normalize_state_dict_keys(state_dict):
@@ -200,22 +205,42 @@ def infer_transformer(args, *, logger: Optional[Logger] = None, artifact_path: O
 
 def infer_image(args, *, logger: Optional[Logger] = None):
     set_sdp_backend(getattr(args, "attention_sdp_backend", "auto"))
-    model = TransformerImage(
-        vocab_size=args.vocab_size,
-        context_length=args.context_length,
-        d_model=args.d_model,
-        num_layers=args.num_layers,
-        num_heads=args.num_heads,
-        d_ff=args.d_ff,
-        rope_theta=args.rope_theta,
-        label_vocab_size=args.label_vocab_size,
-        attention_backend=getattr(args, "attention_backend", "custom"),
-        image_height=getattr(args, "image_height", None),
-        image_width=getattr(args, "image_width", None),
-        use_rope_2d=bool(getattr(args, "use_rope_2d", False)),
-        device=args.device,
-        dtype=DTYPES[args.dtype],
-    )
+    model_type = str(getattr(args, "model_type", "image")).lower()
+    if model_type == "image_dit":
+        model = DiTImage(
+            context_length=args.context_length,
+            d_model=args.d_model,
+            num_layers=args.num_layers,
+            num_heads=args.num_heads,
+            d_ff=args.d_ff,
+            rope_theta=args.rope_theta,
+            label_vocab_size=args.label_vocab_size,
+            attention_backend=getattr(args, "attention_backend", "custom"),
+            image_height=getattr(args, "image_height", None),
+            image_width=getattr(args, "image_width", None),
+            use_rope_2d=bool(getattr(args, "use_rope_2d", False)),
+            device=args.device,
+            dtype=DTYPES[args.dtype],
+        )
+    elif model_type == "image":
+        model = TransformerImage(
+            vocab_size=args.vocab_size,
+            context_length=args.context_length,
+            d_model=args.d_model,
+            num_layers=args.num_layers,
+            num_heads=args.num_heads,
+            d_ff=args.d_ff,
+            rope_theta=args.rope_theta,
+            label_vocab_size=args.label_vocab_size,
+            attention_backend=getattr(args, "attention_backend", "custom"),
+            image_height=getattr(args, "image_height", None),
+            image_width=getattr(args, "image_width", None),
+            use_rope_2d=bool(getattr(args, "use_rope_2d", False)),
+            device=args.device,
+            dtype=DTYPES[args.dtype],
+        )
+    else:
+        raise ValueError("infer_image requires model_type to be one of: image, image_dit")
     model.eval()
 
     model_state = _normalize_state_dict_keys(load_file(str(args.ckpt_path)))
@@ -245,24 +270,38 @@ def infer_image(args, *, logger: Optional[Logger] = None):
             )
         uncond_context = torch.full((num_samples,), int(null_label_id), device=device, dtype=torch.long)
 
-    out_indices = image_diffusion_generate(
-        model,
-        prompt,
-        context=context,
-        mask_id=int(args.mask_id),
-        eos_token_id=None,
-        steps=int(args.steps),
-        gen_length=int(gen_length),
-        block_length=int(args.block_length),
-        temperature=float(args.temperature),
-        top_p=(None if args.top_p is None else float(args.top_p)),
-        cfg_scale=cfg_scale,
-        uncond_context=uncond_context,
-        remasking=str(args.remasking),
-        logits_eos_inf=False,
-        confidence_eos_eot_inf=False,
-        generator=generator,
-    )
+    generation_mode = str(getattr(args, "generation_mode", "diffusion")).lower()
+    if generation_mode == "diffusion":
+        out = image_diffusion_generate(
+            model,
+            prompt,
+            context=context,
+            mask_id=int(args.mask_id),
+            eos_token_id=None,
+            steps=int(args.steps),
+            gen_length=int(gen_length),
+            block_length=int(args.block_length),
+            temperature=float(args.temperature),
+            top_p=(None if args.top_p is None else float(args.top_p)),
+            cfg_scale=cfg_scale,
+            uncond_context=uncond_context,
+            remasking=str(args.remasking),
+            logits_eos_inf=False,
+            confidence_eos_eot_inf=False,
+            generator=generator,
+        )
+    elif generation_mode == "flow":
+        out = flow_image_generate(
+            model,
+            prompt,
+            context=context,
+            steps=int(args.steps),
+            cfg_scale=cfg_scale,
+            uncond_context=uncond_context,
+            generator=generator,
+        )
+    else:
+        raise ValueError("generation_mode must be one of: diffusion, flow")
 
     h = getattr(args, "image_height", None)
     w = getattr(args, "image_width", None)
@@ -281,8 +320,12 @@ def infer_image(args, *, logger: Optional[Logger] = None):
     out_dir.mkdir(parents=True, exist_ok=True)
     outputs = []
     if num_samples <= 1:
-        tokens = out_indices[0].detach().cpu().to(torch.int32).numpy().reshape(int(h), int(w))
-        arr = dequantize_tokens_to_uint8(tokens, pixel_bins=pixel_bins)
+        sample = out[0].detach().cpu().numpy().reshape(int(h), int(w))
+        if generation_mode == "flow":
+            arr = flow_pixels_to_uint8(sample)
+        else:
+            tokens = sample.astype("int32")
+            arr = dequantize_tokens_to_uint8(tokens, pixel_bins=pixel_bins)
         img = Image.fromarray(arr, mode="L")
         path = out_dir / f"label_{label}_sample_0.png"
         img.save(path)
@@ -294,8 +337,12 @@ def infer_image(args, *, logger: Optional[Logger] = None):
         rows = int(math.ceil(num_samples / cols))
         grid = Image.new("L", (cols * int(w), rows * int(h)))
         for i in range(num_samples):
-            tokens = out_indices[i].detach().cpu().to(torch.int32).numpy().reshape(int(h), int(w))
-            arr = dequantize_tokens_to_uint8(tokens, pixel_bins=pixel_bins)
+            sample = out[i].detach().cpu().numpy().reshape(int(h), int(w))
+            if generation_mode == "flow":
+                arr = flow_pixels_to_uint8(sample)
+            else:
+                tokens = sample.astype("int32")
+                arr = dequantize_tokens_to_uint8(tokens, pixel_bins=pixel_bins)
             img = Image.fromarray(arr, mode="L")
             r = i // cols
             c = i % cols
@@ -311,6 +358,7 @@ def infer_image(args, *, logger: Optional[Logger] = None):
                 "metrics.num_samples": int(num_samples),
                 "params.label": int(label),
                 "params.pixel_bins": int(pixel_bins),
+                "params.generation_mode": generation_mode,
                 "params.output_dir": str(out_dir),
             }
         )

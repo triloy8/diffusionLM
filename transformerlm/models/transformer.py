@@ -10,6 +10,24 @@ from transformerlm.models.attention import (
 )
 
 
+def _timestep_embedding(t: torch.Tensor, dim: int, max_period: float = 10000.0) -> torch.Tensor:
+    if t.dim() != 1:
+        raise ValueError("t must be 1D with shape (batch,)")
+    half = dim // 2
+    if half == 0:
+        return t[:, None]
+    freqs = torch.exp(
+        -torch.log(torch.tensor(max_period, device=t.device, dtype=torch.float32))
+        * torch.arange(half, device=t.device, dtype=torch.float32)
+        / max(half - 1, 1)
+    )
+    args = t.to(torch.float32)[:, None] * freqs[None, :]
+    emb = torch.cat([torch.sin(args), torch.cos(args)], dim=-1)
+    if dim % 2 == 1:
+        emb = torch.cat([emb, torch.zeros((t.shape[0], 1), device=t.device, dtype=emb.dtype)], dim=-1)
+    return emb
+
+
 class TransformerBlock(nn.Module):
     def __init__(
         self,
@@ -295,3 +313,121 @@ class TransformerImage(nn.Module):
         normed_output_seq = self.ln_final(output_seq)
         logits = self.lm_head(normed_output_seq)
         return logits
+
+
+class DiTImage(nn.Module):
+    def __init__(
+        self,
+        context_length: int,
+        d_model: int,
+        num_layers: int,
+        num_heads: int,
+        d_ff: int,
+        rope_theta: float,
+        label_vocab_size: int,
+        attention_backend: str = "custom",
+        image_height: int | None = None,
+        image_width: int | None = None,
+        use_rope_2d: bool = False,
+        device=None,
+        dtype=None,
+    ):
+        super().__init__()
+        self.context_length = int(context_length)
+        self.use_rope_2d = bool(use_rope_2d)
+        if self.use_rope_2d:
+            if image_height is None or image_width is None:
+                side = int(context_length ** 0.5)
+                if side * side != context_length:
+                    raise ValueError("image_height/image_width must be set when context_length is not a square")
+                image_height = side
+                image_width = side
+        self.image_height = image_height
+        self.image_width = image_width
+
+        self.input_proj = Linear(1, d_model, device, dtype)
+        self.time_proj = Linear(d_model, d_model, device, dtype)
+        self.label_embeddings = Embedding(label_vocab_size, d_model, device, dtype)
+        self.layers = torch.nn.ModuleList(
+            [
+                TransformerImageBlock(
+                    d_model,
+                    num_heads,
+                    context_length,
+                    self.image_height,
+                    self.image_width,
+                    rope_theta,
+                    d_ff,
+                    attention_backend=attention_backend,
+                    use_rope_2d=self.use_rope_2d,
+                    device=device,
+                    dtype=dtype,
+                )
+                for _ in range(num_layers)
+            ]
+        )
+        self.ln_final = RMSNorm(d_model, device=device, dtype=dtype)
+        self.output_proj = Linear(d_model, 1, device, dtype)
+
+    def forward(
+        self,
+        x: torch.Tensor,
+        t: torch.Tensor,
+        context: torch.Tensor | None = None,
+    ) -> torch.Tensor:
+        if x.dim() != 2:
+            raise ValueError("x must be 2D with shape (batch, seq)")
+        if context is None:
+            raise ValueError("context must be provided for DiTImage")
+        if context.dim() != 1:
+            raise ValueError("context must be 1D with shape (batch,)")
+        if context.shape[0] != x.shape[0]:
+            raise ValueError("context batch size must match x batch size")
+        if t.dim() == 2 and t.shape[1] == 1:
+            t = t[:, 0]
+        if t.dim() != 1:
+            raise ValueError("t must be 1D or 2D with shape (batch,) or (batch, 1)")
+        if t.shape[0] != x.shape[0]:
+            raise ValueError("t batch size must match x batch size")
+
+        output_seq = self.input_proj(x.unsqueeze(-1))
+        t_emb = _timestep_embedding(t, output_seq.shape[-1]).to(dtype=output_seq.dtype)
+        cond = self.time_proj(t_emb) + self.label_embeddings(context)
+        context_emb = cond.unsqueeze(-2)
+
+        token_positions = torch.arange(output_seq.shape[-2], device=output_seq.device, dtype=torch.long)
+        context_token_positions = torch.arange(context_emb.shape[-2], device=output_seq.device, dtype=torch.long)
+
+        row_positions = None
+        col_positions = None
+        context_row_positions = None
+        context_col_positions = None
+        if self.use_rope_2d:
+            if self.image_height is None or self.image_width is None:
+                raise ValueError("image_height/image_width must be set when use_rope_2d is True")
+            seq_len = output_seq.shape[-2]
+            expected = int(self.image_height) * int(self.image_width)
+            if seq_len != expected:
+                raise ValueError(f"sequence length {seq_len} does not match image_height*image_width {expected}")
+            row_positions = torch.arange(int(self.image_height), device=output_seq.device, dtype=torch.long)
+            row_positions = row_positions.repeat_interleave(int(self.image_width))
+            col_positions = torch.arange(int(self.image_width), device=output_seq.device, dtype=torch.long)
+            col_positions = col_positions.repeat(int(self.image_height))
+            context_row_positions = torch.zeros(context_emb.shape[-2], device=output_seq.device, dtype=torch.long)
+            context_col_positions = torch.zeros(context_emb.shape[-2], device=output_seq.device, dtype=torch.long)
+
+        for layer in self.layers:
+            output_seq = layer(
+                output_seq,
+                token_positions,
+                context_emb,
+                context_token_positions,
+                row_positions=row_positions,
+                col_positions=col_positions,
+                context_row_positions=context_row_positions,
+                context_col_positions=context_col_positions,
+                attention_mask=None,
+            )
+        output_seq = self.ln_final(output_seq)
+        velocity = self.output_proj(output_seq).squeeze(-1)
+        return velocity

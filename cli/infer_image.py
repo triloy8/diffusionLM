@@ -27,6 +27,7 @@ def main():
 
     ns = argparse.Namespace(
         # model
+        model_type=cfg_dc.model.model_type,
         vocab_size=cfg_dc.model.vocab_size,
         pixel_bins=cfg_dc.model.pixel_bins,
         context_length=cfg_dc.model.context_length,
@@ -48,6 +49,7 @@ def main():
         # checkpoint
         ckpt_path=str(cfg_dc.checkpoint.ckpt_path),
         # inference
+        generation_mode=cfg_dc.inference.generation_mode,
         label=cfg_dc.inference.label,
         num_samples=cfg_dc.inference.num_samples,
         steps=cfg_dc.inference.steps,
