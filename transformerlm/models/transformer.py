@@ -390,8 +390,10 @@ class DiTImage(nn.Module):
         if t.shape[0] != x.shape[0]:
             raise ValueError("t batch size must match x batch size")
 
+        model_dtype = self.input_proj.weight.dtype
+        x = x.to(dtype=model_dtype)
         output_seq = self.input_proj(x.unsqueeze(-1))
-        t_emb = _timestep_embedding(t, output_seq.shape[-1]).to(dtype=output_seq.dtype)
+        t_emb = _timestep_embedding(t, output_seq.shape[-1]).to(dtype=model_dtype)
         cond = self.time_proj(t_emb) + self.label_embeddings(context)
         context_emb = cond.unsqueeze(-2)
 

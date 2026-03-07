@@ -19,15 +19,15 @@ image_height = 28
 image_width = 28
 
 [checkpoint]
-ckpt_path = "/home/tadhiel/transformerlm/runs/REPLACE_WITH_FLOW_RUN/versions/v006000/model.safetensors"
+ckpt_path = "/home/tadhiel/transformerlm/runs/2026-03-07_19-54-38/versions/v004000/model.safetensors"
 
 [inference]
 generation_mode = "flow"
-label = 2
-num_samples = 4
-steps = 64
+label = 9
+num_samples = 16
+steps = 128
 block_length = 784
-temperature = 1.0
+temperature = 128
 top_p = 1.0
 cfg_scale = 2.0
 remasking = "random"
