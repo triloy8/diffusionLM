@@ -4,7 +4,7 @@
 
 ## 🚀 Runs: 
 - [trixyL/transformerlm-ar-8k-simplestories](https://hf.co/trixyL/transformerlm-ar-8k-simplestories) — AR SimpleStories run (512 ctx, 8K vocab) 🤖📚 ([demo](https://huggingface.co/spaces/trixyL/simplestories-ar-demo))
-- [trixyL/transformerlm-diff-32-mnist](https://hf.co/trixyL/transformerlm-diff-32-mnist) — MNIST image diffusion run (32 bins, 28x28) 🤖🌫️ ([demo](https://huggingface.co/spaces/trixyL/mnist-diff-demo)) 
+- [trixyL/transformerlm-diff-32-mnist](https://hf.co/trixyL/transformerlm-diff-32-mnist) — Legacy MNIST image diffusion run (32-bin quantized pixels, 28x28) 🤖🌫️ ([demo](https://huggingface.co/spaces/trixyL/mnist-diff-demo)) 
 
 ## ✨ What Is This?
 

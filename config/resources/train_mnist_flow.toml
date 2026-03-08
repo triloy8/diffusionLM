@@ -1,8 +1,8 @@
 [model]
 model_type = "image_dit"
 label_vocab_size = 11
-vocab_size = 33
-pixel_bins = 32
+vocab_size = 257
+pixel_bins = 256
 context_length = 784
 d_model = 256
 num_layers = 8
