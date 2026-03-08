@@ -19,11 +19,11 @@ image_height = 28
 image_width = 28
 
 [checkpoint]
-ckpt_path = "/home/tadhiel/transformerlm/runs/2026-03-07_19-54-38/versions/v004000/model.safetensors"
+ckpt_path = "/home/tadhiel/transformerlm/runs/2026-03-08_12-52-45/versions/v008000/model.safetensors"
 
 [inference]
 generation_mode = "flow"
-label = 9
+label = 1
 num_samples = 16
 steps = 128
 block_length = 784
