@@ -404,6 +404,76 @@ def autoregressive_generate(
 
 
 @torch.no_grad()
+def categorical_flow_image_generate(
+    model,
+    prompt_indices: torch.Tensor,
+    *,
+    context: torch.Tensor,
+    steps: int,
+    temperature: float = 0.0,
+    top_p: float | None = None,
+    cfg_scale: float = 0.0,
+    uncond_context: torch.Tensor | None = None,
+    generator: torch.Generator | None = None,
+) -> torch.Tensor:
+    if prompt_indices.dim() != 2:
+        raise ValueError("prompt_indices must be 2D (batch, seq)")
+    if context.dim() != 1:
+        raise ValueError("context must be 1D (batch,)")
+    if prompt_indices.shape[0] != context.shape[0]:
+        raise ValueError("context batch size must match prompt batch size")
+    if prompt_indices.shape[1] != 0:
+        raise ValueError("categorical_flow_image_generate expects empty prompt_indices for full-image generation")
+    if steps <= 0:
+        raise ValueError("steps must be > 0")
+    if temperature < 0:
+        raise ValueError("temperature must be >= 0")
+
+    batch_size = context.shape[0]
+    gen_length = int(getattr(model, "context_length"))
+    vocab_size = int(getattr(model, "vocab_size"))
+    x = torch.full(
+        (batch_size, gen_length, vocab_size),
+        fill_value=1.0 / float(vocab_size),
+        device=prompt_indices.device,
+        dtype=torch.float32,
+    )
+
+    if uncond_context is not None:
+        if uncond_context.dim() != 1:
+            raise ValueError("uncond_context must be 1D (batch,)")
+        if uncond_context.shape[0] != batch_size:
+            raise ValueError("uncond_context batch size must match prompt batch size")
+        uncond_context = uncond_context.to(device=context.device, dtype=context.dtype)
+
+    for step_idx in range(steps):
+        s_val = float(step_idx) / float(steps)
+        t_val = float(step_idx + 1) / float(steps)
+        s = torch.full((batch_size,), s_val, device=x.device, dtype=x.dtype)
+        t = torch.full((batch_size,), t_val, device=x.device, dtype=x.dtype)
+        if cfg_scale > 0.0:
+            if uncond_context is None:
+                raise ValueError("uncond_context must be set when cfg_scale > 0 for categorical_flow_image_generate")
+            logits_cond = model(x, s, t, context=context)
+            logits_uncond = model(x, s, t, context=uncond_context)
+            logits = logits_uncond + (cfg_scale + 1.0) * (logits_cond - logits_uncond)
+        else:
+            logits = model(x, s, t, context=context)
+        probs = softmax(logits, dim=-1)
+        gamma = (t_val - s_val) / max(1.0 - s_val, 1e-6)
+        x = x + gamma * (probs - x)
+        x = x.clamp_min(0.0)
+        x = x / x.sum(dim=-1, keepdim=True).clamp_min(1e-6)
+
+    logits = torch.log(x.clamp_min(1e-6))
+    if top_p is not None:
+        probs = top_p_filter(softmax(logits, dim=-1), float(top_p))
+        logits = torch.where(probs > 0, logits, torch.full_like(logits, float("-inf")))
+    logits = add_gumbel_noise(logits, temperature, generator=generator)
+    return torch.argmax(logits, dim=-1)
+
+
+@torch.no_grad()
 def flow_image_generate(
     model,
     prompt_indices: torch.Tensor,
@@ -464,6 +534,7 @@ __all__ = [
     "diffusion_generate",
     "image_diffusion_generate",
     "autoregressive_generate",
+    "categorical_flow_image_generate",
     "flow_image_generate",
     "generate",
 ]

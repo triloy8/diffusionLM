@@ -199,15 +199,18 @@ class ModelConfig(_BaseConfig):
         if not (1 < self.pixel_bins <= 256):
             raise ValueError("pixel_bins must be in [2, 256]")
         self.model_type = self.model_type.lower()
-        if self.model_type not in {"lm", "image", "image_dit"}:
-            raise ValueError("model_type must be one of: lm, image, image_dit")
-        if self.model_type in {"image", "image_dit"}:
+        if self.model_type not in {"lm", "image", "image_dit", "image_cfm"}:
+            raise ValueError("model_type must be one of: lm, image, image_dit, image_cfm")
+        if self.model_type in {"image", "image_dit", "image_cfm"}:
             if self.label_vocab_size is None or self.label_vocab_size <= 0:
-                raise ValueError("label_vocab_size must be > 0 when model_type is image/image_dit")
+                raise ValueError("label_vocab_size must be > 0 when model_type is image/image_dit/image_cfm")
             if self.model_type == "image":
                 # Image diffusion pipeline reserves one token for masking.
                 if self.vocab_size != self.pixel_bins + 1:
                     raise ValueError("for model_type='image', vocab_size must equal pixel_bins + 1")
+            if self.model_type == "image_cfm":
+                if self.vocab_size != self.pixel_bins:
+                    raise ValueError("for model_type='image_cfm', vocab_size must equal pixel_bins")
             if self.null_label_id is not None and not (0 <= self.null_label_id < self.label_vocab_size):
                 raise ValueError("null_label_id must be in [0, label_vocab_size)")
             if (self.image_height is None) ^ (self.image_width is None):
@@ -273,6 +276,8 @@ class TrainingConfig(_BaseConfig):
     p_mask_override: Optional[float] = None
     deterministic_mask: bool = False
     uncond_label_dropout_prob: float = 0.0
+    categorical_flow_inf_weight: float = 1.0
+    categorical_flow_ec_weight: float = 1.0
 
     @model_validator(mode="after")
     def _validate_training(self):
@@ -291,9 +296,17 @@ class TrainingConfig(_BaseConfig):
         if self.amp_dtype not in ALLOWED_AMP_DTYPES:
             raise ValueError(f"amp_dtype must be one of {sorted(ALLOWED_AMP_DTYPES)}")
         self.objective = self.objective.lower()
-        if self.objective not in {"diffusion", "megadlm-diffusion", "ar", "joint-diffusion-ar", "joint-mntp-ar", "flow"}:
+        if self.objective not in {
+            "diffusion",
+            "megadlm-diffusion",
+            "ar",
+            "joint-diffusion-ar",
+            "joint-mntp-ar",
+            "flow",
+            "categorical-flow",
+        }:
             raise ValueError(
-                "objective must be one of: diffusion, megadlm-diffusion, ar, joint-diffusion-ar, joint-mntp-ar, flow"
+                "objective must be one of: diffusion, megadlm-diffusion, ar, joint-diffusion-ar, joint-mntp-ar, flow, categorical-flow"
             )
         if not (0 <= self.joint_diffusion_alpha <= 1):
             raise ValueError("joint_diffusion_alpha must be in [0, 1]")
@@ -329,6 +342,10 @@ class TrainingConfig(_BaseConfig):
             raise ValueError("p_mask_override must be in (0, 1] when provided")
         if not (0 <= self.uncond_label_dropout_prob <= 1):
             raise ValueError("uncond_label_dropout_prob must be in [0, 1]")
+        if self.categorical_flow_inf_weight < 0:
+            raise ValueError("categorical_flow_inf_weight must be >= 0")
+        if self.categorical_flow_ec_weight < 0:
+            raise ValueError("categorical_flow_ec_weight must be >= 0")
         return self
 
 
@@ -512,8 +529,8 @@ class TrainInferConfig(_BaseConfig):
             raise ValueError("train_infer.cfg_scale must be >= 0")
         if self.remasking not in {"low_confidence", "random"}:
             raise ValueError("train_infer.remasking must be one of: low_confidence, random")
-        if self.generation_mode not in {"diffusion", "ar"}:
-            raise ValueError("train_infer.generation_mode must be one of: diffusion, ar")
+        if self.generation_mode not in {"diffusion", "ar", "categorical_flow"}:
+            raise ValueError("train_infer.generation_mode must be one of: diffusion, ar, categorical_flow")
         if self.seed is not None and self.seed < 0:
             raise ValueError("train_infer.seed must be >= 0 when provided")
         return self
@@ -543,9 +560,13 @@ class TrainConfig(_BaseConfig):
             raise ValueError("training.objective='flow' requires model.model_type='image_dit'")
         if self.model.model_type == "image_dit" and self.training.objective != "flow":
             raise ValueError("model.model_type='image_dit' requires training.objective='flow'")
+        if self.training.objective == "categorical-flow" and self.model.model_type != "image_cfm":
+            raise ValueError("training.objective='categorical-flow' requires model.model_type='image_cfm'")
+        if self.model.model_type == "image_cfm" and self.training.objective != "categorical-flow":
+            raise ValueError("model.model_type='image_cfm' requires training.objective='categorical-flow'")
         if self.training.uncond_label_dropout_prob > 0:
-            if self.model.model_type not in {"image", "image_dit"}:
-                raise ValueError("uncond_label_dropout_prob requires model_type in {'image', 'image_dit'}")
+            if self.model.model_type not in {"image", "image_dit", "image_cfm"}:
+                raise ValueError("uncond_label_dropout_prob requires model_type in {'image', 'image_dit', 'image_cfm'}")
             if self.model.null_label_id is None:
                 raise ValueError("uncond_label_dropout_prob > 0 requires model.null_label_id")
         return self
@@ -723,8 +744,8 @@ class ImageInferenceConfig(_BaseConfig):
     @model_validator(mode="after")
     def _validate_image_infer(self):
         self.generation_mode = self.generation_mode.lower()
-        if self.generation_mode not in {"diffusion", "flow"}:
-            raise ValueError("generation_mode must be one of: diffusion, flow")
+        if self.generation_mode not in {"diffusion", "flow", "categorical_flow"}:
+            raise ValueError("generation_mode must be one of: diffusion, flow, categorical_flow")
         if self.label < 0:
             raise ValueError("label must be >= 0")
         if self.num_samples <= 0:
@@ -760,8 +781,8 @@ class ImageInferConfig(_BaseConfig):
 
     @model_validator(mode="after")
     def _finalize_image_inference(self):
-        if self.model.model_type not in {"image", "image_dit"}:
-            raise ValueError("model.model_type must be one of: image, image_dit for image inference")
+        if self.model.model_type not in {"image", "image_dit", "image_cfm"}:
+            raise ValueError("model.model_type must be one of: image, image_dit, image_cfm for image inference")
         inf = self.inference
         updates = {}
         if inf.generation_mode == "diffusion" and inf.mask_id is None and self.model.mask_token_id is not None:
@@ -772,6 +793,8 @@ class ImageInferConfig(_BaseConfig):
             raise ValueError("model.model_type='image_dit' requires inference.generation_mode='flow'")
         if self.model.model_type == "image" and inf.generation_mode != "diffusion":
             raise ValueError("model.model_type='image' requires inference.generation_mode='diffusion'")
+        if self.model.model_type == "image_cfm" and inf.generation_mode != "categorical_flow":
+            raise ValueError("model.model_type='image_cfm' requires inference.generation_mode='categorical_flow'")
         self.inference = inf
         return self
 

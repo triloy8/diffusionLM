@@ -5,12 +5,13 @@ import time
 from safetensors.torch import load_file
 
 from transformerlm.tokenizer.tokenizer import Tokenizer
-from transformerlm.models import TransformerLM, TransformerImage, DiTImage
+from transformerlm.models import TransformerLM, TransformerImage, DiTImage, CategoricalFlowImage
 from transformerlm.models.attention import set_sdp_backend
 from trainkit.inference.generate import (
     autoregressive_generate,
     diffusion_generate,
     image_diffusion_generate,
+    categorical_flow_image_generate,
     flow_image_generate,
 )
 from transformerlm.utils.dtypes import DTYPES
@@ -222,6 +223,23 @@ def infer_image(args, *, logger: Optional[Logger] = None):
             device=args.device,
             dtype=DTYPES[args.dtype],
         )
+    elif model_type == "image_cfm":
+        model = CategoricalFlowImage(
+            vocab_size=args.vocab_size,
+            context_length=args.context_length,
+            d_model=args.d_model,
+            num_layers=args.num_layers,
+            num_heads=args.num_heads,
+            d_ff=args.d_ff,
+            rope_theta=args.rope_theta,
+            label_vocab_size=args.label_vocab_size,
+            attention_backend=getattr(args, "attention_backend", "custom"),
+            image_height=getattr(args, "image_height", None),
+            image_width=getattr(args, "image_width", None),
+            use_rope_2d=bool(getattr(args, "use_rope_2d", False)),
+            device=args.device,
+            dtype=DTYPES[args.dtype],
+        )
     elif model_type == "image":
         model = TransformerImage(
             vocab_size=args.vocab_size,
@@ -240,7 +258,7 @@ def infer_image(args, *, logger: Optional[Logger] = None):
             dtype=DTYPES[args.dtype],
         )
     else:
-        raise ValueError("infer_image requires model_type to be one of: image, image_dit")
+        raise ValueError("infer_image requires model_type to be one of: image, image_dit, image_cfm")
     model.eval()
 
     model_state = _normalize_state_dict_keys(load_file(str(args.ckpt_path)))
@@ -300,8 +318,20 @@ def infer_image(args, *, logger: Optional[Logger] = None):
             uncond_context=uncond_context,
             generator=generator,
         )
+    elif generation_mode == "categorical_flow":
+        out = categorical_flow_image_generate(
+            model,
+            prompt,
+            context=context,
+            steps=int(args.steps),
+            temperature=float(args.temperature),
+            top_p=(None if args.top_p is None else float(args.top_p)),
+            cfg_scale=cfg_scale,
+            uncond_context=uncond_context,
+            generator=generator,
+        )
     else:
-        raise ValueError("generation_mode must be one of: diffusion, flow")
+        raise ValueError("generation_mode must be one of: diffusion, flow, categorical_flow")
 
     h = getattr(args, "image_height", None)
     w = getattr(args, "image_width", None)

@@ -1,6 +1,11 @@
 from types import SimpleNamespace
 
-from trainkit.objectives import build_objective, JointMntpAutoregressiveObjective, FlowMatchingObjective
+from trainkit.objectives import (
+    build_objective,
+    JointMntpAutoregressiveObjective,
+    FlowMatchingObjective,
+    CategoricalFlowObjective,
+)
 
 
 class _DummyTokenizer:
@@ -46,3 +51,17 @@ def test_build_objective_flow():
     )
     objective = build_objective(cfg, _DummyTokenizer())
     assert isinstance(objective, FlowMatchingObjective)
+
+
+def test_build_objective_categorical_flow():
+    cfg = SimpleNamespace(
+        training_objective="categorical-flow",
+        vocab_size=32,
+        random_trunc_prob=0.0,
+        null_label_id=10,
+        uncond_label_dropout_prob=0.1,
+        categorical_flow_inf_weight=1.0,
+        categorical_flow_ec_weight=1.0,
+    )
+    objective = build_objective(cfg, _DummyTokenizer())
+    assert isinstance(objective, CategoricalFlowObjective)

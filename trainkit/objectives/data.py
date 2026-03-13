@@ -46,6 +46,19 @@ class FlowMatchingBatch:
     labels: torch.Tensor | None = None
 
 
+@dataclass
+class CategoricalFlowBatch:
+    x_s: torch.Tensor
+    x_t: torch.Tensor
+    clean_targets: torch.Tensor
+    s_timesteps: torch.Tensor
+    t_timesteps: torch.Tensor
+    attention_mask: torch.Tensor | None
+    loss_mask: torch.Tensor | None
+    metadata: Dict[str, Any]
+    labels: torch.Tensor | None = None
+
+
 def _rand_uniform(shape, *, device: torch.device, generator: torch.Generator | None = None):
     if generator is not None:
         return torch.rand(shape, generator=generator, device=device)
@@ -487,13 +500,76 @@ def get_flow_matching_batch(
     )
 
 
+def get_categorical_flow_batch(
+    dataset,
+    batch_size: int,
+    context_length: int,
+    device: str,
+    *,
+    vocab_size: int,
+    random_trunc_prob: float = 0.0,
+    generator: torch.Generator | None = None,
+) -> CategoricalFlowBatch:
+    if vocab_size <= 1:
+        raise ValueError("vocab_size must be > 1 for categorical flow")
+    clean_targets, attention_mask, random_trunc_applied, labels = _draw_clean_targets(
+        dataset,
+        batch_size,
+        context_length,
+        device,
+        random_trunc_prob=random_trunc_prob,
+        min_length=1,
+        generator=generator,
+    )
+    if clean_targets.min().item() < 0 or clean_targets.max().item() >= vocab_size:
+        raise ValueError("clean_targets must be in [0, vocab_size)")
+
+    x1 = torch.nn.functional.one_hot(clean_targets, num_classes=vocab_size).to(torch.float32)
+    x0 = torch.full_like(x1, 1.0 / float(vocab_size))
+    t = _rand_uniform((clean_targets.shape[0], 1), device=clean_targets.device, generator=generator)
+    s = _rand_uniform((clean_targets.shape[0], 1), device=clean_targets.device, generator=generator) * t
+    x_s = (1.0 - s.unsqueeze(-1)) * x0 + s.unsqueeze(-1) * x1
+    x_t = (1.0 - t.unsqueeze(-1)) * x0 + t.unsqueeze(-1) * x1
+
+    loss_mask = attention_mask
+    token_count = int(loss_mask.sum().item()) if loss_mask is not None else int(clean_targets.numel())
+    metadata: Dict[str, Any] = {
+        "random_truncation_applied": random_trunc_applied,
+        "sequence_length": int(clean_targets.shape[1]),
+        "token_count": token_count,
+        "s_stats": {
+            "mean": float(s.mean().detach().cpu().item()),
+            "min": float(s.min().detach().cpu().item()),
+            "max": float(s.max().detach().cpu().item()),
+        },
+        "t_stats": {
+            "mean": float(t.mean().detach().cpu().item()),
+            "min": float(t.min().detach().cpu().item()),
+            "max": float(t.max().detach().cpu().item()),
+        },
+    }
+    return CategoricalFlowBatch(
+        x_s=x_s,
+        x_t=x_t,
+        clean_targets=clean_targets,
+        s_timesteps=s,
+        t_timesteps=t,
+        attention_mask=attention_mask,
+        loss_mask=loss_mask,
+        labels=labels,
+        metadata=metadata,
+    )
+
+
 __all__ = [
     "DiffusionBatch",
     "AutoregressiveBatch",
     "JointBatch",
     "FlowMatchingBatch",
+    "CategoricalFlowBatch",
     "get_batch",
     "get_autoregressive_batch",
     "get_joint_batch",
     "get_flow_matching_batch",
+    "get_categorical_flow_batch",
 ]

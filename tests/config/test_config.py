@@ -435,6 +435,8 @@ def _patch_train_like(cfg: dict, tmp_path: Path) -> dict:
 def _patch_infer_like(cfg: dict, tmp_path: Path) -> dict:
     _patch_tokenizer(cfg["tokenizer"], tmp_path)
     cfg["checkpoint"]["ckpt_path"] = _write_bytes(tmp_path / "ckpt.bin", b"\0\1")
+    if "guide" in cfg and "checkpoint" in cfg["guide"]:
+        cfg["guide"]["checkpoint"]["ckpt_path"] = _write_bytes(tmp_path / "guide_ckpt.bin", b"\0\1")
     return cfg
 
 
@@ -487,6 +489,18 @@ def test_train_config_accepts_flow_with_image_dit(tmp_path: Path):
     assert cfg.training.objective == "flow"
 
 
+def test_train_config_accepts_categorical_flow_with_image_cfm(tmp_path: Path):
+    raw = tomllib.load((RESOURCE_ROOT / "train_mnist.toml").open("rb"))
+    patched = deepcopy(raw)
+    patched["model"]["model_type"] = "image_cfm"
+    patched["model"]["vocab_size"] = patched["model"]["pixel_bins"]
+    patched["model"].pop("mask_token_id", None)
+    patched["training"]["objective"] = "categorical-flow"
+    cfg = TrainConfig.model_validate(patched)
+    assert cfg.model.model_type == "image_cfm"
+    assert cfg.training.objective == "categorical-flow"
+
+
 def test_image_infer_config_accepts_flow_mode_for_image_dit(tmp_path: Path):
     ckpt = tmp_path / "model.safetensors"
     ckpt.write_bytes(b"123")
@@ -530,6 +544,49 @@ def test_image_infer_config_accepts_flow_mode_for_image_dit(tmp_path: Path):
     assert cfg.inference.generation_mode == "flow"
 
 
+def test_image_infer_config_accepts_categorical_flow_mode_for_image_cfm(tmp_path: Path):
+    ckpt = tmp_path / "model.safetensors"
+    ckpt.write_bytes(b"123")
+    cfg_path = tmp_path / "infer_image_categorical_flow.toml"
+    write(cfg_path, f"""
+    [model]
+    model_type = "image_cfm"
+    vocab_size = 32
+    pixel_bins = 32
+    context_length = 784
+    d_model = 16
+    num_layers = 1
+    num_heads = 2
+    d_ff = 32
+    rope_theta = 10000.0
+    label_vocab_size = 11
+    null_label_id = 10
+    use_rope_2d = true
+    image_height = 28
+    image_width = 28
+    attention_backend = "torch_sdpa"
+    attention_sdp_backend = "auto"
+    device = "cpu"
+    dtype = "float32"
+
+    [checkpoint]
+    ckpt_path = "{ckpt.as_posix()}"
+
+    [inference]
+    generation_mode = "categorical_flow"
+    label = 3
+    num_samples = 2
+    steps = 8
+    block_length = 784
+    temperature = 1.0
+    cfg_scale = 1.0
+    output_dir = "{(tmp_path / 'out').as_posix()}"
+    """)
+    cfg = load_image_infer_config(cfg_path)
+    assert isinstance(cfg, ImageInferConfig)
+    assert cfg.inference.generation_mode == "categorical_flow"
+
+
 def test_train_config_rejects_flow_without_image_dit(tmp_path: Path):
     raw = tomllib.load((RESOURCE_ROOT / "train_mnist.toml").open("rb"))
     patched = deepcopy(raw)
@@ -537,3 +594,12 @@ def test_train_config_rejects_flow_without_image_dit(tmp_path: Path):
     with pytest.raises(ValidationError) as exc:
         TrainConfig.model_validate(patched)
     assert "requires model.model_type='image_dit'" in str(exc.value)
+
+
+def test_train_config_rejects_categorical_flow_without_image_cfm(tmp_path: Path):
+    raw = tomllib.load((RESOURCE_ROOT / "train_mnist.toml").open("rb"))
+    patched = deepcopy(raw)
+    patched["training"]["objective"] = "categorical-flow"
+    with pytest.raises(ValidationError) as exc:
+        TrainConfig.model_validate(patched)
+    assert "requires model.model_type='image_cfm'" in str(exc.value)

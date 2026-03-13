@@ -1,6 +1,6 @@
 import torch
 
-from trainkit.inference.generate import diffusion_generate, image_diffusion_generate
+from trainkit.inference.generate import diffusion_generate, image_diffusion_generate, categorical_flow_image_generate
 from trainkit.inference.sampling import compute_transfer_schedule, add_gumbel_noise
 
 
@@ -32,6 +32,23 @@ class DummyImageModel(torch.nn.Module):
         # Class-conditional signal on token 2.
         cond = (context == 2).to(logits.dtype).view(batch, 1)
         logits[..., 2] = cond
+        return logits
+
+
+class DummyCategoricalFlowImageModel(torch.nn.Module):
+    def __init__(self, vocab_size: int, context_length: int):
+        super().__init__()
+        self.vocab_size = vocab_size
+        self.context_length = context_length
+
+    def forward(self, x: torch.Tensor, s: torch.Tensor, t: torch.Tensor, context: torch.Tensor) -> torch.Tensor:
+        del x, s, t
+        batch = context.shape[0]
+        seq_len = self.context_length
+        logits = torch.zeros(batch, seq_len, self.vocab_size, device=context.device)
+        logits[..., 1] = 1.1
+        cond = (context == 2).to(logits.dtype).view(batch, 1)
+        logits[..., 2] = 0.5 * cond
         return logits
 
 
@@ -126,6 +143,57 @@ def test_image_diffusion_generate_requires_uncond_context_when_cfg_enabled():
             steps=2,
             gen_length=4,
             block_length=2,
+            cfg_scale=1.0,
+            temperature=0.0,
+        )
+    except ValueError as exc:
+        assert "uncond_context must be set" in str(exc)
+    else:
+        raise AssertionError("expected ValueError when cfg_scale > 0 without uncond_context")
+
+
+def test_categorical_flow_image_generate_cfg_uses_unconditional_context():
+    device = torch.device("cpu")
+    model = DummyCategoricalFlowImageModel(vocab_size=6, context_length=4).to(device)
+    prompt = torch.empty((1, 0), dtype=torch.long, device=device)
+    context = torch.tensor([2], dtype=torch.long, device=device)
+    uncond_context = torch.tensor([0], dtype=torch.long, device=device)
+
+    out_no_cfg = categorical_flow_image_generate(
+        model,
+        prompt,
+        context=context,
+        uncond_context=uncond_context,
+        steps=3,
+        cfg_scale=0.0,
+        temperature=0.0,
+    )
+    assert torch.all(out_no_cfg == 1)
+
+    out_cfg = categorical_flow_image_generate(
+        model,
+        prompt,
+        context=context,
+        uncond_context=uncond_context,
+        steps=3,
+        cfg_scale=2.0,
+        temperature=0.0,
+    )
+    assert torch.all(out_cfg == 2)
+
+
+def test_categorical_flow_image_generate_requires_uncond_context_when_cfg_enabled():
+    device = torch.device("cpu")
+    model = DummyCategoricalFlowImageModel(vocab_size=6, context_length=4).to(device)
+    prompt = torch.empty((1, 0), dtype=torch.long, device=device)
+    context = torch.tensor([2], dtype=torch.long, device=device)
+
+    try:
+        _ = categorical_flow_image_generate(
+            model,
+            prompt,
+            context=context,
+            steps=2,
             cfg_scale=1.0,
             temperature=0.0,
         )

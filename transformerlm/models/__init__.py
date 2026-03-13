@@ -1,4 +1,4 @@
-from .transformer import TransformerLM, TransformerImage, DiTImage
+from .transformer import TransformerLM, TransformerImage, DiTImage, CategoricalFlowImage
 from .layers import Linear, Embedding, RMSNorm, SwiGLU
 from .attention import (
     RotaryPositionalEmbedding,
@@ -12,6 +12,7 @@ __all__ = [
     "TransformerLM",
     "TransformerImage",
     "DiTImage",
+    "CategoricalFlowImage",
     "Linear",
     "Embedding",
     "RMSNorm",
