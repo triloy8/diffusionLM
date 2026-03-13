@@ -19,11 +19,17 @@ train config="config/resources/train.toml" extra="":
 train-mnist extra="":
 	ssh {{prime_host}} "cd {{remote_root}} && bash scripts/run_train_remote.sh $(printf '%q' 'config/resources/train_mnist_flow.toml') $(printf '%q' '{{extra}}')"
 
+train-mnist-categorical-flow extra="":
+	ssh {{prime_host}} "cd {{remote_root}} && bash scripts/run_train_remote.sh $(printf '%q' 'config/resources/train_mnist_categorical_flow.toml') $(printf '%q' '{{extra}}')"
+
 sweep-train config="config/resources/wandb/train_sweep.yaml" extra="":
 	ssh {{prime_host}} "cd {{remote_root}} && bash scripts/run_sweep_train_remote.sh $(printf '%q' '{{config}}') $(printf '%q' '{{extra}}')"
 
 infer command="{{infer_command_default}}" args="":
 	ssh {{prime_host}} "cd {{remote_root}} && bash scripts/run_infer_remote.sh $(printf '%q' '{{command}}') $(printf '%q' '{{args}}')"
+
+infer-mnist-categorical-flow args="":
+	ssh {{prime_host}} "cd {{remote_root}} && bash scripts/run_infer_remote.sh $(printf '%q' 'uv run transformerlm-infer-image --config config/resources/infer_mnist_categorical_flow.toml') $(printf '%q' '{{args}}')"
 
 nvitop:
 	ssh -t {{prime_host}} 'export PATH="$HOME/.local/bin:$PATH"; uvx nvitop'
@@ -67,5 +73,7 @@ sync-env:
 auto-train: bootstrap-remote data-remote sync-env train
 
 auto-train-mnist: bootstrap-remote data-remote sync-env train-mnist
+
+auto-train-mnist-categorical-flow: bootstrap-remote data-remote sync-env train-mnist-categorical-flow
 
 auto-sweep-train: bootstrap-remote data-remote sync-env sweep-train

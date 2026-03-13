@@ -1,0 +1,35 @@
+[model]
+model_type = "image_cfm"
+label_vocab_size = 11
+vocab_size = 32
+pixel_bins = 32
+context_length = 784
+d_model = 256
+num_layers = 8
+num_heads = 16
+d_ff = 1024
+rope_theta = 10000.0
+attention_backend = "torch_sdpa"
+attention_sdp_backend = "auto"
+device = "cuda"
+dtype = "float16"
+null_label_id = 10
+use_rope_2d = true
+image_height = 28
+image_width = 28
+
+[checkpoint]
+ckpt_path = "/home/tadhiel/transformerlm/runs/2026-03-13_00-00-00/versions/v001000/model.safetensors"
+
+[inference]
+generation_mode = "categorical_flow"
+label = 1
+num_samples = 16
+steps = 32
+block_length = 784
+temperature = 0.0
+top_p = 1.0
+cfg_scale = 2.0
+remasking = "random"
+seed = 123
+output_dir = "./runs/infer_images_categorical_flow"
